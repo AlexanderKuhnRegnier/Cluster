@@ -2,7 +2,7 @@
 # comments are Cary Colgan's when reviewing the code as a UROP placement in the Summer 2015. Detail specific actions in a line, form the point of view of someone familiar with coding, but not immediately with the php language.
 /** comments are Cary Colgan's (Summer 2015) synoptic comments of the code, if a review is needed at a quick glance. Used in the form of function blurbs */
 // comments are the original in line comments added by Tim Oddy when he originally wrote the code, circa 2001.
-
+##AKR commments
 
 $verbose=FALSE;																	#global boolean, set if debugging required, ignore commands involving it
 
@@ -21,7 +21,7 @@ define("RAW","/cluster/data/raw/");												#shortcut to raw data directory
 $filename=$_GET["filename"];													#This assigns the variable to the information in the web address. Automatically super global.
 																				#$filename is only then changed in one scope when using the corresponding .SCCH file
 function fgetb($handle)
-	/** Returns the ASCII value of the current character in the handle (Handle is often the .SCCH file). 
+	/** Returns the ASCII value of the current character in the handle (Handle is often the .SCCH file). ##.SCCH files are S/C command files.
 	
 	This function is NOT used in this script, but was important in stage1_processing.php. I assume it can be deleted here.
 	*/
