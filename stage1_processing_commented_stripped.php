@@ -513,7 +513,8 @@ function packet_analyse($bytes,&$state,&$startreset,&$stopreset)
 		else		#eg. if vector is invalid
 			$state=$table[$state][NONE];
 
-		#vectors could be both, but how do these assignments make subsequent detection of opposite state possible?
+		#vectors could be both, but how do these assignments make subsequent detection of opposite state possible? - 
+		#ie. how is line 511 possible? (elseif ($iseven && $isodd))
 		#eg. even -> odd, or odd -> even, since condition ((($resetodd-$prevresetodd+4096)%4096)<=1) has to be fulfilled 
 		#assignments are of course necessary to continually detect 1 state, eg. even, even, even, etc...
 		$prevreseteven=$reseteven;
