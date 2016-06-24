@@ -88,8 +88,9 @@ function lastextendedmode($unixtime,$sc,$type)
 					for($dummy=0;$dummy<15;$dummy++) fgetc($handle);			#cuts out the first 15 characters of the .SCCH file. Whatever these characters are (binary?), they can't be easily displayed in HTML either. #by specifying $dummy++ in the for loop, it calls the argument BEFORE incrementing, so loop is effectively while 0<n<15.
 					$line[]=fgets($handle,256);									#appends the rest of that entire line to an array, so array gradually built up.
 				}
+				
 				fclose($handle);												#closes the .SCCH file
-				rsort($line);													#reverses array
+				rsort($line);													##sorts array from highest to lowest (reverse order)
 				for($m=0;$m<count($line);$m++)									#iterating over the entire length of the array, but breaks at first entry
 				{
 					if (strstr($line[$m],"FGM") && $verbose)
@@ -103,7 +104,7 @@ function lastextendedmode($unixtime,$sc,$type)
 						{														#breaks loop after finding first, so last in actual time, valid entry.
 							$extmode=$event;
 							break 2;											#so if this is invalid for the day prior to the extended mode switch, then checks the day before etc.
-						}
+						}														##break2 breaks out of 2 nexted enclosing structures
 					}
 				}
 			}
