@@ -520,7 +520,7 @@ for($n=0;$n<$loopsize;$n++)
 // 	                  0,0,0,0);
 	$teststuff=array(	($range<<4)+14,
 						16,
-						128+(COORD&7),
+						128+(COORD&7),									#COORD = 1, constant
 						(($sc-1)<<6)+1,
 	                  $time1[0],$time1[1],$time1[2],$time1[3],
 	                  $time2[0],$time2[1],$time2[2],$time2[3],
