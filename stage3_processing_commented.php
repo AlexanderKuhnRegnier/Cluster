@@ -319,20 +319,19 @@ echo '<PRE><FONT SIZE=-1>';
 displaycal($sc);
 echo '</PRE></FONT>';
 
-modifycal($sc);
+modifycal($sc);											#modifies calibration for use in despun vectors
 echo '<PRE><FONT SIZE=-1>';
-displaycal($sc);
+displaycal($sc);										#displays modified calibration
 echo '</PRE></FONT>';
 
-
-$satt_name=RAW.'20'.$year.'/'.$month.'/C'.$sc.'_'.$year.$month.$day.'_'.$version.'.SATT';
-
-if (file_exists($satt_name) && ($satt_h=fopen($satt_name,"rb")))
+$satt_name=RAW.'20'.$year.'/'.$month.'/C'.$sc.'_'.$year.$month.$day.'_'.$version.'.SATT';	#constructs name of attitude file
+#eg. $satt_name='/cluster/data/raw/'.'20'.'16'.'/'.'01'.'/C'.'1'.'_'.'16'.'01'.'01'.'_'.'A'.'.SATT';
+if (file_exists($satt_name) && ($satt_h=fopen($satt_name,"rb")))	#opens attitude file
 {
-	ignore($satt_h,15);
-	$satt_line=fgets($satt_h,100);
-	fclose($satt_h);
-	$deltatime=60/substr($satt_line,61,9);
+	ignore($satt_h,15);												#ignores binary header
+	$satt_line=fgets($satt_h,100);									#gets first line
+	fclose($satt_h);												#closes file
+	$deltatime=60/substr($satt_line,61,9);							#spin period of satellite
 	echo 'Spacecraft Period is '.$deltatime.' seconds.<P>';
 }
 else
@@ -364,7 +363,7 @@ $start=read_meta(EXT.'20'.$year.'/'.$month.'/'.substr(basename($filepicked),0,-3
 
 echo "\$start=".$start."<BR>";
 
-$current=$start;
+$current=$start;						#Extended Mode Entry
 
 echo "Extended mode entered : ".date("j M Y H:i:s\Z",$start);
 
@@ -392,7 +391,7 @@ echo "Extended mode entered : ".date("j M Y H:i:s\Z",$start);
 
 
 
-$extfile=file($filepicked);
+$extfile=file($filepicked);			#reads entire file to array $extfile
 
 echo '<P>Opening : '.EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT</P>';
 
