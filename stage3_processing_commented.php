@@ -1,6 +1,6 @@
 <?php
 
-#AKR comments
+#, /* */AKR comments
 
 define("RESETPERIOD",5.152);
 
@@ -244,6 +244,14 @@ function getcal($sc)
 
 
 function modifycal($sc)
+/*
+Takes obtained calibration parameters from getcal() and adapts it to use for the spin-averaged vectors 
+obtained in Extended Mode. It is assumed that the offsets in the spin plane cancel due to the 
+averaging. Thus, they are assigned 0. The gains in the spin plane are both taken to be the 
+average gain of the two spin plane components.
+The spin axis component is left unchanged, as it is assumed that averaging has a negligible 
+influence on this component.
+*/
 {
 	global $gainx,$gainy,$gainz,$offsetx,$offsety,$offsetz;
 
@@ -289,7 +297,6 @@ define("PROC",'/cluster/data/reference/');
 
 define("COORD",1);
 
-
 require("headfoot.php");
 
 head("cluster");
@@ -316,8 +323,6 @@ modifycal($sc);
 echo '<PRE><FONT SIZE=-1>';
 displaycal($sc);
 echo '</PRE></FONT>';
-
-
 
 
 $satt_name=RAW.'20'.$year.'/'.$month.'/C'.$sc.'_'.$year.$month.$day.'_'.$version.'.SATT';
