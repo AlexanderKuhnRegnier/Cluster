@@ -355,15 +355,15 @@ else
 
 // $start=lastextendedmode(date('Y',$dtc),date('m',$dtc),date('d',$dtc),date('H',$dtc),date('i',$dtc),date('s',$dtc),$sc,$version);
 
-$section=substr($filepicked,-1,1);
+$section=substr($filepicked,-1,1);				#picks out last character - the section
 
-echo "META File : ".EXT.'20'.$year.'/'.$month.'/'.substr(basename($filepicked),0,-3).".META"."<BR>";
+echo "META File : ".EXT.'20'.$year.'/'.$month.'/'.substr(basename($filepicked),0,-3).".META"."<BR>";			#substr(basename(),0,-3) strips last 3 chars
 
 $start=read_meta(EXT.'20'.$year.'/'.$month.'/'.substr(basename($filepicked),0,-3).".META","ExtendedModeEntry_Unix",$section);
 
 echo "\$start=".$start."<BR>";
 
-$current=$start;						#Extended Mode Entry
+$current=$start;												#Extended Mode Entry
 
 echo "Extended mode entered : ".date("j M Y H:i:s\Z",$start);
 
@@ -391,29 +391,29 @@ echo "Extended mode entered : ".date("j M Y H:i:s\Z",$start);
 
 
 
-$extfile=file($filepicked);			#reads entire file to array $extfile
+$extfile=file($filepicked);			#reads entire file to array $extfile (eg. filepicked=/cluster/data/extended/2016/01/C1_160101_B.E0)
 
-echo '<P>Opening : '.EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT</P>';
+echo '<P>Opening : '.EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT</P>';	#prints output to website
 
-if (!is_dir(EXT.date('Y',$start)))
-	mkdir(EXT.date('Y',$start),0750);
+if (!is_dir(EXT.date('Y',$start)))																		#creates directories for output file if needed
+	mkdir(EXT.date('Y',$start),0750);																	#date() creates Year ('Y') from UNIX time
 
-if (!is_dir(EXT.date('Y/m',$start)))
-	mkdir(EXT.date('Y/m',$start),0750);
+if (!is_dir(EXT.date('Y/m',$start)))																	#'Y/m' output format of date
+	mkdir(EXT.date('Y/m',$start),0750);																	#creates subdirectory if needed
 
 ////////////////////////////////////// *************************
 
-echo ">>>> ".EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT';
+echo ">>>> ".EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT';				#Prints more to screen
 
-$outhandle=fopen(EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT','ab');
-if (!$outhandle)
-{
+$outhandle=fopen(EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT','ab');		#opens .EXT file for writing
+if (!$outhandle)																						#error message if file can't be opened for writing
+{																										#"ab" is "append; open or create binary file for writing at end-of-file"
 	echo '<FONT COLOR=RED>Bugger</FONT>';
 	exit -1;
 }
 
-$tmp=tempnam('/var/tmp','ExtProcRaw_');
-$testhandle=fopen($tmp,'wb'); // NB wb not ab
+$tmp=tempnam('/var/tmp','ExtProcRaw_');																	#creates file with unique file name in '/var/tmp'
+$testhandle=fopen($tmp,'wb'); // NB wb not ab															#opens file for writing 'wb' (not append)
 if (!$testhandle)
 {
 	echo "BUGGER";
@@ -421,9 +421,9 @@ if (!$testhandle)
 }
 
 
-$sattfile=RAW.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.SATT';
-$stoffile=RAW.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.STOF';
-$procfile=PROC.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT.GSE';
+$sattfile=RAW.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.SATT';					#Spacecraft Attitude and Spin Rates
+$stoffile=RAW.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.STOF';					#Short Term Orbit file
+$procfile=PROC.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT.GSE';				#Where the data goes - into the reference folder!
 
 //$testhandle=fopen(EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.G','wb'); // NB wb not ab
 
@@ -438,28 +438,28 @@ $procfile=PROC.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'
 
 $k=pi()*pi()/16;
 $k2=pi()/4;
-$time=$start;
+$time=$start;					#$current = $start - extended mode entry time
 // $deltatime=60/$rpm;
 echo '<PRE>';
 
 $lastreset=999999;
 
-$loopsize=count($extfile);
-$onepercent=(int)($loopsize/100);
+$loopsize=count($extfile);		#number of vectors
+$onepercent=(int)($loopsize/100);	#1% of vectors (rounded down to nearest integer)
 
-for($n=0;$n<$loopsize;$n++)
+for($n=0;$n<$loopsize;$n++)			#goes through all vectors in file
 {
 //	echo "\"".trim($extfile[$n])."\"";
 	
-	sscanf($extfile[$n],"%d %d %d %d %d %s",&$instrx,&$instry,&$instrz,&$range,&$reset,&$comment);
-
+	sscanf($extfile[$n],"%d %d %d %d %d %s",&$instrx,&$instry,&$instrz,&$range,&$reset,&$comment);	#values assigned by reference to last variables according to the first 2
+																									#field values are in engineering values
 //	echo "   ".$instrx.",".$instry.",".$instrz.",".$range."<BR>";
 	
-	if (!(($instrx==0 && $instry==0 && $instrz==0 && $range==0) || $range<2 || $range>6 ))
+	if (!(($instrx==0 && $instry==0 && $instrz==0 && $range==0) || $range<2 || $range>6 ))			#checks if data are valid
 	{
 		$deltareset=($reset-$lastreset+4096)%4096; // allow for -ve values (wraparound)
 
-		if (($deltareset)>1 and ($lastreset!=999999))
+		if (($deltareset)>1 and ($lastreset!=999999))												#this is effectively some error handling
 		{
 			// OK, if reset goes up by more than one, then are missing resets for some reason
 
@@ -467,6 +467,7 @@ for($n=0;$n<$loopsize;$n++)
 			// spin to get rough time/reset increment.
 
 			$time+=$deltatime*($deltareset-1)*16*RESETPERIOD/$deltatime; // remove 1, since already added deltatime on previous iteration
+																									#deltatime is spin period
 
 			echo "<FONT COLOR=RED>BIG RESET JUMP : Ammending time by ".($deltareset-1)*16*RESETPERIOD/$deltatime." seconds.</FONT><BR>";
 
@@ -475,10 +476,10 @@ for($n=0;$n<$loopsize;$n++)
 
 		$lastreset=$reset; // Set lastreset to reset
 
-		$scale=(512>>(($range-2)*2))/2;
+		$scale=(512>>(($range-2)*2))/2;			#gets instrument scale to convert from engineering units
 
 		if ($instrx>32767)
-			$bx=($instrx-65536)/$scale;
+			$bx=($instrx-65536)/$scale;			#negative magnetic field values
 		else
 			$bx=$instrx/$scale;
 
@@ -492,22 +493,24 @@ for($n=0;$n<$loopsize;$n++)
 		else
 			$bz=$instrz/$scale;
 
-		$bx=$bx*$gainx[$extadc][$extsensor][$range]-$offsetx[$extadc][$extsensor][$range];
+		$bx=$bx*$gainx[$extadc][$extsensor][$range]-$offsetx[$extadc][$extsensor][$range];			#applies calibration to the b-field components
 //		$bx=$bx-$offsetx[$extadc][$extsensor][$range];
 		$by=$by*$k2*$gainy[$extadc][$extsensor][$range]-$offsety[$extadc][$extsensor][$range];
 		$bz=$bz*$k2*$gainz[$extadc][$extsensor][$range]-$offsetz[$extadc][$extsensor][$range];
+		
 // -> Last Line Removed echo "<BR><FONT COLOR=SILVER>".$gainx[$extadc][$extsensor][$range].",".$gainy[$extadc][$extsensor][$range].",".$gainz[$extadc][$extsensor][$range]." / ".$offsetx[$extadc][$extsensor][$range].",".$offsety[$extadc][$extsensor][$range].",".$offsetz[$extadc][$extsensor][$range]."</FONT><BR>";
 //		$stuff=date("Y-m-d\TH:i:s",$time).'.'.sprintf("%03d",((int)(1000*($time-(int)$time)))).'Z '.sprintf("%4.3f %4.3f %4.3f\n",2*sqrt($bx*$bx+$k*$by*$by+$k*$bz*$bz),0,0);
+		
 		$stuff=date("Y-m-d\TH:i:s",$time).'.'.sprintf("%03d",((int)(1000*($time-(int)$time)))).'Z '.sprintf("%4.3f %4.3f %4.3f\n",$bx,$by,$bz);
-
+			#date information string, which is later written to file. Contains date, number of ms and magnetic field components in (sensor?) coordinate system
+			
 // Hereabouts need to do Reference Frame conversion
 
 	$hexbx=float2hex($bx);
 	$hexby=float2hex($by);
 	$hexbz=float2hex($bz);
-	$time1=integer2hex($time);
-	$time2=integer2hex(floatbit($time)*1e9);
-
+	$time1=integer2hex($time);					#seconds
+	$time2=integer2hex(floatbit($time)*1e9);	#nanoseconds
 
 // 	$teststuff=array( (($sc-1)<<6)+1,128+(COORD&7),16,($range<<4)+14,
 // 	                  $time1[0],$time1[1],$time1[2],$time1[3],
@@ -517,6 +520,7 @@ for($n=0;$n<$loopsize;$n++)
 // 	                  $hexbz[0],$hexbz[1],$hexbz[2],$hexbz[3],
 // 	                  0,0,0,0,
 // 	                  0,0,0,0);
+
 	$teststuff=array(	($range<<4)+14,
 						16,
 						128+(COORD&7),									#COORD = 1, constant
@@ -530,7 +534,8 @@ for($n=0;$n<$loopsize;$n++)
 	                  0,0,0,0);
 
 	}
-	else
+	
+	else			#if vector data are not valid!! - all vector components are set to 0
 	{
 		$stuff=date("Y-m-d\TH:i:s",$time).'.'.sprintf("%03d",((int)(1000*($time-(int)$time)))).'Z '.sprintf("%4.3f %4.3f %4.3f\n",0,0,0);
 // 		$teststuff=array( ($sc-1)<<6+1,128+3,128,14,
@@ -544,7 +549,7 @@ for($n=0;$n<$loopsize;$n++)
 							128,
 							128+3,
 							($sc-1)<<6+1,
-		                  integer2hex($time),integer2hex(floatbit($time)/1e9),
+		                  integer2hex($time),integer2hex(floatbit($time)/1e9),	#time info recorded same as before
 		                  0,0,0,0,
 		                  0,0,0,0,
 		                  0,0,0,0,
@@ -558,21 +563,40 @@ for($n=0;$n<$loopsize;$n++)
 		fputb($testhandle,$teststuff[$i]);
 	// echo substr(str_pad(substr($extfile[$n],0,-1),80,' '),0,80).' <FONT COLOR=GRAY>'.$stuff.'</FONT>';
 
-	if (isset($flibble))
+	if (isset($flibble))			#$flibble related to printing data to webpage
 		$flibble++;
 	else
 		$flibble=1;
-	if (($flibble%$onepercent)==0) { echo (int)$flibble/$onepercent."% "; flush(); }
+	if (($flibble%$onepercent)==0) { echo (int)$flibble/$onepercent."% "; flush(); } #flush() flushes system output buffer - attempts to push current output to browser
 	if ($flibble==($loopsize-1)) echo "<BR>";
 
-	$time+=$deltatime;
-	if (date("d",$current)!=date("d",$time))
+	$time+=$deltatime;																#increments time by 1 spin period
+	
+	if (date("d",$current)!=date("d",$time))										#if a new day is reached!
+	/*
+	Repeat much of the above, but with the new day
+	Close the currently open file and open the new one, assigning it to the old handle.
+	The currently read in vectors are processed and written to file before the new vectors are read in.
+	*/
 	{
 		echo '<P><FONT COLOR=MAROON>Closing file for '.date("ymd",$current).' and opening file for '.date("ymd",$time).'.</FONT></P>';
 		$current=$time;
 		fclose($outhandle);
 		fclose($testhandle);
 		// process file before we generate new one
+		/*
+		Creates new temporary file to hold the output of the dp software modules piped together below
+		
+		Sets FGMPATH to the default calibration folder
+		Makes this variable available to the following scripts (EXPORT)
+		Prints the temporary file from before to standard output (using cat ".$tmp." ) - $tmp=tempnam('/var/tmp','ExtProcRaw_'); and $testhandle=fopen($tmp,'wb');
+			This file contains the processed vector data from the day (since it is written to the handle $testhandle)
+		fgmhrt -> transforms this data into the gse coordinate system using the information provided by the attitude file
+		fgmpos -> adds SC position data to the vectors
+		igmvec -> transforms binary output from fgmpos to an ASCII output of FGM vectors
+			-o <outfile>, data is written to $tmp2
+		using cat, data from $tmp2 is written to $procfile
+		*/
 		$tmp2=tempnam('/var/tmp','ExtProcDecoded_');
 		echo "<P><FONT COLOR=RED>FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cat ".$tmp2." >> ".$procfile."</FONT></P>";
 		exec("FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cat ".$tmp2." >> ".$procfile);
@@ -620,11 +644,10 @@ fclose($testhandle);
 //		}
 //echo ">>>>>>>>>>>>>>>End of output from popen";
 
-		$tmp2=tempnam('/var/tmp','ExtProcDecoded_');
-		echo "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile;
-		exec("FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile);
-
-
+#repeats above steps (from the if() loop) to write the remaining data from the *last* day
+$tmp2=tempnam('/var/tmp','ExtProcDecoded_');
+echo "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile;
+exec("FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile);
 
 echo '</PRE>';
 
