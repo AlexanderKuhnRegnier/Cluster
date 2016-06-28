@@ -2,27 +2,6 @@
 /**AKR Comments*/
 #AKR Comments
 #previous comments by Cary Colgan used where available, but overwritten where wrong / NA
-echo "<script type=\"text/javascript\">";
-
-echo "
-
-function showMe (box)
-{
-	var checkboxes=document.getElementsByName('click'+box);
-	var visible='none';
-	
-	for(var n=0;n<checkboxes.length;n++)
-	{ 
-		if(checkboxes[n].checked)
-		{
-			visible='block';
-			break;
-		}
-	}
-	document.getElementById('vectors'+box).style.display=visible;
-}";
-
-echo "</script>";
 
 //The Meta functions, here we only use write_meta and inc_meta
 #created META files go into the EXT directory
@@ -118,22 +97,9 @@ function WriteEntireBlock()
 	#access global variables modified elsewhere
 	if (count($outputdata)!=0)
 	{
-		echo "  <B>Extended Block Count     ".$extblockcount."<BR></FONT>";
-		echo '  Reset Range              '.$startsection.'-'.$lastgoodendreset.'<BR>';
-		printf('  Aproximate Duration      %8.3f seconds / %2.1f hours</B> <FONT COLOR="C0C0C0"><I>(assumes 5.152s reset period)</I></FONT><B><BR>',($lastgoodendreset-$startsection+4096)%4096*16*5.152,($lastgoodendreset-$startsection+4096)%4096*16*5.152/3600);
-		#2**12 is 4096, size of counter in EXT, thus wraps around at 4096, approx every 16 seconds - corresponds to 1 reset?
-		#%4096 thus finds number of overflows, 16=number of seconds per overflow and *5.152 for every reset, 
-			// Reset Count will increment by 0 or 1 (Modulo 4096) where there is valid data.
-
-		echo '  Total number of vectors  '.count($outputdata)."<BR>";
-		printf('  Aproximate Duration      %8.3f seconds / %2.1f hours</B> <FONT COLOR="C0C0C0"><I>(assumes 4s spin)</I></FONT><BR>',count($outputdata)*4,count($outputdata)*4/3600);
-		printf("\n");
-
-		echo "<form>";
-		echo "<input type=\"checkbox\" name=\"click".$extblockcount."\" onclick=\"showMe(".$extblockcount.")\">Show Vectors";
-		echo "</form>";
-		
-		echo "<DIV ID=\"vectors".$extblockcount."\" style=\"display:none\">";
+		/*
+		See original code for the 2 measures of approximate duration!
+		*/
 
 		#write metadata to META file in EXT directory
 		write_meta($metafilename,"DumpStartTime_Unix",$extdtc,$extblockcount);
@@ -151,27 +117,20 @@ function WriteEntireBlock()
 		write_meta($metafilename,"NumberOfVectors",count($outputdata),$extblockcount);
 		if ($block)#if file can be opened
 		{
-			#prints column headers the webpage
-			echo "Vector [Eng Units]         Range\n";
-			echo "Count  Bx     By     Bz      Reset\n";
-			echo "=====  =====  =====  ===== = ====\n";
 			$extblockcount++;
 
 			for($n=0;$n<count($outputdata);$n++)
 			{
-				printf("<FONT COLOR=GRAY>%5d %s</FONT>\n",$n,$outputdata[$n]);#prints data to webpage
 				fputs($block,$outputdata[$n]."\n");#writes to the file 
 			}
 			fclose($block);#closes file
 		}
 		else
 		{
-			printf('<FONT COLOR=RED SIZE=+2>Cannot Open File for writing ('.dir.$filename.'.E'.$extblockcount.')');#dir, not $dir?? definition of $dir???
 			exit -1;
 		}
 	}
 	$outputdata=array();#assigns empty array to outputdata, as all data should have been output and written to file
-	echo "</DIV>";
 }
 
 // Packet State Machine - States
@@ -568,7 +527,7 @@ $outputdata=array();
 set_time_limit(600);									#Sets maximum execution time limit
 
 // define("EXT",'/cluster/data/extended/');
-define("EXT",'/home/ahk114/extended/'); #writing the meta files to my own home directory on the server
+define("EXT",'/home/ahk114/extended/'); 				#writing the meta files to my own home directory on the server
 define("RAW",'/cluster/data/raw/');
 
 require("headfoot.php");								#headfoot.php and meta_file_functions.php found in root directory www
@@ -586,14 +545,9 @@ $version=$_GET["version"];
 $base="C".$sc."_".$shortyear.$month.$day."_".$version;
 $datafilename=RAW.$year."/".$month."/".$base.".BS";		#burst science (BS) raw data file
 
-
 head("cluster","Extended Mode: ".$year."-".$month."-".$day);
 
-
-echo $datafilename."<BR>";								#To view in HTML (<BR> is HTML)
-$metafilename=EXT.$year.'/'.$month.'/'.$base.".META";
-echo $metafilename."<BR>";								
-
+$metafilename=EXT.$year.'/'.$month.'/'.$base.".META";								
 
 if (!is_dir(EXT.$year))									#make directory named with date if non-existent. (Failing here 24-06-15)
 	mkdir(EXT.$year,0750);
@@ -603,8 +557,6 @@ if (!is_dir(EXT.$year.'/'.$month))
 
 write_meta($metafilename,"SourceFile",$datafilename);					#since 4th field is missing, written to "GLOBAL" section 
 write_meta($metafilename,"ProcessingTime_ISO",date("Y-m-d\TH:i:s\Z"));  #at top of META file
-
-echo("<PRE>");											#tag defines preformatted text
 
 $handle=fopen($datafilename,"r");						#open file for reading data ONLY, starting from the beginning
 
@@ -654,15 +606,6 @@ $s=NULL;
 $e=NULL;
 $size=NULL;
 
-#Below describes the strings used for the webpage key
-echo "<DIV STYLE=\"position: fixed; top: 0px; background-color: #F0F0F0;\">";
-printf("Pack  Pack                      Pack  TM      E    E              Ext         Flags<BR>");
-printf("#     Date and Time             Rst   Mode P  Size Reset                      USOMPEW Vectors in<BR>");   
-printf("                                                   Srt  End  Dif  S  Out B D    E  LW Packet<BR>");
-printf("====  ========================  ====  ===  =  ===  ===  ===  ===  =  ==  ===  =<B>=</B>=<B>=</B>=<B>==</B> ====<BR>");
-echo "</DIV>";
-
-
 while (ftell($handle)!=$fsize)						#ftell is the current position in open data file. while command iterates through (until EOF)
 {
 	// Get the SCET data from the DDS header
@@ -671,10 +614,6 @@ while (ftell($handle)!=$fsize)						#ftell is the current position in open data 
 
 	$headlen=$header[9]*65536+$header[10]*256+$header[11];  #extracts length (2^16=65536)
 	$headsc=$header[12]>>4;								    #spacecraft
-	
-	// Information: The packet count #is initially 0 ofc
-	
-	printf("%04d  ",$packetcount);
 
 	// Packet Header
 
@@ -691,10 +630,6 @@ while (ftell($handle)!=$fsize)						#ftell is the current position in open data 
 	$dtc=mktime(0,0,$scetms/1000,1,1+$scetday,1958);  // Convert SCET days into Unix Seconds from 1st Jan 1970
 
 	$date=date("Y-m-d\TH:i:s",$dtc);  // Convert that value into ISO date and time (without the decimal bit or 'Z')
-
-	// Information: The date and time, in ISO format, including microseconds
-
-	printf("%s.%03dZ  ",$date,$scetms%1000);
 
 	#extracts 15 bytes from the Science Telemetry Header (every fgetb advances by 1 byte)
 	$telemstatus=fgetb($handle)*256+fgetb($handle);     // Used to determine whether we're in Extended Mode
@@ -714,10 +649,6 @@ while (ftell($handle)!=$fsize)						#ftell is the current position in open data 
 	if ($deltahfsun<0)
 		$deltahfsun+=65536;										#overflow of 16 bit counter
 
-	// Information: The packet reset count (ie at the time of data downlink)
-	
-	printf("%04X  ",$telemreset);
-
 	if (($telemstatus&0x0F)==15)#get last 4 bits!
 	{
 		$msa=array_slice(unpack("C*",fread($handle,3562)),0);	#C-unsigned char, * is repeater argument, repeat to end of data
@@ -732,8 +663,6 @@ while (ftell($handle)!=$fsize)						#ftell is the current position in open data 
 		// bits.
 		// (The "& 0xFFF" clips -1 values to 0xFFF). 	#what does this mean??? 0xFFF = 4095 = 0b00000011 1111111111 -shouldn't this be the other way around?
 		
-		printf("EXT  %1d  %3d  %03X  %03X  ",$retstate,$size,$s & 0xFFF,($e & 0xFFF)); #$retstate modified within packet_analyse?
-
 // WORKS !!!! If Missing packet, ie Pack Reset +2, then DONT check Vector Reset,
 // becase it *WILL* be wrong as well (doh!)
 
@@ -772,8 +701,6 @@ while (ftell($handle)!=$fsize)						#ftell is the current position in open data 
 	}
 	else												// This isn't an extended mode packet, so it's clearly
 	{													// bad
-		// Information: just display some blank bits
-		printf(" <FONT COLOR=RED>%01X</FONT>   -   -    -    -   ",$telemstatus&0x0F);
 		// Jump over the remainder of the packet, we don't care what is in it.
 		fseek($handle,$headlen-34,SEEK_CUR);
 		$badpacket=1;									// This is a bad packet #triggers EW if previous state NOT S_IDLE (ie. previous packet is 'known')
@@ -854,32 +781,26 @@ while (ftell($handle)!=$fsize)						#ftell is the current position in open data 
 	
 	if ($ispartial)
 	{
-		printf("%03X  ",$delta);
 	}
 	else
 	{
 		if ($delta==-1)
 		{
-			printf(" -   ");
 		}
 		else if ($delta!=0)
 		{
 			if (($delta>24) || ($delta<21))
 			{
-				printf("<FONT COLOR=\"RED\">%03X</FONT>  ",$delta);
-				
 				// Also record that this has occured.  I'm not sure that this is a sensible
 				// descriptor BadSpinCount ?
 				inc_meta($metafilename,"BadSunPacketCount",$extblockcount);
 			}
 			else
 			{
-				printf("%03X  ",$delta);
 			}
 		}
 		else
 		{
-			printf(" -   ");
 		}
 	}
 
@@ -891,9 +812,8 @@ while (ftell($handle)!=$fsize)						#ftell is the current position in open data 
 	// If we have some output data, then display how many values there are
 	
 	if (count($outputdata)!=0)
-		echo " ".count($outputdata)." ";
-
-	echo"<BR>";
+	{
+	}
 		
 	// Time to act upon flags
 	// order is
@@ -910,7 +830,6 @@ while (ftell($handle)!=$fsize)						#ftell is the current position in open data 
 
 	if ($writeearly)
 	{
-		echo "<BR><B>Early Write</B><BR>";
 		WriteEntireBlock();
 	}
 
@@ -1054,7 +973,6 @@ while (ftell($handle)!=$fsize)						#ftell is the current position in open data 
 
 	if ($writelate)
 	{
-		echo "<BR><B>Late Write</B><BR>";
 		WriteEntireBlock();
 	}
 }
@@ -1064,13 +982,9 @@ while (ftell($handle)!=$fsize)						#ftell is the current position in open data 
 
 if (count($outputdata)!=0)
 {
-	echo "<BR><B>Terminal Write</B><BR>";
 	WriteEntireBlock();
 }
 
-echo("</PRE>");
-
 write_meta($metafilename,"NumberOfBlocks",$extblockcount);
 
-foot("cluster");
 ?>
