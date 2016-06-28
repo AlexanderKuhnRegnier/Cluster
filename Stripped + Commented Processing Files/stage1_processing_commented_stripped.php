@@ -1,4 +1,11 @@
 <?php
+/*
+Delete the following 3 lines, AND LAST LINE for deployment, or figure out why permission to normal session folder are denied
+*/
+session_destroy();
+ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
+session_start();
+
 /**AKR Comments*/
 #AKR Comments
 #previous comments by Cary Colgan used where available, but overwritten where wrong / NA
@@ -539,18 +546,18 @@ $options = getopt($shortopts);
 #var_dump($options);
 
 if (array_key_exists("y",$options)){$year  = $options["y"];}
-else {exit("Please select a Year".PHP_EOL);}
+else {exit("Please select a Year!".PHP_EOL);}
 if (array_key_exists("m",$options)){$month = $options["m"];}
-else {exit("Please select a month".PHP_EOL);}
+else {exit("Please select a Month!".PHP_EOL);}
 if (array_key_exists("d",$options)){$day   = $options["d"];}
-else {exit("Please select a Day".PHP_EOL);}
+else {exit("Please select a Day!".PHP_EOL);}
 
 #verification of input parameters, php automatically converts between string and int
 if (array_key_exists("sc",$options))
 {
 	if ($sc > 4 || $sc < 1)
 	{
-		exit("Invalid Spacecraft".PHP_EOL);
+		exit("Invalid Spacecraft!".PHP_EOL);
 	}
 	else {$sc = $options["sc"];}
 }
@@ -563,7 +570,7 @@ if (array_key_exists("ver",$options))
 {
 	if (strtoupper($version) != 'A' || strtoupper($version) != 'B' || strtoupper($version) != 'K')
 	{
-		exit("Invalid Version".PHP_EOL);
+		exit("Invalid Version!".PHP_EOL);
 	}
 	else {$version = $option["ver"];}
 }
@@ -574,7 +581,7 @@ else
 }
 if ($month > 12 || $month < 1)
 {
-	exit("Invalid Month".PHP_EOL);
+	exit("Invalid Month!".PHP_EOL);
 }
 #possible issue with date()
 if ($year < 2000)
@@ -583,12 +590,12 @@ if ($year < 2000)
 }
 if ($year > date("Y") || $year < 2000)
 {
-	exit("Invalid Year".PHP_EOL);
+	exit("Invalid Year!".PHP_EOL);
 }
 #beware of lacking support for calendars, but seems to be working (24/06/2016)
 if ($options["d"] > cal_days_in_month(CAL_GREGORIAN,$month,$year) || $options["d"] < 1)
 {
-	exit("Number of days is invalid".PHP_EOL);
+	exit("Number of days is invalid!".PHP_EOL);
 }
 
 $jdcount = gregoriantojd($month, $day, $year);
@@ -615,9 +622,11 @@ $day=sprintf("%02d",$day);
 $base="C".$sc."_".$shortyear.$month.$day."_".$version;
 $datafilename=RAW.$year."/".$month."/".$base.".BS";		#burst science (BS) raw data file
 
-head("cluster","Extended Mode: ".$year."-".$month."-".$day);
-
 $metafilename=EXT.$year.'/'.$month.'/'.$base.".META";								
+
+echo "Reading Data from: ".$datafilename.PHP_EOL;
+echo "Meta-filename:     ".$metafilename.PHP_EOL;
+echo "Writing to:        ".EXT.'$year'."/".$month."/".$base.'E'.'n'.PHP_EOL;
 
 if (!is_dir(EXT.$year))									#make directory named with date if non-existent. (Failing here 24-06-15)
 	mkdir(EXT.$year,0750);
@@ -808,28 +817,6 @@ while (ftell($handle)!=$fsize)						#ftell is the current position in open data 
 	$writeearly=($output & 64)!=0;
 	$writelate= ($output & 128)!=0;
 	
-		// Generate a string based upon some status variables, and sets various globals
-	//
-	//  U S O M P EW LW          (nine characters long, displayed spaces not present)
-	//      E  
-	//  U (Black)    = Use this packet or " "
-	//  S (Green)    = Start " "
-	//  O (Blue)     = Odd packet or
-	//    E (Blue)   = Even packet or " "
-	//  M (Red)      = Missing or " "
-	//  P (Black)    = Partial or " "
-	//  EW (Green)   = Early Write or
-	//    LW (Green) = Late Write or "  "
-
-	$disp_stuff ="<B>";
-	$disp_stuff.=$use        ? "<FONT COLOR=BLACK>U</FONT>"  : " ";
-	$disp_stuff.=$isstart    ? "<FONT COLOR=GREEN>S</FONT>"  : " ";
-	$disp_stuff.=$isodd      ? "<FONT COLOR=BLUE>O</FONT>"   : ($iseven    ? "<FONT COLOR=BLUE>E</FONT>"   : " ");
-	$disp_stuff.=$ismissing  ? "<FONT COLOR=RED>M</FONT>"    : " ";
-	$disp_stuff.=$ispartial  ? "<FONT COLOR=BLACK>P</FONT>"  : " ";
-	$disp_stuff.=$writeearly ? "<FONT COLOR=GREEN>EW</FONT>" : ($writelate ? "<FONT COLOR=GREEN>LW</FONT>" : "  ");
-	$disp_stuff.="</B>";
-
 	// Spin is roughly between 3.9 and 4.4 seconds, so 444 spins will take between 1731 seconds and
 	// 1954 seconds.  With resets at around 5.152 seconds, it will increment betweem 336 and 379 times,
 	// but we only see the top 12 bits, so divide this by 16 to get a range or 21 to 24.
@@ -873,11 +860,6 @@ while (ftell($handle)!=$fsize)						#ftell is the current position in open data 
 		{
 		}
 	}
-
-	// Information: Display the current state, what response has come from the state machine
-	// Whether it B (Bad) or D (Double) and the flags.
-
-	printf("%d  %02X  %3s  %s",$state,$output,($in==1)?"  D":(($in==2)?"B  ":"   "),$disp_stuff);
 
 	// If we have some output data, then display how many values there are
 	
@@ -1057,4 +1039,6 @@ if (count($outputdata)!=0)
 
 write_meta($metafilename,"NumberOfBlocks",$extblockcount);
 
+
+session_destroy();
 ?>
