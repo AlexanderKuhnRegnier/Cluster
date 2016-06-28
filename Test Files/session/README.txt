@@ -1,0 +1,2 @@
+This is folder is needed to store temporary data from the php execution, which is deleted upon calling session_destroy(); 
+Hopefully there is a workaround for this, the primary cause is the lack of permission to write in /var/lib/php/session
