@@ -10,7 +10,7 @@ Delete the following 3 lines, AND LAST LINE for deployment, or figure out why pe
 session_destroy();
 ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
 session_start();
-$verbose=FALSE;																	#global boolean, set if debugging required, ignore commands involving it
+$verbose=TRUE;																	#global boolean, set if debugging required, ignore commands involving it
 
 echo "Starting Stage2".PHP_EOL;
 
@@ -26,8 +26,6 @@ define("RAW","/cluster/data/raw/");												#shortcut to raw data directory
 # in my case, /home/ahk114/extended/2016/01/C1_160101_B
 $stdin_input=file_get_contents("php://stdin",'r');
 $filename = substr($stdin_input,strpos($stdin_input, 'target')+6,41);			#now extracts filename from stdin, not URL
-
-exit("Testing");
 
 function fgetb($handle)
 	/** Returns the ASCII value of the current character in the handle (Handle is often the .SCCH file). ##.SCCH files are S/C command files.
@@ -85,7 +83,7 @@ function lastextendedmode($unixtime,$sc,$type)
 	{
 		$filename=RAW.sprintf("%04d",date("Y",$n))."/".sprintf("%02d",date("m",$n))."/C".$sc."_".sprintf("%6s",date("ymd",$n))."_B.SCCH";	#SCCH file address in the raw data directory
 		if ($verbose)
-			echo "<HR>".$n." ".$filename."<BR>";
+			echo $n." ".$filename.PHP_EOL;
 		if (file_exists($filename))												#If the .SCCH for that day even exists
 		{
 			$handle=fopen($filename,"r");										#if it exists open that .SCCH. $handle is the currently open .SCCH file
@@ -97,7 +95,6 @@ function lastextendedmode($unixtime,$sc,$type)
 					for($dummy=0;$dummy<15;$dummy++) fgetc($handle);			#cuts out the first 15 characters of the .SCCH file. Whatever these characters are (binary?), they can't be easily displayed in HTML either. #by specifying $dummy++ in the for loop, it calls the argument BEFORE incrementing, so loop is effectively while 0<n<15.
 					$line[]=fgets($handle,256);									#appends the rest of that entire line to an array, so array gradually built up.
 				}
-				
 				fclose($handle);												#closes the .SCCH file
 				rsort($line);													##sorts array from highest to lowest (reverse order)
 				for($m=0;$m<count($line);$m++)									#iterating over the entire length of the array, but breaks at first entry
@@ -117,7 +114,8 @@ function lastextendedmode($unixtime,$sc,$type)
 			}
 		}
 	}
-	
+	if ($verbose)
+		echo "Return value: ".$extmode.PHP_EOL;
 	return $extmode;
 }
 
@@ -170,6 +168,8 @@ $bits=explode("/",$filename);												#Each section (defined by the separator
 
 $sc=substr($bits[count($bits)-1],1,1);										#searches the sections of the HTML web address for the spacecraft number.
 
+echo "number of blocks: ".$numberofblocks.PHP_EOL;
+
 for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks in the extended mode data as found by stage1_processing.php
 {
 	$start=lastextendedmode(read_meta($filename.".META","DumpStartTime_Unix",$n),$sc,INITIATE);
@@ -182,14 +182,7 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 	$cary["spin period "."$n".":"] = $spin;
 	$calcvec=(int)(($end-$start)/$spin);												#number of vectors found from duration of extended mode and spin period NOT from extended mode data.
 	$actualvec=read_meta($filename.".META","NumberOfVectors",$n);						#number of vectors as found from the extended mode data via stage1_processing.php	
-	$carykeys = array_keys($cary);
-	$caryvalues = array_values($cary);
-	$m = count($cary);
-	for($i=0; $i<=($m-1); $i++)
-		$caryfinal[] = "$carykeys[$i]"." "."$caryvalues[$i]";
-	
 	$miss=read_meta($filename.".META","MissingPacket",$n);								#variable created in stage1_processing.php
-
 	$reset_start=read_meta($filename.".META","ResetCountStart",$n);						#Counts of the 5.152s reset pulse sent to instrument. Found in stage1_processing.php
 	$reset_stop=read_meta($filename.".META","ResetCountEnd",$n);
 
@@ -199,11 +192,42 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 	write_meta($filename.".META","ExtendedModeExit_Unix",$end,$n);
 	write_meta($filename.".META","SpinPeriod",round($spin,6));
 	
-	$impcary = implode(", ", $caryfinal);
-	$caryfilename = substr($filename, -11);
-	file_put_contents("$caryfilename"."_information.txt", $impcary);					#saves to my www directory - permission denied in my own directory
+	if ($verbose)
+	{
+		$linecounter = 1;
+		echo PHP_EOL;
+		echo "++------------------------------------------------------------".PHP_EOL;
+		echo "BLOCK NUMBER: ".$n.PHP_EOL;
+		echo $linecounter.":".$start.PHP_EOL;
+		$linecounter += 1;
+		echo $linecounter.":".$end.PHP_EOL;
+		$linecounter += 1;
+		echo $linecounter.":".$part.PHP_EOL;
+		$linecounter += 1;
+		echo $linecounter.":".$spin.PHP_EOL;
+		$linecounter += 1;
+		echo $linecounter.":".$calcvec.PHP_EOL;
+		$linecounter += 1;
+		echo $linecounter.":".$actualvec.PHP_EOL;
+		echo "--------------------------------------------------------------".PHP_EOL;
+		echo PHP_EOL;
+	}
 }
 
+#writing info to file
+$carykeys = array_keys($cary);
+$caryvalues = array_values($cary);
+for($i=0; $i<=(count($cary)-1); $i++)
+	$caryfinal[] = "$carykeys[$i]"." "."$caryvalues[$i]";
+$impcary = implode("\n", $caryfinal);
+$alexfilepath = substr($filename,0,30);
+file_put_contents($alexfilepath."_information.txt", $impcary);
+
+if ($verbose)
+{
+	echo "Writing to info file: ".PHP_EOL;
+	echo $impcary.PHP_EOL;
+}
 
 session_destroy();
 ?>
