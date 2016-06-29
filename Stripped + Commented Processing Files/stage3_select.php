@@ -38,8 +38,9 @@ function spinrate($year,$month,$day,$sc,$version)
 	return $deltatime;
 }
 
-$filepicked = NULL;
-$this_event_date = NULL;
+#$filepicked = NULL;
+#$this_event_date = NULL;
+
 $year=2016;
 $month = 1;
 $day = 1;
@@ -55,9 +56,9 @@ if (($year!="") && ($month!=""))
 				for($age=12;$age>=0;$age--)	#to iterate through letters A to M
 				{
 					$filename=EXT."/".sprintf("%04d",$year)."/".sprintf("%02d",$month)."/C".$sc."_".sprintf("%02d%02d%02d",$year-2000,$month,$day)."_".chr(ord("A")+$age);
-					echo "filename: ".$filename.PHP_EOL;
 					if ((file_exists($filename.".E".$ext)) && (filesize($filename.".E".$ext)!=0))
 					{
+						echo "filename: ".$filename.PHP_EOL;
 						if (!$startrow) { $startrow=TRUE; }
 	
 						#echo "<A HREF=stage3_processing.php?filepicked=".$filename.".E".$ext."<C".$sc."_".date("ymd",mktime(0,0,0,$month,$day,$year))."_".chr(ord("A")+$age).".E".$ext."</A>";
@@ -73,14 +74,15 @@ if (($year!="") && ($month!=""))
 						$numvec=read_meta($filename.".META","NumberOfVectors",$ext);
 						$vectorperiod=$numvec*spinrate($year,$month,$day,$sc,chr(ord("A")+$age));
 
-						if (abs($resetperiod-$vectorperiod)>(16*RESET_PERIOD))  // Reset Count only good to 16*RESET PERIOD
+						#if (abs($resetperiod-$vectorperiod)>(16*RESET_PERIOD))  // Reset Count only good to 16*RESET PERIOD
 							#echo "<BR><FONT COLOR=RED>Vec/Reset Mismatch</FONT>";
 
-						if ($bspc!=0)
+						#if ($bspc!=0)
 							#echo "<BR><FONT COLOR=RED>BSPC : ".$bspc."</FONT>";
-
+						
+						#echo "return value of function: ".read_meta($filename.".META","ExtendedModeEntry_ISO",$ext).PHP_EOL;
 						$this_event_date=read_meta($filename.".META","ExtendedModeEntry_ISO",$ext);
-						echo "Reading this event date: ".$filename.".META"."  ".$ext."     :".read_meta($filename.".META","ExtendedModeEntry_ISO",$ext).PHP_EOL;
+						echo "Reading this event date: ".$filename.".META"."  ".$ext."     :".$this_event_date.PHP_EOL;
 						$this_event_block=$ext;
 						
 						$entry=read_meta($filename.".META","ExtendedModeEntry_Unix",$ext);
@@ -98,14 +100,20 @@ if (($year!="") && ($month!=""))
 						while(!$use and $index<100); #do while loop
 						
 						#echo "Use : ".$index;
+						echo read_meta($extmodeentrymetafile,"EventTime_ISO",chr(ord("A")+$index)).PHP_EOL;
+						echo $this_event_date.PHP_EOL;
+						echo read_meta($extmodeentrymetafile,"Block",chr(ord("A")+$index)).PHP_EOL;
+						echo $this_event_block.PHP_EOL;
 						
 						if ((read_meta($extmodeentrymetafile,"EventTime_ISO",chr(ord("A")+$index))==$this_event_date) and (read_meta($extmodeentrymetafile,"Block",chr(ord("A")+$index))==$this_event_block))
 							{	
 							#echo "<FONT COLOR=\"#40FF40\"><B>Recommended</B></FONT>";
 							$filepicked = $filename."/C".$sc."_".date("ymd",mktime(0,0,0,$month,$day,$year))."_".chr(ord("A")+$age).".E".$ext;
+							echo "File picked: ".PHP_EOL;
+							echo $filepicked.PHP_EOL;							
 							break 3; 
 							}
-						
+						echo PHP_EOL;
 					#$used=TRUE;
 					
 					
@@ -114,9 +122,6 @@ if (($year!="") && ($month!=""))
 			}
 	}
 }
-
-echo "File picked: ".PHP_EOL;
-echo $filepicked.PHP_EOL;
 
 
 
