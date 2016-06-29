@@ -10,7 +10,7 @@ Delete the following 3 lines, AND LAST LINE for deployment, or figure out why pe
 session_destroy();
 ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
 session_start();
-$verbose=TRUE;																	#global boolean, set if debugging required, ignore commands involving it
+$verbose=FALSE;																	#global boolean, set if debugging required, ignore commands involving it
 
 echo "Starting Stage2".PHP_EOL;
 
@@ -26,7 +26,7 @@ define("RAW","/cluster/data/raw/");												#shortcut to raw data directory
 # in my case, /home/ahk114/extended/2016/01/C1_160101_B
 $stdin_input=file_get_contents("php://stdin",'r');
 $filename = substr($stdin_input,strpos($stdin_input, 'target')+6,41);			#now extracts filename from stdin, not URL
-
+echo "Stage1 Input Filename: ".$filename.PHP_EOL;
 function fgetb($handle)
 	/** Returns the ASCII value of the current character in the handle (Handle is often the .SCCH file). ##.SCCH files are S/C command files.
 	
