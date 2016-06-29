@@ -1,6 +1,12 @@
 <?php
-
 #, /* */AKR comments
+
+/*
+Delete the following 3 lines, AND LAST LINE for deployment, or figure out why permission to normal session folder are denied
+*/
+session_destroy();
+ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
+session_start();
 
 define("RESETPERIOD",5.152);
 
@@ -109,7 +115,7 @@ function lastextendedmode($year,$month,$day,$hour,$minute,$second,$sc,$version="
 	for($n=$fromday;$n>($fromday-10*86400);$n-=86400)
 	{
 		$filename=RAW.sprintf("%04d",date("Y",$n))."/".sprintf("%02d",date("m",$n))."/C".$sc."_".sprintf("%6s",date("ymd",$n))."_".$version.".SCCH";
-		echo "<HR>".$n." ".$filename."<BR>";
+		#echo "<HR>".$n." ".$filename."<BR>";
 		if (file_exists($filename))
 		{
 			$handle=fopen($filename,"r");
@@ -126,7 +132,7 @@ function lastextendedmode($year,$month,$day,$hour,$minute,$second,$sc,$version="
 				for($m=0;$m<count($line);$m++)
 				{
 					if (strstr($line[$m],"FGM"))
-						echo "<FONT SIZE=-3>".$line[$m]."</FONT><BR>";
+						#echo "<FONT SIZE=-3>".$line[$m]."</FONT><BR>";
 					if (strstr(EXTMODECOMMAND,substr($line[$m],61,8)))
 					{
 						$event=mktime(substr($line[$m],11,2),substr($line[$m],14,2),substr($line[$m],17,2),substr($line[$m],5,2),substr($line[$m],8,2),substr($line[$m],0,4));
@@ -174,8 +180,6 @@ function getcal($sc)
 	// ----
 	// Gain Z
 
-
-	echo "Get Calibration for S/C ".$sc."<BR>";
 	$cal=fopen("/cluster/operations/calibration/default/C".$sc.".fgmcal","rb");
 	if ($cal)
 	{
@@ -255,7 +259,6 @@ influence on this component.
 {
 	global $gainx,$gainy,$gainz,$offsetx,$offsety,$offsetz;
 
-	echo "Modify Calibration for S/C ".$sc."<BR>";
 	for($adc=1;$adc<3;$adc++)
 		for($sensor=0;$sensor<2;$sensor++)
 			for($range=2;$range<6;$range++)
@@ -289,24 +292,28 @@ function displaycal($sc)
 	}
 }
 
-
 define("RAW","/cluster/data/raw/");
 define("EXTMODECOMMAND","SFGMJ059 SFGMJ064 SFGMSEXT SFGMM002");
-define("EXT",'/cluster/data/extended/');
-define("PROC",'/cluster/data/reference/');
+#define("EXT",'/cluster/data/extended/');
+define("EXT",'/home/ahk114/extended/');
+#define("PROC",'/cluster/data/reference/');
+define("PROC",'/home/ahk114/reference/');
 
 define("COORD",1);
 
-require("headfoot.php");
+#require("headfoot.php");
 
-head("cluster");
+#head("cluster");
 
 $extsensor=0;
 $extadc=1;
 
-$filepicked=$_GET["filepicked"];
 
-echo '<H1>'.$filepicked.'</H1>';
+$stdin_input=file_get_contents("php://stdin",'r');
+
+#eg.          /cluster/data/extended/2016/01/C1_160101_B.E0
+# in my case, /home/ahk114/extended/2016/01/C1_160101_B.E0
+$filepicked = substr($stdin_input,strpos($stdin_input, 'target')+6,44);	#file picked starts after "target" string in the input
 
 $year=substr(basename($filepicked),3,2);
 $month=substr(basename($filepicked),5,2);
@@ -315,14 +322,14 @@ $sc=substr(basename($filepicked),1,1);
 $version=substr(basename($filepicked),10,1);
 
 getcal($sc);
-echo '<PRE><FONT SIZE=-1>';
-displaycal($sc);
-echo '</PRE></FONT>';
+#echo '<PRE><FONT SIZE=-1>';
+#displaycal($sc);
+#echo '</PRE></FONT>';
 
 modifycal($sc);											#modifies calibration for use in despun vectors
-echo '<PRE><FONT SIZE=-1>';
-displaycal($sc);										#displays modified calibration
-echo '</PRE></FONT>';
+#echo '<PRE><FONT SIZE=-1>';
+#displaycal($sc);										#displays modified calibration
+#echo '</PRE></FONT>';
 
 $satt_name=RAW.'20'.$year.'/'.$month.'/C'.$sc.'_'.$year.$month.$day.'_'.$version.'.SATT';	#constructs name of attitude file
 #eg. $satt_name='/cluster/data/raw/'.'20'.'16'.'/'.'01'.'/C'.'1'.'_'.'16'.'01'.'01'.'_'.'A'.'.SATT';
@@ -332,12 +339,12 @@ if (file_exists($satt_name) && ($satt_h=fopen($satt_name,"rb")))	#opens attitude
 	$satt_line=fgets($satt_h,100);									#gets first line
 	fclose($satt_h);												#closes file
 	$deltatime=60/substr($satt_line,61,9);							#spin period of satellite
-	echo 'Spacecraft Period is '.$deltatime.' seconds.<P>';
+	#echo 'Spacecraft Period is '.$deltatime.' seconds.<P>';
 }
 else
 {
 	$deltatime=4;
-	echo 'Spacecraft Period is 4 seconds (Default).<P>';
+	#echo 'Spacecraft Period is 4 seconds (Default).<P>';
 }
 
 
@@ -357,15 +364,15 @@ else
 
 $section=substr($filepicked,-1,1);				#picks out last character - the section
 
-echo "META File : ".EXT.'20'.$year.'/'.$month.'/'.substr(basename($filepicked),0,-3).".META"."<BR>";			#substr(basename(),0,-3) strips last 3 chars
+#echo "META File : ".EXT.'20'.$year.'/'.$month.'/'.substr(basename($filepicked),0,-3).".META"."<BR>";			#substr(basename(),0,-3) strips last 3 chars
 
 $start=read_meta(EXT.'20'.$year.'/'.$month.'/'.substr(basename($filepicked),0,-3).".META","ExtendedModeEntry_Unix",$section);
 
-echo "\$start=".$start."<BR>";
+#echo "\$start=".$start."<BR>";
 
 $current=$start;												#Extended Mode Entry
 
-echo "Extended mode entered : ".date("j M Y H:i:s\Z",$start);
+#echo "Extended mode entered : ".date("j M Y H:i:s\Z",$start);
 
 // Input format .En
 // 0         1         2         3         4         5         6
@@ -393,7 +400,7 @@ echo "Extended mode entered : ".date("j M Y H:i:s\Z",$start);
 
 $extfile=file($filepicked);			#reads entire file to array $extfile (eg. filepicked=/cluster/data/extended/2016/01/C1_160101_B.E0)
 
-echo '<P>Opening : '.EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT</P>';	#prints output to website
+#echo '<P>Opening : '.EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT</P>';	#prints output to website
 
 if (!is_dir(EXT.date('Y',$start)))																		#creates directories for output file if needed
 	mkdir(EXT.date('Y',$start),0750);																	#date() creates Year ('Y') from UNIX time
@@ -403,7 +410,7 @@ if (!is_dir(EXT.date('Y/m',$start)))																	#'Y/m' output format of dat
 
 ////////////////////////////////////// *************************
 
-echo ">>>> ".EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT';				#Prints more to screen
+#echo ">>>> ".EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT';				#Prints more to screen
 
 $outhandle=fopen(EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT','ab');		#opens .EXT file for writing
 if (!$outhandle)																						#error message if file can't be opened for writing
@@ -440,7 +447,7 @@ $k=pi()*pi()/16;
 $k2=pi()/4;
 $time=$start;					#$current = $start - extended mode entry time
 // $deltatime=60/$rpm;
-echo '<PRE>';
+#echo '<PRE>';
 
 $lastreset=999999;
 
@@ -469,9 +476,8 @@ for($n=0;$n<$loopsize;$n++)			#goes through all vectors in file
 			$time+=$deltatime*($deltareset-1)*16*RESETPERIOD/$deltatime; // remove 1, since already added deltatime on previous iteration
 																									#deltatime is spin period
 
-			echo "<FONT COLOR=RED>BIG RESET JUMP : Ammending time by ".($deltareset-1)*16*RESETPERIOD/$deltatime." seconds.</FONT><BR>";
-
-
+			#echo "<FONT COLOR=RED>BIG RESET JUMP : Ammending time by ".($deltareset-1)*16*RESETPERIOD/$deltatime." seconds.</FONT><BR>";
+			echo "BIG RESET JUMP : Ammending time by ".($deltareset-1)*16*RESETPERIOD/$deltatime." seconds.";
 		}
 
 		$lastreset=$reset; // Set lastreset to reset
@@ -557,7 +563,7 @@ for($n=0;$n<$loopsize;$n++)			#goes through all vectors in file
 		                  0,0,0,0);
 
 	}
-
+	
 	fputs($outhandle,$stuff);
 	for($i=0;$i<32;$i++)
 		fputb($testhandle,$teststuff[$i]);
@@ -598,7 +604,7 @@ for($n=0;$n<$loopsize;$n++)			#goes through all vectors in file
 		using cat, data from $tmp2 is written to $procfile
 		*/
 		$tmp2=tempnam('/var/tmp','ExtProcDecoded_');
-		echo "<P><FONT COLOR=RED>FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cat ".$tmp2." >> ".$procfile."</FONT></P>";
+		#echo "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cat ".$tmp2." >> ".$procfile;
 		exec("FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cat ".$tmp2." >> ".$procfile);
 
 		if (!is_dir(EXT.date('Y',$time)))
@@ -646,11 +652,9 @@ fclose($testhandle);
 
 #repeats above steps (from the if() loop) to write the remaining data from the *last* day
 $tmp2=tempnam('/var/tmp','ExtProcDecoded_');
-echo "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile;
+#echo "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile;
 exec("FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile);
 
-echo '</PRE>';
 
-foot("cluster");
-
+session_destroy();
 ?>
