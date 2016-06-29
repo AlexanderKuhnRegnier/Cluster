@@ -55,6 +55,7 @@ if (($year!="") && ($month!=""))
 				for($age=12;$age>=0;$age--)	#to iterate through letters A to M
 				{
 					$filename=EXT."/".sprintf("%04d",$year)."/".sprintf("%02d",$month)."/C".$sc."_".sprintf("%02d%02d%02d",$year-2000,$month,$day)."_".chr(ord("A")+$age);
+					echo "filename: ".$filename.PHP_EOL;
 					if ((file_exists($filename.".E".$ext)) && (filesize($filename.".E".$ext)!=0))
 					{
 						if (!$startrow) { $startrow=TRUE; }
@@ -85,7 +86,7 @@ if (($year!="") && ($month!=""))
 						$entry=read_meta($filename.".META","ExtendedModeEntry_Unix",$ext);
 
 						$extmodeentrymetafile=EXT."/".date("Y",$entry)."/".date("m",$entry)."/C".$sc."_".date("ymd",$entry)."_".chr(ord("A")+$age).".META";
-						
+						echo "entry meta filename: ".$extmodeentrymetafile.PHP_EOL;
 						// Search for usable Extended Mode
 						$index=0;
 						do

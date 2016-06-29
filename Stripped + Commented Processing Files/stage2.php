@@ -10,23 +10,29 @@ Delete the following 3 lines, AND LAST LINE for deployment, or figure out why pe
 session_destroy();
 ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
 session_start();
+
+set_time_limit(5);
+
 $verbose=FALSE;																	#global boolean, set if debugging required, ignore commands involving it
 
 echo "Starting Stage2".PHP_EOL;
 
 require 'meta_file_functions.php';
+require 'iso.php';
 
 define("EXTMODECOMMAND_INITIATE","SFGMJ059 SFGMJ064 SFGMSEXT");					#string to recognise extended mode commands in the .SCCH files
 define("EXTMODECOMMAND_TERMINATE","SFGMJ065 SFGMJ050");
 define("INITIATE",1);
 define("TERMINATE",2);
 define("RAW","/cluster/data/raw/");												#shortcut to raw data directory
+define("EXT","/home/ahk114/extended/");
 
 #eg. /cluster/data/extended/2016/01/C1_160101_B
 # in my case, /home/ahk114/extended/2016/01/C1_160101_B
 $stdin_input=file_get_contents("php://stdin",'r');
 $filename = substr($stdin_input,strpos($stdin_input, 'target')+6,41);			#now extracts filename from stdin, not URL
 echo "Stage1 Input Filename: ".$filename.PHP_EOL;
+
 function fgetb($handle)
 	/** Returns the ASCII value of the current character in the handle (Handle is often the .SCCH file). ##.SCCH files are S/C command files.
 	
@@ -162,11 +168,33 @@ function spin($unixtime,$sc)
 		return 4;
 }
 
+function spaceship($a,$b)
+{
+	if ($a==$b)
+		return 0;
+	else if ($a<$b)
+		return -1;
+	else
+		return 1;
+}
+
+function sorter($a,$b)
+{
+	$first=spaceship($a['unix'],$b['unix']);
+	if ($first!=0)
+		return $first;
+	else
+		return spaceship($a['block'],$b['block']);
+}
+
+
 $numberofblocks=read_meta($filename.".META","NumberOfBlocks");				#stage1_processing.php calculates the block count in extended mode and writes it to the .META file
 
 $bits=explode("/",$filename);												#Each section (defined by the separator /) is written as separate elements of an array
 
 $sc=substr($bits[count($bits)-1],1,1);										#searches the sections of the HTML web address for the spacecraft number.
+$vers=substr($bits[count($bits)-1],-1,1);
+$src_date=mktime(0,0,0,substr($bits[count($bits)-1],5,2),substr($bits[count($bits)-1],7,2),substr($bits[count($bits)-1],3,2));
 
 echo "number of blocks: ".$numberofblocks.PHP_EOL;
 
@@ -175,17 +203,14 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 	$start=lastextendedmode(read_meta($filename.".META","DumpStartTime_Unix",$n),$sc,INITIATE);
 	$end=lastextendedmode(read_meta($filename.".META","DumpStartTime_Unix",$n),$sc,TERMINATE);
 	$part=read_meta($filename.".META","PartialStart",$n);
-	$cary["Extended Mode Entry "."$n".":"] = date("Y-m-d\TH:i:s\Z",$start);
-	$cary["Extended Mode Exit "."$n".":"] = date("Y-m-d\TH:i:s\Z",$end);
-	$cary["Extended Mode Duration "."$n".":"] = date("H:i:s",$end-$start);
 	$spin=spin($start,$sc);
-	$cary["spin period "."$n".":"] = $spin;
+	
 	$calcvec=(int)(($end-$start)/$spin);												#number of vectors found from duration of extended mode and spin period NOT from extended mode data.
 	$actualvec=read_meta($filename.".META","NumberOfVectors",$n);						#number of vectors as found from the extended mode data via stage1_processing.php	
 	$miss=read_meta($filename.".META","MissingPacket",$n);								#variable created in stage1_processing.php
 	$reset_start=read_meta($filename.".META","ResetCountStart",$n);						#Counts of the 5.152s reset pulse sent to instrument. Found in stage1_processing.php
 	$reset_stop=read_meta($filename.".META","ResetCountEnd",$n);
-
+	
 	write_meta($filename.".META","ExtendedModeEntry_ISO",date("Y-m-d\TH:i:s\Z",$start),$n);		#?? used later on- but not utilised at the moment
 	write_meta($filename.".META","ExtendedModeEntry_Unix",$start,$n);
 	write_meta($filename.".META","ExtendedModeExit_ISO",date("Y-m-d\TH:i:s\Z",$end),$n);
@@ -212,21 +237,212 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 		echo "--------------------------------------------------------------".PHP_EOL;
 		echo PHP_EOL;
 	}
-}
+	
+	$where_filename=EXT.date("Y/m/",$start)."C".$sc."_".date("ymd",$start)."_".$vers.".META";		#new META file for actual date of ext mode
 
-#writing info to file
-$carykeys = array_keys($cary);
-$caryvalues = array_values($cary);
-for($i=0; $i<=(count($cary)-1); $i++)
-	$caryfinal[] = "$carykeys[$i]"." "."$caryvalues[$i]";
-$impcary = implode("\n", $caryfinal);
-$alexfilepath = substr($filename,0,30);
-file_put_contents($alexfilepath."_information.txt", $impcary);
+	$event=array();
+	$unused_event=array();
+	
+	if (!file_exists($where_filename))
+	{
+		if (!file_exists(EXT.date("Y",$start)))			mkdir(EXT.date("Y",$start));
+		if (!file_exists(EXT.date("Y/m",$start)))		mkdir(EXT.date("Y/m",$start));
+		touch($where_filename);			#sets accesstime to current time
+		
+		$where_count=1;
+		$event[0]['filename']=read_meta($filename.".META","SourceFile");
+		$event[0]['unix']=$start;
+		$event[0]['block']=0;
+		$event[0]['use']=1;	
+	}
+	else
+	{
+		$where_count=0+read_meta($where_filename,"NumberOfExtendedEvents");
+		for($i=0;$i<$where_count;$i++)
+		{
+			$use_it=0+read_meta($where_filename,"Use",chr(ord("A")+$i));
+			if ($use_it)
+			{
+				$event[$i]['filename']=read_meta($where_filename,"FileName",chr(ord("A")+$i));
+				$event[$i]['unix']=0+read_meta($where_filename,"EventTime_Unix",chr(ord("A")+$i));
+				$event[$i]['block']=0+read_meta($where_filename,"Block",chr(ord("A")+$i));
+				$event[$i]['use']=$use_it;
+			}
+			else
+			{
+				$unused_event[$i]['filename']=read_meta($where_filename,"FileName",chr(ord("A")+$i));
+				$unused_event[$i]['unix']=0+read_meta($where_filename,"EventTime_Unix",chr(ord("A")+$i));
+				$unused_event[$i]['block']=0+read_meta($where_filename,"Block",chr(ord("A")+$i));
+				$unused_event[$i]['use']=$use_it;
+			}
+		}		
+	}
+	if (!file_exists(EXT.date("Y",$start)))			mkdir(EXT.date("Y",$start));
+	if (!file_exists(EXT.date("Y/m",$start)))		mkdir(EXT.date("Y/m",$start));
+	if (!file_exists($where_filename))				touch($where_filename);
+	
+	if (isset($event[0]['unix']))
+		$found_date=$event[0]['unix'];
+	else
+		$found_date=mktime(0,0,0,1,1,2999);
+	
+	if (isset($event[0]['block']))
+		$found_block=$event[0]['block'];
+	else
+		$found_block=9999;
+	
+	// $event[$where_count]['filename']=RAW.date("Y",$start)."/".date("m",$start)."/"."C".$sc."_".date("ymd",$start)."_".$vers.".BS";
+	// $event[$where_count]['filename']=$filename.".BS";
+	$event[$where_count]['filename']=read_meta($filename.".META","SourceFile");
+	#echo "get from ".$filename.".META"."<BR>";
+	#echo "got ".read_meta($filename.".META","SourceFile")."<BR>";
+	$event[$where_count]['unix']=$start;
+	$event[$where_count]['block']=$n;
+	$event[$where_count]['use']=1;
+	
+	if ($found_date!="")
+	{
+		if ($src_date<$found_date)
+		{
+			#echo "This date/block is Better<BR>";
+			$good_to_do_stage3=TRUE;
+		}
+		elseif ($src_date==$found_date)
+		{
+			if ($n<$found_block)
+			{
+				#echo "This block is Better<BR>";
+				$good_to_do_stage3=TRUE;
+			}
+			elseif ($n==$found_block)
+			{
+				#echo "This is the Existing (Date same then block same)<BR>";
+				$good_to_do_stage3=TRUE;
+			}
+			else
+			{
+				#echo "Existing is better (Date same then block greater)<BR>";
+				$good_to_do_stage3=FALSE;
+			}
+		}
+		else
+		{
+			#echo "Existing is better (Date newer)<BR>";
+			$good_to_do_stage3=FALSE;
+		}
+	}
+	else
+	{
+		#echo "This is New<BR>";
+		$good_to_do_stage3=TRUE;
+		write_meta($where_filename,"FoundDate_Unix",$src_date);
+		write_meta($where_filename,"FoundDate_ISO",unix2iso($src_date));
+		write_meta($where_filename,"FoundBlock",$n);
+	}
+	if ($good_to_do_stage3)
+	{
+		#echo "<FONT COLOR=\"#00D000\"><B>This Block should be processed further</B></FONT><BR>";
+	}
+	
+	#echo "Dump Start ".read_meta($filename.".META","DumpStartTime_ISO",$n)."<BR>";
+	if ($part=="TRUE")
+		#echo "<FONT COLOR=\"#F000C0\">Probable repeat copy</FONT><BR>";
+	#echo "Extended Mode Entry: ".date("Y-m-d\TH:i:s\Z",$start)."<BR>";
+	#echo "Extended Mode Exit: ".date("Y-m-d\TH:i:s\Z",$end)."<BR>";
+	#echo "Extended Mode Duration: ".date("H:i:s",$end-$start)."<BR>";
+	$spin=spin($start,$sc);
+	#printf("Spin period: %0.6f<BR>",$spin);
+	$calcvec=(int)(($end-$start)/$spin);
+	$actualvec=0+read_meta($filename.".META","NumberOfVectors",$n);
+	#echo "Derived Number of vectors : ".$calcvec."<BR>";
+	#echo "Number of vectors in block : ".$actualvec."<BR>";
+	/*
+	if (abs($calcvec-$actualvec)>0)
+	{
+		if (abs($calcvec-$actualvec)>10)
+			#echo "<FONT COLOR=\"RED\">";
+		else
+			#echo "<FONT COLOR=\"BLACK\">";
+		#echo "Timing suggests ".(int)(($calcvec-$actualvec)/444.5)." packets missing";
+		if ($part)
+			#echo " - This block is partial, so this is not unexpected";
+		#echo "</FONT><BR>";
+	}
+	*/
+	$miss=read_meta($filename.".META","MissingPacket",$n);
+	#if ($miss!=0)
+		#echo "<FONT COLOR=RED>State machine suggests, at least ".$miss." packets missing</FONT><BR>";
+	$reset_start=read_meta($filename.".META","ResetCountStart",$n);
+	$reset_stop=read_meta($filename.".META","ResetCountEnd",$n);
+	#printf("Reset range: %d-%d / %03X-%03X<BR>",$reset_start,$reset_stop,$reset_start,$reset_stop);
+	#echo "<P>";
+	write_meta($filename.".META","ExtendedModeEntry_ISO",date("Y-m-d\TH:i:s\Z",$start),$n);
+	write_meta($filename.".META","ExtendedModeEntry_Unix",$start,$n);
+	write_meta($filename.".META","ExtendedModeExit_ISO",date("Y-m-d\TH:i:s\Z",$end),$n);
+	write_meta($filename.".META","ExtendedModeExit_Unix",$end,$n);
+	write_meta($filename.".META","SpinPeriod",round($spin,6));
+	
+	#echo "FRESH<BR>";
+	#echo "<PRE>"; var_dump($event); echo "</PRE>";
+	$event=array_unique($event,SORT_REGULAR);				// Remove any identical cases (need SORT_REGULAR so it doesn't do a string comparison)
+	#echo "REMOVED UNIQUE<BR>";
+	#echo "<PRE>"; var_dump($event); echo "</PRE>";
+	$event=array_merge($event,$unused_event);				// Now combine in the unused events (ie those with 'use' marked as 0
+	#echo "MERGED<BR>";
+	#echo "<PRE>"; var_dump($event); echo "</PRE>";
+	usort($event,"sorter");									// Sort according to the 'unix' field and then the 'block' field
+	#echo "SORTED<BR>";
+	#echo "<PRE>"; var_dump($event); echo "</PRE>";
+	$event=array_combine(range(0,count($event)-1),$event);	// Re-index the array, from 0 to size-1
+	
+	do
+	{
+		$removed=FALSE;
+		#echo ".";
+		for($i=0;$i<(count($event)-1);$i++)						// We need to make sure that the cases with 'use' marked zero, supersede those with it marked as one.
+																// Loop one less range, because we're checking pairs.
+		{
+			#echo $i.",";
+			if (($event[$i]['unix']==$event[$i+1]['unix']) and ($event[$i]['block']==$event[$i+1]['block'])) // OK, only do this, if the time and block in this pair are the same
+			{	
+				if ($event[$i]['use'] and !$event[$i+1]['use']) // the second one is marked "bad", so throw away the one marked "use" (the first)
+				{
+					unset ($event[$i]);
+					$removed=TRUE;
+					#echo "<B>(R)</B>";
+				}
+				else if (!$event[$i]['use'] and $event[$i+1]['use']) // the first one is marked "bad", so throw awat the one marked "use" (the second)
+				{
+					unset ($event[$i+1]);
+					$i++;			// We have to increment the counter, otherwise the next loop will fail, because this event has been deleted
+					$removed=TRUE;
+					echo "<B>(R)</B>";
+				}
+				else
+				{	// only need to check the cases where the two cases differ, if they're the same, we should never get here.
+					exit("OK, this should **never** happen.  Awooga awooga");
+				}
+			}
+		}
+		if ($removed)
+			$event=array_combine(range(0,count($event)-1),$event);	// Re-index the array, from 0 to size-1, to allow for any which were removed.
+	}
+	while ($removed);
+	
+	#echo "REMOVED<BR>";
+	echo var_dump($event);
+	
+	write_meta($where_filename,"NumberOfExtendedEvents",count($event));
 
-if ($verbose)
-{
-	echo "Writing to info file: ".PHP_EOL;
-	echo $impcary.PHP_EOL;
+	for($i=0;$i<count($event);$i++)
+	{
+		write_meta($where_filename,"Use",$event[$i]['use'],chr(ord("A")+$i));
+		write_meta($where_filename,"FileName",$event[$i]['filename'],chr(ord("A")+$i));
+		write_meta($where_filename,"EventTime_Unix",$event[$i]['unix'],chr(ord("A")+$i));
+		write_meta($where_filename,"EventTime_ISO",unix2iso($event[$i]['unix']),chr(ord("A")+$i));
+		write_meta($where_filename,"Block",$event[$i]['block'],chr(ord("A")+$i));
+	}	
+	
 }
 
 session_destroy();
