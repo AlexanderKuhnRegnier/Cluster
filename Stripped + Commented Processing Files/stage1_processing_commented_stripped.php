@@ -479,7 +479,7 @@ function packet_analyse($bytes,&$state,&$startreset,&$stopreset)
 			$state=$table[$state][NONE];
 
 		#vectors could be both, but how do these assignments make subsequent detection of opposite state possible? - 
-		#ie. how is line 511 possible? (elseif ($iseven && $isodd))
+		#ie. how is line (511) possible? (elseif ($iseven && $isodd))
 		#eg. even -> odd, or odd -> even, since condition ((($resetodd-$prevresetodd+4096)%4096)<=1) has to be fulfilled 
 		#assignments are of course necessary to continually detect 1 state, eg. even, even, even, etc...
 		$prevreseteven=$reseteven;
@@ -528,6 +528,14 @@ function packet_analyse($bytes,&$state,&$startreset,&$stopreset)
 
 // Program start
 
+$outputdata=array();
+
+set_time_limit(600);									#Sets maximum execution time limit
+
+// define("EXT",'/cluster/data/extended/');
+define("EXT",'/home/ahk114/extended/'); 				#writing the meta files to my own home directory on the server
+define("RAW",'/cluster/data/raw/');
+
 //Acquiring the selection info from the command line input now, not from the URL!
 
 $day = null;
@@ -540,7 +548,7 @@ $shortopts  = "d:";
 $shortopts .= "m:";
 $shortopts .= "y:";
 $shortopts .= "sc:";
-$shortopts .= "ver:";
+#$shortopts .= "ver:"; #select version automatically
 
 $options = getopt($shortopts);
 #var_dump($options);
@@ -559,13 +567,14 @@ if (array_key_exists("sc",$options))
 	{
 		exit("Invalid Spacecraft!".PHP_EOL);
 	}
-	else {$sc = $options["sc"];}
+	else {$sc = sprintf('%1d',$options["sc"]);}
 }
 else
 {
 	echo "Setting default value for Spacecraft: Rumba (1)".PHP_EOL;
 	$sc = 1;
 }
+/*
 if (array_key_exists("ver",$options))
 {
 	if (strtoupper($version) != 'A' || strtoupper($version) != 'B' || strtoupper($version) != 'K')
@@ -579,6 +588,7 @@ else
 	echo "Setting default value for Version: B".PHP_EOL;
 	$version = 'B';
 }
+*/
 if ($month > 12 || $month < 1)
 {
 	exit("Invalid Month!".PHP_EOL);
@@ -601,23 +611,37 @@ if ($options["d"] > cal_days_in_month(CAL_GREGORIAN,$month,$year) || $options["d
 $jdcount = gregoriantojd($month, $day, $year);
 $month_name = jdmonthname($jdcount,0);
 
+$shortyear=sprintf("%02d",$year-2000);			
+$month=sprintf("%02d",$month);
+$day=sprintf("%02d",$day);
+
+/*Selecting version based on selected date and the available burst science data */
+$target_dir = RAW.$year.'/'.sprintf('%02d',$month).'/';
+$files = scandir($target_dir);
+$needle_base = 'C'.$sc.'_'.$shortyear.$month.$day.'_';	#eg. 'C1_160101_A.BS'
+
+$versions = array('K','B','A');							#due to break statement - give precendence in this order, ie. K is most important
+foreach ($versions as $version)
+{
+	$needle_tip = $version.'.BS';
+	if (array_search($needle_base.$needle_tip,$files))
+	{
+		break;
+	}
+	else
+	{
+		if ($version == 'A')
+		{
+			exit("No valid Version (A,B or K) for Burst Science Data found!");
+		}
+	}
+} 
+
 echo "Year:       ".$year.PHP_EOL;
 echo "Month:      ".$month_name.PHP_EOL;
 echo "Day:        ".$day.PHP_EOL;
 echo "Spacecraft: ".$sc.PHP_EOL;
 echo "Version:    ".$version.PHP_EOL;
-
-$outputdata=array();
-
-set_time_limit(600);									#Sets maximum execution time limit
-
-// define("EXT",'/cluster/data/extended/');
-define("EXT",'/home/ahk114/extended/'); 				#writing the meta files to my own home directory on the server
-define("RAW",'/cluster/data/raw/');
-
-$shortyear=sprintf("%02d",$year-2000);			
-$month=sprintf("%02d",$month);
-$day=sprintf("%02d",$day);
 
 $base="C".$sc."_".$shortyear.$month.$day."_".$version;
 $datafilename=RAW.$year."/".$month."/".$base.".BS";		#burst science (BS) raw data file
@@ -626,7 +650,7 @@ $metafilename=EXT.$year.'/'.$month.'/'.$base.".META";
 
 echo "Reading Data from: ".$datafilename.PHP_EOL;
 echo "Meta-filename:     ".$metafilename.PHP_EOL;
-echo "Writing to:        ".EXT.'$year'."/".$month."/".$base.'E'.'n'.PHP_EOL;
+echo "Writing to:        ".EXT.$year."/".$month."/".$base.'.E'.'n'.'    (n is the block number)'.PHP_EOL;
 
 if (!is_dir(EXT.$year))									#make directory named with date if non-existent. (Failing here 24-06-15)
 	mkdir(EXT.$year,0750);
