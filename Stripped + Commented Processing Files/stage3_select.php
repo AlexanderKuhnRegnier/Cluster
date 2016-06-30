@@ -40,7 +40,7 @@ function spinrate($year,$month,$day,$sc,$version)
 
 $stdin_input=file_get_contents("php://stdin",'r');
 $filename = substr($stdin_input,strpos($stdin_input, 'target')+6,41);			#now extracts filename from stdin, not URL
-echo "Stage1 Input Filename: ".$filename.PHP_EOL;
+echo "Stage2 Input Filename (now in stage3_select): ".$filename.PHP_EOL;
 $fileparts = explode("/",$filename);
 $year=   substr(end($fileparts),3,2);
 if ($year < 2000){$year+=2000;}

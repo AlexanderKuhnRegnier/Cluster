@@ -111,7 +111,8 @@ for ($i=0; $i<abs($number); $i+=1)
 	$month= date("m",$time_unix);
 	$day=   date("d",$time_unix);
 	$option_string = " -y".$year." -m".$month." -d".$day." -sc".$sc;
-	$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php | php stage3.php";	
+	#$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php | php stage3.php";
+	$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php";		
 	echo "Executing: ".$cmd.PHP_EOL;
 	exec($cmd,$output);
 	var_dump($output);
