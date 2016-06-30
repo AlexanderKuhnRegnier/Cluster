@@ -3,8 +3,8 @@
 Delete the following 3 lines, AND LAST LINE for deployment, or figure out why permission to normal session folder are denied
 */
 session_destroy();
-ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
-session_start();
+#ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
+#session_start();
 
 set_time_limit(5);
 
@@ -38,9 +38,17 @@ function spinrate($year,$month,$day,$sc,$version)
 	return $deltatime;
 }
 
-$year=2016;
-$month = 1;
-$day = 1;
+$stdin_input=file_get_contents("php://stdin",'r');
+$filename = substr($stdin_input,strpos($stdin_input, 'target')+6,41);			#now extracts filename from stdin, not URL
+echo "Stage1 Input Filename: ".$filename.PHP_EOL;
+$fileparts = explode("/",$filename);
+$year=   substr(end($fileparts),3,2);
+if ($year < 2000){$year+=2000;}
+$month = substr(end($fileparts),5,2);
+$day =   substr(end($fileparts),7,2);
+
+echo "Selected Date: ".date("Y/m/d",mktime(0,0,0,$month,$day,$year)).PHP_EOL;
+
 if (($year!="") && ($month!=""))
 {
 	for($sc=1;$sc<5;$sc++)
@@ -106,9 +114,12 @@ if (($year!="") && ($month!=""))
 						if ((read_meta($extmodeentrymetafile,"EventTime_ISO",chr(ord("A")+$index))==$this_event_date) and (read_meta($extmodeentrymetafile,"Block",chr(ord("A")+$index))==$this_event_block))
 							{	
 							#echo "<FONT COLOR=\"#40FF40\"><B>Recommended</B></FONT>";
-							$filepicked = $filename."/C".$sc."_".date("ymd",mktime(0,0,0,$month,$day,$year))."_".chr(ord("A")+$age).".E".$ext;
-							echo "File picked: ".PHP_EOL;
-							echo $filepicked.PHP_EOL;							
+							$filepicked = substr($filename,0,29)."/C".$sc."_".date("ymd",mktime(0,0,0,$month,$day,$year))."_".chr(ord("A")+$age).".E".$ext;
+							echo "Stage 3 Selection: File picked: ".PHP_EOL;
+							echo $filepicked.PHP_EOL;
+
+							fwrite(STDOUT,"target".$filepicked.PHP_EOL);			#write filename base to stdout, for input into stage3!
+							
 							break 3; 
 							}
 						echo PHP_EOL;
@@ -123,5 +134,5 @@ if (($year!="") && ($month!=""))
 
 
 
-session_destroy();
+#session_destroy();
 ?>

@@ -3,8 +3,8 @@
 Delete the following 3 lines, AND LAST LINE for deployment, or figure out why permission to normal session folder are denied
 */
 session_destroy();
-ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
-session_start();
+#ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
+#session_start();
 
 /**AKR Comments*/
 #AKR Comments
@@ -1066,5 +1066,5 @@ if (count($outputdata)!=0)
 write_meta($metafilename,"NumberOfBlocks",$extblockcount);
 
 
-session_destroy();
+#session_destroy();
 ?>

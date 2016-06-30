@@ -5,8 +5,8 @@
 Delete the following 3 lines, AND LAST LINE for deployment, or figure out why permission to normal session folder are denied
 */
 session_destroy();
-ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
-session_start();
+#ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
+#session_start();
 
 define("RESETPERIOD",5.152);
 
@@ -314,6 +314,7 @@ $stdin_input=file_get_contents("php://stdin",'r');
 #eg.          /cluster/data/extended/2016/01/C1_160101_B.E0
 # in my case, /home/ahk114/extended/2016/01/C1_160101_B.E0
 $filepicked = substr($stdin_input,strpos($stdin_input, 'target')+6,44);	#file picked starts after "target" string in the input
+echo "Filepicked: ".$filepicked.PHP_EOL;
 
 $year=substr(basename($filepicked),3,2);
 $month=substr(basename($filepicked),5,2);
@@ -430,6 +431,10 @@ if (!$testhandle)
 
 $sattfile=RAW.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.SATT';					#Spacecraft Attitude and Spin Rates
 $stoffile=RAW.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.STOF';					#Short Term Orbit file
+
+
+if (!file_exists(PROC.date("Y",$start)))	{mkdir(PROC.date("Y",$start));}
+if (!file_exists(PROC.date("Y/m",$start)))	{mkdir(PROC.date("Y/m",$start));}
 $procfile=PROC.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT.GSE';				#Where the data goes - into the reference folder!
 
 //$testhandle=fopen(EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.G','wb'); // NB wb not ab
@@ -604,7 +609,7 @@ for($n=0;$n<$loopsize;$n++)			#goes through all vectors in file
 		using cat, data from $tmp2 is written to $procfile
 		*/
 		$tmp2=tempnam('/var/tmp','ExtProcDecoded_');
-		#echo "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cat ".$tmp2." >> ".$procfile;
+		echo "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cat ".$tmp2." >> ".$procfile;
 		exec("FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cat ".$tmp2." >> ".$procfile);
 
 		if (!is_dir(EXT.date('Y',$time)))
@@ -652,9 +657,9 @@ fclose($testhandle);
 
 #repeats above steps (from the if() loop) to write the remaining data from the *last* day
 $tmp2=tempnam('/var/tmp','ExtProcDecoded_');
-#echo "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile;
+echo "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile;
 exec("FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile);
 
 
-session_destroy();
+#session_destroy();
 ?>

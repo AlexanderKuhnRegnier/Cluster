@@ -8,8 +8,8 @@
 Delete the following 3 lines, AND LAST LINE for deployment, or figure out why permission to normal session folder are denied
 */
 session_destroy();
-ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
-session_start();
+#ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
+#session_start();
 
 set_time_limit(5);
 
@@ -32,6 +32,8 @@ define("EXT","/home/ahk114/extended/");
 $stdin_input=file_get_contents("php://stdin",'r');
 $filename = substr($stdin_input,strpos($stdin_input, 'target')+6,41);			#now extracts filename from stdin, not URL
 echo "Stage1 Input Filename: ".$filename.PHP_EOL;
+
+fwrite(STDOUT,"target".$filename.PHP_EOL);			#write filename base to stdout, for input into stage3 selection!
 
 function fgetb($handle)
 	/** Returns the ASCII value of the current character in the handle (Handle is often the .SCCH file). ##.SCCH files are S/C command files.
@@ -444,5 +446,5 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 	
 }
 
-session_destroy();
+#session_destroy();
 ?>
