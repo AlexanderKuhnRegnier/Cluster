@@ -200,22 +200,15 @@ echo "number of blocks: ".$numberofblocks.PHP_EOL;
 
 for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks in the extended mode data as found by stage1_processing.php
 {
+	// The $filename.".META" metafile is at the location of the source data file, and contains the date of where the
+	// Extended Mode starts in the $start variable.
+	
+	// The $where_filename metafile is at the location where Extended Mode starts from the $start variable and contains
+	// the location of the source data file and block.	
+
 	$start=lastextendedmode(read_meta($filename.".META","DumpStartTime_Unix",$n),$sc,INITIATE);
 	$end=lastextendedmode(read_meta($filename.".META","DumpStartTime_Unix",$n),$sc,TERMINATE);
 	$part=read_meta($filename.".META","PartialStart",$n);
-	$spin=spin($start,$sc);
-	
-	$calcvec=(int)(($end-$start)/$spin);												#number of vectors found from duration of extended mode and spin period NOT from extended mode data.
-	$actualvec=read_meta($filename.".META","NumberOfVectors",$n);						#number of vectors as found from the extended mode data via stage1_processing.php	
-	$miss=read_meta($filename.".META","MissingPacket",$n);								#variable created in stage1_processing.php
-	$reset_start=read_meta($filename.".META","ResetCountStart",$n);						#Counts of the 5.152s reset pulse sent to instrument. Found in stage1_processing.php
-	$reset_stop=read_meta($filename.".META","ResetCountEnd",$n);
-	
-	write_meta($filename.".META","ExtendedModeEntry_ISO",date("Y-m-d\TH:i:s\Z",$start),$n);		#?? used later on- but not utilised at the moment
-	write_meta($filename.".META","ExtendedModeEntry_Unix",$start,$n);
-	write_meta($filename.".META","ExtendedModeExit_ISO",date("Y-m-d\TH:i:s\Z",$end),$n);
-	write_meta($filename.".META","ExtendedModeExit_Unix",$end,$n);
-	write_meta($filename.".META","SpinPeriod",round($spin,6));
 	
 	if ($verbose)
 	{
@@ -239,7 +232,7 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 	}
 	
 	$where_filename=EXT.date("Y/m/",$start)."C".$sc."_".date("ymd",$start)."_".$vers.".META";		#new META file for actual date of ext mode
-
+	echo "Where Filename ".$where_filename;
 	$event=array();
 	$unused_event=array();
 	
@@ -275,7 +268,11 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 				$unused_event[$i]['block']=0+read_meta($where_filename,"Block",chr(ord("A")+$i));
 				$unused_event[$i]['use']=$use_it;
 			}
-		}		
+		}
+		echo "READ WHERE (EVENT)";
+		echo var_dump($event);
+		echo "UNUSED";
+		echo var_dump($unused_event);	
 	}
 	if (!file_exists(EXT.date("Y",$start)))			mkdir(EXT.date("Y",$start));
 	if (!file_exists(EXT.date("Y/m",$start)))		mkdir(EXT.date("Y/m",$start));
@@ -345,15 +342,15 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 	}
 	
 	#echo "Dump Start ".read_meta($filename.".META","DumpStartTime_ISO",$n)."<BR>";
-	if ($part=="TRUE")
+	#if ($part=="TRUE")
 		#echo "<FONT COLOR=\"#F000C0\">Probable repeat copy</FONT><BR>";
 	#echo "Extended Mode Entry: ".date("Y-m-d\TH:i:s\Z",$start)."<BR>";
 	#echo "Extended Mode Exit: ".date("Y-m-d\TH:i:s\Z",$end)."<BR>";
 	#echo "Extended Mode Duration: ".date("H:i:s",$end-$start)."<BR>";
 	$spin=spin($start,$sc);
 	#printf("Spin period: %0.6f<BR>",$spin);
-	$calcvec=(int)(($end-$start)/$spin);
-	$actualvec=0+read_meta($filename.".META","NumberOfVectors",$n);
+	$calcvec=(int)(($end-$start)/$spin);												#number of vectors found from duration of extended mode and spin period NOT from extended mode data.
+	$actualvec=0+read_meta($filename.".META","NumberOfVectors",$n);						#number of vectors as found from the extended mode data via stage1_processing.php	
 	#echo "Derived Number of vectors : ".$calcvec."<BR>";
 	#echo "Number of vectors in block : ".$actualvec."<BR>";
 	/*
@@ -369,30 +366,32 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 		#echo "</FONT><BR>";
 	}
 	*/
-	$miss=read_meta($filename.".META","MissingPacket",$n);
+	$miss=read_meta($filename.".META","MissingPacket",$n);								#variable created in stage1_processing.php
 	#if ($miss!=0)
 		#echo "<FONT COLOR=RED>State machine suggests, at least ".$miss." packets missing</FONT><BR>";
-	$reset_start=read_meta($filename.".META","ResetCountStart",$n);
+	$reset_start=read_meta($filename.".META","ResetCountStart",$n);						#Counts of the 5.152s reset pulse sent to instrument. Found in stage1_processing.php
 	$reset_stop=read_meta($filename.".META","ResetCountEnd",$n);
+
 	#printf("Reset range: %d-%d / %03X-%03X<BR>",$reset_start,$reset_stop,$reset_start,$reset_stop);
 	#echo "<P>";
-	write_meta($filename.".META","ExtendedModeEntry_ISO",date("Y-m-d\TH:i:s\Z",$start),$n);
+
+	write_meta($filename.".META","ExtendedModeEntry_ISO",date("Y-m-d\TH:i:s\Z",$start),$n);		#?? used later on- but not utilised at the moment
 	write_meta($filename.".META","ExtendedModeEntry_Unix",$start,$n);
 	write_meta($filename.".META","ExtendedModeExit_ISO",date("Y-m-d\TH:i:s\Z",$end),$n);
 	write_meta($filename.".META","ExtendedModeExit_Unix",$end,$n);
 	write_meta($filename.".META","SpinPeriod",round($spin,6));
 	
-	#echo "FRESH<BR>";
-	#echo "<PRE>"; var_dump($event); echo "</PRE>";
+	echo "FRESH";
+	var_dump($event);
 	$event=array_unique($event,SORT_REGULAR);				// Remove any identical cases (need SORT_REGULAR so it doesn't do a string comparison)
-	#echo "REMOVED UNIQUE<BR>";
-	#echo "<PRE>"; var_dump($event); echo "</PRE>";
+	echo "REMOVED UNIQUE";
+	var_dump($event);
 	$event=array_merge($event,$unused_event);				// Now combine in the unused events (ie those with 'use' marked as 0
-	#echo "MERGED<BR>";
-	#echo "<PRE>"; var_dump($event); echo "</PRE>";
+	echo "MERGED";
+	var_dump($event);
 	usort($event,"sorter");									// Sort according to the 'unix' field and then the 'block' field
-	#echo "SORTED<BR>";
-	#echo "<PRE>"; var_dump($event); echo "</PRE>";
+	echo "SORTED";
+	var_dump($event);
 	$event=array_combine(range(0,count($event)-1),$event);	// Re-index the array, from 0 to size-1
 	
 	do

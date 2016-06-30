@@ -38,9 +38,6 @@ function spinrate($year,$month,$day,$sc,$version)
 	return $deltatime;
 }
 
-#$filepicked = NULL;
-#$this_event_date = NULL;
-
 $year=2016;
 $month = 1;
 $day = 1;
@@ -89,6 +86,7 @@ if (($year!="") && ($month!=""))
 
 						$extmodeentrymetafile=EXT."/".date("Y",$entry)."/".date("m",$entry)."/C".$sc."_".date("ymd",$entry)."_".chr(ord("A")+$age).".META";
 						echo "entry meta filename: ".$extmodeentrymetafile.PHP_EOL;
+						
 						// Search for usable Extended Mode
 						$index=0;
 						do
