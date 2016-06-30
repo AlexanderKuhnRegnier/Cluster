@@ -313,7 +313,13 @@ $stdin_input=file_get_contents("php://stdin",'r');
 
 #eg.          /cluster/data/extended/2016/01/C1_160101_B.E0
 # in my case, /home/ahk114/extended/2016/01/C1_160101_B.E0
-$filepicked = substr($stdin_input,strpos($stdin_input, 'target')+6,44);	#file picked starts after "target" string in the input
+$target_pos = strpos($stdin_input, 'target');
+if ($target_pos)
+{
+$filepicked = substr($stdin_input,$target_pos+6,44);	#file picked starts after "target" string in the input
+}
+else
+{exit("No filename supplied to stage3".PHP_EOL);}
 echo "Filepicked: ".$filepicked.PHP_EOL;
 
 $year=substr(basename($filepicked),3,2);

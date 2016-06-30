@@ -30,7 +30,15 @@ define("EXT","/home/ahk114/extended/");
 #eg. /cluster/data/extended/2016/01/C1_160101_B
 # in my case, /home/ahk114/extended/2016/01/C1_160101_B
 $stdin_input=file_get_contents("php://stdin",'r');
-$filename = substr($stdin_input,strpos($stdin_input, 'target')+6,41);			#now extracts filename from stdin, not URL
+
+$target_pos = strpos($stdin_input, 'target');
+if ($target_pos)
+{
+$filename = substr($stdin_input,$target_pos+6,41);	#file picked starts after "target" string in the input
+}
+else
+{exit("No filename supplied to stage2".PHP_EOL);}
+
 echo "Stage1 Input Filename: ".$filename.PHP_EOL;
 
 fwrite(STDOUT,"target".$filename.PHP_EOL);			#write filename base to stdout, for input into stage3 selection!

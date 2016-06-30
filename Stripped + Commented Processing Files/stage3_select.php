@@ -39,7 +39,15 @@ function spinrate($year,$month,$day,$sc,$version)
 }
 
 $stdin_input=file_get_contents("php://stdin",'r');
-$filename = substr($stdin_input,strpos($stdin_input, 'target')+6,41);			#now extracts filename from stdin, not URL
+
+$target_pos = strpos($stdin_input, 'target');
+if ($target_pos)
+{
+$filename = substr($stdin_input,$target_pos+6,41);	#file picked starts after "target" string in the input
+}
+else
+{exit("No filename supplied to stage3_select".PHP_EOL);}
+
 echo "Stage2 Input Filename (now in stage3_select): ".$filename.PHP_EOL;
 $fileparts = explode("/",$filename);
 $year=   substr(end($fileparts),3,2);
@@ -132,7 +140,7 @@ if (($year!="") && ($month!=""))
 	}
 }
 
-
+echo "Not found".PHP_EOL;
 
 #session_destroy();
 ?>
