@@ -104,22 +104,90 @@ $initial_unix = mktime(0,0,0,$month,$day,$year);
 $direction_multiplier = ($direction == FORWARDS) ? 1:-1;
 $time_unix=$initial_unix;
 
-for ($i=0; $i<abs($number); $i+=1)
+/*
+Process stage1 and stage2 for 7 days prior to region of interest, in order to circumvent the problem that sometimes previous
+days need to be processed this was in order for stage3 processing to work properly (and/or the selection process as well)
+*/
+echo "Pre-processing of days leading up to earliest selected date".PHP_EOL;
+if ($direction == FORWARDS)
 {
-	echo "Input date: ".date("Y/m/d",$time_unix).PHP_EOL;
+	#need to process additional days before the earliest date of interest
+	for ($i=0; $i<7; $i+=1)
+	{
+	$time_unix = $time_unix - $i*86400;
 	$year=  date("Y",$time_unix);
 	$month= date("m",$time_unix);
 	$day=   date("d",$time_unix);
 	$option_string = " -y".$year." -m".$month." -d".$day." -sc".$sc;
-	$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php | php stage3.php";
-	#$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php";		
-	echo "Executing: ".$cmd.PHP_EOL;
+	$cmd = "php stage1.php".$option_string." | php stage2.php";
+	echo "Executing: ".$cmd.PHP_EOL;	
 	exec($cmd,$output);
 	var_dump($output);
-	echo "Output: ".PHP_EOL.$output;
-	$time_unix = $time_unix + $direction_multiplier*86400; 
+	}
 }
+elseif ($direction == BACKWARDS)
+{
+	#need to process additional days before the earliest date of interest. Here, that is before the initial date!
+	$time_unix = $time_unix - abs($number)*86400;
+	for ($i=0; $i<7; $i+=1)
+	{
+	$year=  date("Y",$time_unix);
+	$month= date("m",$time_unix);
+	$day=   date("d",$time_unix);
+	$option_string = " -y".$year." -m".$month." -d".$day." -sc".$sc;
+	$cmd = "php stage1.php".$option_string." | php stage2.php";
+	echo "Executing: ".$cmd.PHP_EOL;	
+	exec($cmd,$output);
+	var_dump($output);
+	$time_unix = $time_unix - $i*86400;
+	}
+}
+else{exit("Direction not assigned".PHP_EOL);}
 
+echo "Finished pre-processing".PHP_EOL;
+
+
+
+if ($direction == FORWARDS)
+{	
+	$time_unix=$initial_unix;
+	#start at the earliest date always, so here start at $initial_unix
+	for ($i=0; $i<abs($number); $i+=1)
+	{
+		echo "Input date: ".date("Y/m/d",$time_unix).PHP_EOL;
+		$year=  date("Y",$time_unix);
+		$month= date("m",$time_unix);
+		$day=   date("d",$time_unix);
+		$option_string = " -y".$year." -m".$month." -d".$day." -sc".$sc;
+		$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php | php stage3.php";
+		#$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php";		
+		echo "Executing: ".$cmd.PHP_EOL;
+		exec($cmd,$output);
+		var_dump($output);
+		echo "Output: ".PHP_EOL.$output;
+		$time_unix = $time_unix + 86400; 
+	}
+}
+elseif ($direction == BACKWARDS)
+{
+	$time_unix=$initial_unix-(abs($number)-1)*86400;
+	#need to start at earliest date, so go back in time from $initial_unix
+	for ($i=0; $i<abs($number); $i+=1)
+	{
+		echo "Input date: ".date("Y/m/d",$time_unix).PHP_EOL;
+		$year=  date("Y",$time_unix);
+		$month= date("m",$time_unix);
+		$day=   date("d",$time_unix);
+		$option_string = " -y".$year." -m".$month." -d".$day." -sc".$sc;
+		$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php | php stage3.php";
+		#$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php";		
+		echo "Executing: ".$cmd.PHP_EOL;
+		exec($cmd,$output);
+		var_dump($output);
+		echo "Output: ".PHP_EOL.$output;
+		$time_unix = $time_unix + 86400; 
+	}	
+}
 echo PHP_EOL;
 #session_destroy();
 ?>
