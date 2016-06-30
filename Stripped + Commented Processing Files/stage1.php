@@ -563,11 +563,11 @@ else {exit("Please select a Day!".PHP_EOL);}
 #verification of input parameters, php automatically converts between string and int
 if (array_key_exists("sc",$options))
 {
+	$sc = sprintf('%1d',$options["sc"]);
 	if ($sc > 4 || $sc < 1)
 	{
 		exit("Invalid Spacecraft!".PHP_EOL);
 	}
-	else {$sc = sprintf('%1d',$options["sc"]);}
 }
 else
 {
