@@ -97,6 +97,7 @@ if (($year!="") && ($month!=""))
 						$this_event_date=read_meta($filename.".META","ExtendedModeEntry_ISO",$ext);
 						echo "Reading this event date: ".$filename.".META"."  ".$ext."     :".$this_event_date.PHP_EOL;
 						$this_event_block=$ext;
+						$this_source=mktime(0,0,0,$month,$day,$year);
 						
 						$entry=read_meta($filename.".META","ExtendedModeEntry_Unix",$ext);
 

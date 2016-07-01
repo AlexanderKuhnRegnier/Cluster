@@ -190,11 +190,23 @@ function spaceship($a,$b)
 
 function sorter($a,$b)
 {
-	$first=spaceship($a['unix'],$b['unix']);
+	$first=spaceship($a['source_unix'],$b['source_unix']);
 	if ($first!=0)
-		return $first;
+		{return $first;}
 	else
-		return spaceship($a['block'],$b['block']);
+	{
+		$second=spaceship($a['block'],$b['block']);
+		if ($second!=0)
+		{
+			#echo "@b";
+			return $second;
+		}
+		else
+		{
+			#echo "@c";
+			return spaceship($a['unix'],$b['unix']);
+		}
+	}
 }
 
 
@@ -257,6 +269,7 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 		$event[0]['unix']=$start;
 		$event[0]['block']=0;
 		$event[0]['use']=1;	
+		$event[0]['source_unix']=$src_date;
 	}
 	else
 	{
@@ -270,6 +283,7 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 				$event[$i]['unix']=0+read_meta($where_filename,"EventTime_Unix",chr(ord("A")+$i));
 				$event[$i]['block']=0+read_meta($where_filename,"Block",chr(ord("A")+$i));
 				$event[$i]['use']=$use_it;
+				$event[$i]['source_unix']=0+read_meta($where_filename,"Source_Unix",chr(ord("A")+$i));
 			}
 			else
 			{
@@ -277,6 +291,7 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 				$unused_event[$i]['unix']=0+read_meta($where_filename,"EventTime_Unix",chr(ord("A")+$i));
 				$unused_event[$i]['block']=0+read_meta($where_filename,"Block",chr(ord("A")+$i));
 				$unused_event[$i]['use']=$use_it;
+				$unused_event[$i]['source_unix']=read_meta($where_filename,"Source_Unix",chr(ord("A")+$i));
 			}
 		}
 		echo "READ WHERE (EVENT)";
@@ -306,6 +321,7 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 	$event[$where_count]['unix']=$start;
 	$event[$where_count]['block']=$n;
 	$event[$where_count]['use']=1;
+	$event[$where_count]['source_unix']=$src_date;
 	
 	if ($found_date!="")
 	{
@@ -345,6 +361,8 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 		write_meta($where_filename,"FoundDate_Unix",$src_date);
 		write_meta($where_filename,"FoundDate_ISO",unix2iso($src_date));
 		write_meta($where_filename,"FoundBlock",$n);
+		write_meta($where_filename,"Source_Unix",$src_date);
+		write_meta($where_filename,"FileName",$filename);
 	}
 	if ($good_to_do_stage3)
 	{
@@ -379,6 +397,7 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 	$miss=read_meta($filename.".META","MissingPacket",$n);								#variable created in stage1_processing.php
 	#if ($miss!=0)
 		#echo "<FONT COLOR=RED>State machine suggests, at least ".$miss." packets missing</FONT><BR>";
+	
 	$reset_start=read_meta($filename.".META","ResetCountStart",$n);						#Counts of the 5.152s reset pulse sent to instrument. Found in stage1_processing.php
 	$reset_stop=read_meta($filename.".META","ResetCountEnd",$n);
 
@@ -412,7 +431,7 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 																// Loop one less range, because we're checking pairs.
 		{
 			#echo $i.",";
-			if (($event[$i]['unix']==$event[$i+1]['unix']) and ($event[$i]['block']==$event[$i+1]['block'])) // OK, only do this, if the time and block in this pair are the same
+			if (($event[$i]['unix']==$event[$i+1]['unix']) and ($event[$i]['block']==$event[$i+1]['block']) and ($event[$i]['source_unix']==$event[$i+1]['source_unix'])) // OK, only do this, if the time and block in this pair are the same
 			{	
 				if ($event[$i]['use'] and !$event[$i+1]['use']) // the second one is marked "bad", so throw away the one marked "use" (the first)
 				{
@@ -450,6 +469,7 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 		write_meta($where_filename,"EventTime_Unix",$event[$i]['unix'],chr(ord("A")+$i));
 		write_meta($where_filename,"EventTime_ISO",unix2iso($event[$i]['unix']),chr(ord("A")+$i));
 		write_meta($where_filename,"Block",$event[$i]['block'],chr(ord("A")+$i));
+		write_meta($where_filename,"Source_Unix",$event[$i]['source_unix'],chr(ord("A")+$i));
 	}	
 	
 }
