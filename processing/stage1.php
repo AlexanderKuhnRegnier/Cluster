@@ -652,7 +652,7 @@ echo "Reading Data from: ".$datafilename.PHP_EOL;
 echo "Meta-filename:     ".$metafilename.PHP_EOL;
 echo "Writing to:        ".EXT.$year."/".$month."/".$base.'.E'.'n'.'    (n is the block number)'.PHP_EOL;
 
-fwrite(STDOUT,"target".EXT.$year."/".$month."/".$base);			#write filename base to stdout, for input into stage2 processing!
+fwrite(STDOUT,"filename_output1:".EXT.$year."/".$month."/".$base);			#write filename base to stdout, for input into stage2 processing!
 
 if (!is_dir(EXT.$year))									#make directory named with date if non-existent. (Failing here 24-06-15)
 	mkdir(EXT.$year,0750);

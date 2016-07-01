@@ -8,6 +8,9 @@ session_destroy();
 
 set_time_limit(5);
 
+$stdin_input=file_get_contents("php://stdin",'r');
+echo PHP_EOL.$stdin_input.PHP_EOL;
+
 require 'meta_file_functions.php';
 
 define("RAW","/cluster/data/raw");
@@ -38,17 +41,20 @@ function spinrate($year,$month,$day,$sc,$version)
 	return $deltatime;
 }
 
-$stdin_input=file_get_contents("php://stdin",'r');
 
-$target_pos = strpos($stdin_input, 'target');
-if ($target_pos)
+$target_pos = strpos($stdin_input, "filename_output2:");
+
+$filename = substr($stdin_input,$target_pos+strlen("filename_output2:"),41);	#file picked starts after "target" string in the input
+
+if (!(substr($filename,0,strlen(EXT)) == EXT))
 {
-$filename = substr($stdin_input,$target_pos+6,41);	#file picked starts after "target" string in the input
+	exit("No filename supplied to stage3_select".PHP_EOL);
 }
 else
-{exit("No filename supplied to stage3_select".PHP_EOL);}
+{
+	echo "Stage2 Input Filename (now in stage3_select): ".$filename.PHP_EOL;
+}
 
-echo "Stage2 Input Filename (now in stage3_select): ".$filename.PHP_EOL;
 $fileparts = explode("/",$filename);
 $year=   substr(end($fileparts),3,2);
 if ($year < 2000){$year+=2000;}
@@ -56,6 +62,8 @@ $month = substr(end($fileparts),5,2);
 $day =   substr(end($fileparts),7,2);
 
 echo "Selected Date: ".date("Y/m/d",mktime(0,0,0,$month,$day,$year)).PHP_EOL;
+
+$found=FALSE;
 
 if (($year!="") && ($month!=""))
 {
@@ -114,7 +122,7 @@ if (($year!="") && ($month!=""))
 						}
 						while(!$use and $index<100); #do while loop
 						
-						#echo "Use : ".$index;
+						echo "Index: ".$index.PHP_EOL;
 						echo read_meta($extmodeentrymetafile,"EventTime_ISO",chr(ord("A")+$index)).PHP_EOL;
 						echo $this_event_date.PHP_EOL;
 						echo read_meta($extmodeentrymetafile,"Block",chr(ord("A")+$index)).PHP_EOL;
@@ -123,11 +131,17 @@ if (($year!="") && ($month!=""))
 						if ((read_meta($extmodeentrymetafile,"EventTime_ISO",chr(ord("A")+$index))==$this_event_date) and (read_meta($extmodeentrymetafile,"Block",chr(ord("A")+$index))==$this_event_block))
 							{	
 							#echo "<FONT COLOR=\"#40FF40\"><B>Recommended</B></FONT>";
+							$source_file = read_meta($extmodeentrymetafile,"FileName",chr(ord("A")+$index));
+							$fileparts = explode("/",$source_file);
+							$year=   substr(end($fileparts),3,2);
+							if ($year < 2000){$year+=2000;}
+							$month = substr(end($fileparts),5,2);
+							$day =   substr(end($fileparts),7,2);
 							$filepicked = substr($filename,0,29)."/C".$sc."_".date("ymd",mktime(0,0,0,$month,$day,$year))."_".chr(ord("A")+$age).".E".$ext;
-							echo "Stage 3 Selection: File picked: ".PHP_EOL;
+							echo "Stage 3_Selection file picked:";
 							echo $filepicked.PHP_EOL;
-
-							fwrite(STDOUT,"target".$filepicked.PHP_EOL);			#write filename base to stdout, for input into stage3!
+							$found = TRUE;
+							fwrite(STDOUT,"filename_output3:".$filepicked.PHP_EOL);			#write filename base to stdout, for input into stage3!
 							
 							break 3; 
 							}
@@ -140,8 +154,7 @@ if (($year!="") && ($month!=""))
 			}
 	}
 }
-
-echo "Not found".PHP_EOL;
+if (!($found)) {echo "Not found".PHP_EOL;}
 
 #session_destroy();
 ?>

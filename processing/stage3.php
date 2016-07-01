@@ -16,6 +16,9 @@ require 'meta_file_functions.php';
 
 set_time_limit(120);
 
+$stdin_input=file_get_contents("php://stdin",'r');
+echo PHP_EOL.$stdin_input.PHP_EOL;
+echo "Stage 3".PHP_EOL;
 // Take a floating point value, and return an array with four bytes (to be passed into the C
 // functions which require data types such as fgmtvec.  See the "FGM Data Processing Handbook".
 
@@ -308,19 +311,16 @@ define("COORD",1);
 $extsensor=0;
 $extadc=1;
 
-
-$stdin_input=file_get_contents("php://stdin",'r');
-
 #eg.          /cluster/data/extended/2016/01/C1_160101_B.E0
 # in my case, /home/ahk114/extended/2016/01/C1_160101_B.E0
-$target_pos = strpos($stdin_input, 'target');
-if ($target_pos)
+$target_pos = strpos($stdin_input, "filename_output3:");
+$filepicked = substr($stdin_input,$target_pos+strlen("filename_output3:"),44);	#file picked starts after "target" string in the input
+if (!(substr($filepicked,0,strlen(EXT)) == EXT))
 {
-$filepicked = substr($stdin_input,$target_pos+6,44);	#file picked starts after "target" string in the input
+	exit("No filename supplied to stage3".PHP_EOL);
 }
-else
-{exit("No filename supplied to stage3".PHP_EOL);}
-echo "Filepicked: ".$filepicked.PHP_EOL;
+
+echo "Filepicked:".$filepicked.PHP_EOL;
 
 $year=substr(basename($filepicked),3,2);
 $month=substr(basename($filepicked),5,2);
@@ -375,7 +375,7 @@ $section=substr($filepicked,-1,1);				#picks out last character - the section
 
 $start=read_meta(EXT.'20'.$year.'/'.$month.'/'.substr(basename($filepicked),0,-3).".META","ExtendedModeEntry_Unix",$section);
 
-#echo "\$start=".$start."<BR>";
+echo "Start: ".$start.PHP_EOL;
 
 $current=$start;												#Extended Mode Entry
 

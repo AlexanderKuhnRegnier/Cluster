@@ -15,6 +15,9 @@ set_time_limit(5);
 
 $verbose=FALSE;																	#global boolean, set if debugging required, ignore commands involving it
 
+$stdin_input=file_get_contents("php://stdin",'r');
+echo PHP_EOL.$stdin_input.PHP_EOL;
+
 echo "Starting Stage2".PHP_EOL;
 
 require 'meta_file_functions.php';
@@ -29,19 +32,21 @@ define("EXT","/home/ahk114/extended/");
 
 #eg. /cluster/data/extended/2016/01/C1_160101_B
 # in my case, /home/ahk114/extended/2016/01/C1_160101_B
-$stdin_input=file_get_contents("php://stdin",'r');
 
-$target_pos = strpos($stdin_input, 'target');
-if ($target_pos)
+
+$target_pos = strpos($stdin_input,"filename_output1:");
+$filename = substr($stdin_input,$target_pos+strlen("filename_output1:"),41);	#file picked starts after "target" string in the input
+if (!(substr($filename,0,strlen(EXT)) == EXT))
 {
-$filename = substr($stdin_input,$target_pos+6,41);	#file picked starts after "target" string in the input
+	exit("No filename supplied to stage2".PHP_EOL);
 }
 else
-{exit("No filename supplied to stage2".PHP_EOL);}
+{
+	echo "Stage1 Input Filename: ".$filename.PHP_EOL;
+}
 
-echo "Stage1 Input Filename: ".$filename.PHP_EOL;
+fwrite(STDOUT,"filename_output2:".$filename.PHP_EOL);			#write filename base to stdout, for input into stage3 selection!
 
-fwrite(STDOUT,"target".$filename.PHP_EOL);			#write filename base to stdout, for input into stage3 selection!
 
 function fgetb($handle)
 	/** Returns the ASCII value of the current character in the handle (Handle is often the .SCCH file). ##.SCCH files are S/C command files.
@@ -254,7 +259,7 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 	}
 	
 	$where_filename=EXT.date("Y/m/",$start)."C".$sc."_".date("ymd",$start)."_".$vers.".META";		#new META file for actual date of ext mode
-	echo "Where Filename ".$where_filename;
+	echo "Where Filename ".$where_filename.PHP_EOL;
 	$event=array();
 	$unused_event=array();
 	
@@ -294,9 +299,9 @@ for($n=0;$n<$numberofblocks;$n++)											#iterate over the number of blocks i
 				$unused_event[$i]['source_unix']=read_meta($where_filename,"Source_Unix",chr(ord("A")+$i));
 			}
 		}
-		echo "READ WHERE (EVENT)";
+		echo "READ WHERE (EVENT)".PHP_EOL;
 		echo var_dump($event);
-		echo "UNUSED";
+		echo "UNUSED".PHP_EOL;
 		echo var_dump($unused_event);	
 	}
 	if (!file_exists(EXT.date("Y",$start)))			mkdir(EXT.date("Y",$start));

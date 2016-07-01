@@ -68,7 +68,6 @@ $shortyear=sprintf("%02d",$year-2000);
 $month=sprintf("%02d",$month);
 $day=sprintf("%02d",$day);
 
-
 define("FORWARDS","f");
 define("BACKWARDS","b");
 
@@ -126,7 +125,10 @@ else
 		$cmd = "php stage1.php".$option_string." | php stage2.php";
 		echo "Executing: ".$cmd.PHP_EOL;	
 		exec($cmd,$output);
-		var_dump($output);
+		$stringout = implode("\n",$output);
+		echo "Pre processing output".PHP_EOL."++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
+		echo $stringout.PHP_EOL;
+		echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 		}
 	}
 	elseif ($direction == BACKWARDS)
@@ -142,7 +144,10 @@ else
 		$cmd = "php stage1.php".$option_string." | php stage2.php";
 		echo "Executing: ".$cmd.PHP_EOL;	
 		exec($cmd,$output);
-		var_dump($output);
+		$stringout = implode("\n",$output);
+		echo "Pre processing output".PHP_EOL."++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
+		echo $stringout.PHP_EOL;
+		echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 		$time_unix = $time_unix - $i*86400;
 		}
 	}
@@ -164,11 +169,13 @@ if ($direction == FORWARDS)
 		$day=   date("d",$time_unix);
 		$option_string = " -y".$year." -m".$month." -d".$day." -s".$sc;
 		$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php | php stage3.php";
-		#$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php";		
+		#$cmd = "php stage1.php".$option_string." | php stage2.php";		
 		echo "Executing: ".$cmd.PHP_EOL;
 		exec($cmd,$output);
-		var_dump($output);
-		echo "Output: ".PHP_EOL.$output;
+		$stringout = implode("\n",$output);
+		echo "Processing output".PHP_EOL."++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
+		echo $stringout.PHP_EOL;
+		echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 		$time_unix = $time_unix + 86400; 
 	}
 }
@@ -187,8 +194,10 @@ elseif ($direction == BACKWARDS)
 		#$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php";		
 		echo "Executing: ".$cmd.PHP_EOL;
 		exec($cmd,$output);
-		var_dump($output);
-		echo "Output: ".PHP_EOL.$output;
+		$stringout = implode("\n",$output);
+		echo "Processing output".PHP_EOL."++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
+		echo $stringout.PHP_EOL;
+		echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 		$time_unix = $time_unix + 86400; 
 	}	
 }
