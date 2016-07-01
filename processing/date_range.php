@@ -122,7 +122,7 @@ else
 		$year=  date("Y",$time_unix);
 		$month= date("m",$time_unix);
 		$day=   date("d",$time_unix);
-		$option_string = " -y".$year." -m".$month." -d".$day." -sc".$sc;
+		$option_string = " -y".$year." -m".$month." -d".$day." -s".$sc;
 		$cmd = "php stage1.php".$option_string." | php stage2.php";
 		echo "Executing: ".$cmd.PHP_EOL;	
 		exec($cmd,$output);
@@ -138,7 +138,7 @@ else
 		$year=  date("Y",$time_unix);
 		$month= date("m",$time_unix);
 		$day=   date("d",$time_unix);
-		$option_string = " -y".$year." -m".$month." -d".$day." -sc".$sc;
+		$option_string = " -y".$year." -m".$month." -d".$day." -s".$sc;
 		$cmd = "php stage1.php".$option_string." | php stage2.php";
 		echo "Executing: ".$cmd.PHP_EOL;	
 		exec($cmd,$output);
@@ -162,7 +162,7 @@ if ($direction == FORWARDS)
 		$year=  date("Y",$time_unix);
 		$month= date("m",$time_unix);
 		$day=   date("d",$time_unix);
-		$option_string = " -y".$year." -m".$month." -d".$day." -sc".$sc;
+		$option_string = " -y".$year." -m".$month." -d".$day." -s".$sc;
 		$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php | php stage3.php";
 		#$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php";		
 		echo "Executing: ".$cmd.PHP_EOL;
@@ -182,7 +182,7 @@ elseif ($direction == BACKWARDS)
 		$year=  date("Y",$time_unix);
 		$month= date("m",$time_unix);
 		$day=   date("d",$time_unix);
-		$option_string = " -y".$year." -m".$month." -d".$day." -sc".$sc;
+		$option_string = " -y".$year." -m".$month." -d".$day." -s".$sc;
 		$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php | php stage3.php";
 		#$cmd = "php stage1.php".$option_string." | php stage2.php | php stage3_select.php";		
 		echo "Executing: ".$cmd.PHP_EOL;

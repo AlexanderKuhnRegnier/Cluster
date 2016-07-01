@@ -547,7 +547,7 @@ $version = null;
 $shortopts  = "d:";
 $shortopts .= "m:";
 $shortopts .= "y:";
-$shortopts .= "sc:";
+$shortopts .= "s:";
 #$shortopts .= "ver:"; #select version automatically
 
 $options = getopt($shortopts);
@@ -561,9 +561,9 @@ if (array_key_exists("d",$options)){$day   = $options["d"];}
 else {exit("Please select a Day!".PHP_EOL);}
 
 #verification of input parameters, php automatically converts between string and int
-if (array_key_exists("sc",$options))
+if (array_key_exists("s",$options))
 {
-	$sc = sprintf('%1d',$options["sc"]);
+	$sc = sprintf('%1d',$options["s"]);
 	if ($sc > 4 || $sc < 1)
 	{
 		exit("Invalid Spacecraft!".PHP_EOL);
