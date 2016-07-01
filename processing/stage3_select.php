@@ -141,7 +141,7 @@ if (($year!="") && ($month!=""))
 							echo "Stage 3_Selection file picked:";
 							echo $filepicked.PHP_EOL;
 							$found = TRUE;
-							fwrite(STDOUT,"filename_output3:".$filepicked.PHP_EOL);			#write filename base to stdout, for input into stage3!
+							fwrite(STDOUT,"filename_output3:".$filepicked.PHP_EOL);					#write filename base to stdout, for input into stage3!
 							
 							break 3; 
 							}

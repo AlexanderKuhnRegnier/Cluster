@@ -182,20 +182,20 @@ function getcal($sc)
 	// ----
 	// ----
 	// Gain Z
-
-	$cal=fopen("/cluster/operations/calibration/default/C".$sc.".fgmcal","rb");
+	
+	$cal=fopen("/cluster/operations/calibration/default/C".$sc.".fgmcal","rb"); #1 file like this is only for 1 spacecraft!!
 	if ($cal)
 	{
-		$dummy=fgets($cal,256); 												#skips first line
+		$dummy=fgets($cal,256); 												#skips first line, containing date/time info
 		for($adc=1;$adc<3;$adc++)
 		{
-			for($sensor=0;$sensor<2;$sensor++)
+			for($sensor=0;$sensor<2;$sensor++)									#goes through 12 lines in total, which cover 1 configuration, eg. OB+ADC1, or IB+ADC2
 			{
 				fscanf($cal,"%f %f %f %f %f %s",&$offsetx[$adc][$sensor][2],	#only takes into account ranges 2,3,4,5 - skips range 7
 				                                &$offsetx[$adc][$sensor][3],
 				                                &$offsetx[$adc][$sensor][4],
 				                                &$offsetx[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);				#here,range 7 and identifier string is skipped (eg. S2_32)
+				                                &$dummy1,&$dummy2);				#here,range 7 (dummy1) and identifier string (dummy2) is skipped (eg. S2_32)
 
 				fscanf($cal,"%f %f %f %f %f %s",&$offsety[$adc][$sensor][2],
 				                                &$offsety[$adc][$sensor][3],
@@ -215,7 +215,7 @@ function getcal($sc)
 				                                &$gainx[$adc][$sensor][5],
 				                                &$dummy1,&$dummy2);
 
-				$dummy=fgets($cal,256); $dummy=fgets($cal,256); $dummy=fgets($cal,256);	#skips 3 lines (IB sensor values)
+				$dummy=fgets($cal,256); $dummy=fgets($cal,256); $dummy=fgets($cal,256);	#skips 3 lines
 
 				fscanf($cal,"%f %f %f %f %f %s",&$gainy[$adc][$sensor][2],
 				                                &$gainy[$adc][$sensor][3],
@@ -223,7 +223,7 @@ function getcal($sc)
 				                                &$gainy[$adc][$sensor][5],
 				                                &$dummy1,&$dummy2);
 
-				$dummy=fgets($cal,256); $dummy=fgets($cal,256); $dummy=fgets($cal,256);
+				$dummy=fgets($cal,256); $dummy=fgets($cal,256); $dummy=fgets($cal,256);	#skips 3 lines
 
 				fscanf($cal,"%f %f %f %f %f %s",&$gainz[$adc][$sensor][2],
 				                                &$gainz[$adc][$sensor][3],
@@ -327,7 +327,17 @@ $month=substr(basename($filepicked),5,2);
 $day=substr(basename($filepicked),7,2);
 $sc=substr(basename($filepicked),1,1);
 $version=substr(basename($filepicked),10,1);
+$block = substr($filepicked,strlen($filepicked)-1,1);
 
+$meta_file = substr($filepicked,0,strlen($filepicked)-2).'META';
+echo "Meta File:".$meta_file.PHP_EOL;
+if (!(file_exists($meta_file))){exit("Stage3, meta file not found!");}
+if (!(filesize($meta_file))){exit("Stage3 Meta file empty!");}
+extmodeentry_unix = read_meta($meta_file,"ExtendedModeEntry_Unix",$block);
+extmodeexit_unix = read_meta($meta_file,"ExtendedModeExit_Unix",$block);
+/*
+To Do - get orbit times - and from there, get the proper calibration filename in the getcal method!
+*/
 getcal($sc);
 #echo '<PRE><FONT SIZE=-1>';
 #displaycal($sc);
