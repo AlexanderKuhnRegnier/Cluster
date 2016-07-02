@@ -338,7 +338,7 @@ extmodeexit_unix = read_meta($meta_file,"ExtendedModeExit_Unix",$block);
 /*
 To Do - get orbit times - and from there, get the proper calibration filename in the getcal method!
 */
-getcal($sc);
+getcal($sc);		#need to modify this!!
 #echo '<PRE><FONT SIZE=-1>';
 #displaycal($sc);
 #echo '</PRE></FONT>';
