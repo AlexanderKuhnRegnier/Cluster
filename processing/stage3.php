@@ -329,14 +329,9 @@ $sc=substr(basename($filepicked),1,1);
 $version=substr(basename($filepicked),10,1);
 $block = substr($filepicked,strlen($filepicked)-1,1);
 
-$meta_file = substr($filepicked,0,strlen($filepicked)-2).'META';
-echo "Meta File:".$meta_file.PHP_EOL;
-if (!(file_exists($meta_file))){exit("Stage3, meta file not found!");}
-if (!(filesize($meta_file))){exit("Stage3 Meta file empty!");}
-extmodeentry_unix = read_meta($meta_file,"ExtendedModeEntry_Unix",$block);
-extmodeexit_unix = read_meta($meta_file,"ExtendedModeExit_Unix",$block);
 /*
 To Do - get orbit times - and from there, get the proper calibration filename in the getcal method!
+-> in file getcalfile.php!
 */
 getcal($sc);		#need to modify this!!
 #echo '<PRE><FONT SIZE=-1>';
