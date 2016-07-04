@@ -83,12 +83,12 @@ function calfile_select($calfiles)
 }
 
 #filepicked in my case, eg. /home/ahk114/extended/2016/01/C1_160101_B.E0
-function getcalfile($filepicked)
+function getcalfile($sc,$filepicked)
 {
 	global $verbose;
 	
 	$block = substr($filepicked,strlen($filepicked)-1,1);
-	$sc=substr(basename($filepicked),1,1);
+	#$sc=substr(basename($filepicked),1,1);
 	$meta_file = substr($filepicked,0,strlen($filepicked)-2).'META';
 	echo "Meta File:".$meta_file.PHP_EOL;
 	if (!(file_exists($meta_file))){echo "getcalfile, meta file not found!".PHP_EOL; return 0;}
