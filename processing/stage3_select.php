@@ -11,7 +11,8 @@ set_time_limit(5);
 $stdin_input=file_get_contents("php://stdin",'r');
 echo PHP_EOL.$stdin_input.PHP_EOL;
 
-require 'meta_file_functions.php';
+#require 'meta_file_functions.php';
+require_once '/home/ahk114/Cluster/processing/meta_file_functions.php';
 
 define("RAW","/cluster/data/raw");
 define("EXT",'/home/ahk114/extended');

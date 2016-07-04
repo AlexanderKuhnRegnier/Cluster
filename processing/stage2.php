@@ -20,7 +20,8 @@ echo PHP_EOL.$stdin_input.PHP_EOL;
 
 echo "Starting Stage2".PHP_EOL;
 
-require 'meta_file_functions.php';
+#require 'meta_file_functions.php';
+require_once '/home/ahk114/Cluster/processing/meta_file_functions.php';
 require 'iso.php';
 
 define("EXTMODECOMMAND_INITIATE","SFGMJ059 SFGMJ064 SFGMSEXT");					#string to recognise extended mode commands in the .SCCH files

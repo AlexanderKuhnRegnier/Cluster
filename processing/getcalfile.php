@@ -4,12 +4,12 @@
 /*
 Delete the following line for deployment or figure out why permission to normal session folder are denied
 */
-session_destroy();
-require 'meta_file_functions.php';
-
-define("RAW","/cluster/data/raw/");
-define("EXT",'/home/ahk114/extended/');
-define("CAL",'/cluster/caa/calibration/');
+#session_destroy();
+#require 'meta_file_functions.php';
+require_once '/home/ahk114/Cluster/processing/meta_file_functions.php';
+if (!(defined('RAW'))){define('RAW',"/cluster/data/raw/");}
+if (!(defined('EXT'))){define('EXT','/home/ahk114/extended/');}
+if (!(defined('CAL'))){define('CAL','/cluster/caa/calibration/');}
 
 $verbose = TRUE;
 

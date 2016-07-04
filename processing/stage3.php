@@ -12,7 +12,9 @@ define("RESETPERIOD",5.152);
 
 define("PREREAD",32768);
 
-require 'meta_file_functions.php';
+#require 'meta_file_functions.php';
+require_once '/home/ahk114/Cluster/processing/meta_file_functions.php';
+require 'getcalfile.php';
 
 set_time_limit(120);
 
@@ -153,7 +155,7 @@ function lastextendedmode($year,$month,$day,$hour,$minute,$second,$sc,$version="
 	return $extmode;
 }
 	
-function getcal($sc)
+function getcal($sc,$filepicked)
 {
 	global $gainx,$gainy,$gainz,$offsetx,$offsety,$offsetz;
 
@@ -182,8 +184,21 @@ function getcal($sc)
 	// ----
 	// ----
 	// Gain Z
+	/*
+	$calfile = "/cluster/operations/calibration/default/C".$sc.".fgmcal";
+	$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!	
+	*/
 	
-	$cal=fopen("/cluster/operations/calibration/default/C".$sc.".fgmcal","rb"); #1 file like this is only for 1 spacecraft!!
+	if ($calfile=getcalfile($sc,$filepicked))
+	{
+		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!		
+	}
+	else
+	{
+		$calfile = "/cluster/operations/calibration/default/C".$sc.".fgmcal";
+		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!
+	}
+	
 	if ($cal)
 	{
 		$dummy=fgets($cal,256); 												#skips first line, containing date/time info
@@ -249,7 +264,6 @@ function getcal($sc)
 	}
 }
 
-
 function modifycal($sc)
 /*
 Takes obtained calibration parameters from getcal() and adapts it to use for the spin-averaged vectors 
@@ -294,11 +308,10 @@ function displaycal($sc)
 		}
 	}
 }
-
-define("RAW","/cluster/data/raw/");
+if (!(defined('RAW'))){define('RAW',"/cluster/data/raw/");}
 define("EXTMODECOMMAND","SFGMJ059 SFGMJ064 SFGMSEXT SFGMM002");
 #define("EXT",'/cluster/data/extended/');
-define("EXT",'/home/ahk114/extended/');
+if (!(defined('EXT'))){define('EXT','/home/ahk114/extended/');}
 #define("PROC",'/cluster/data/reference/');
 define("PROC",'/home/ahk114/reference/');
 
@@ -333,7 +346,7 @@ $block = substr($filepicked,strlen($filepicked)-1,1);
 To Do - get orbit times - and from there, get the proper calibration filename in the getcal method!
 -> in file getcalfile.php!
 */
-getcal($sc);		#need to modify this!!
+getcal($sc,$filepicked);		#need to modify this!!
 #echo '<PRE><FONT SIZE=-1>';
 #displaycal($sc);
 #echo '</PRE></FONT>';

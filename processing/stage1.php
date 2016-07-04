@@ -13,7 +13,8 @@ session_destroy();
 //The Meta functions, here we only use write_meta and inc_meta
 #created META files go into the EXT directory
 
-require("meta_file_functions.php");
+#require 'meta_file_functions.php';
+require_once '/home/ahk114/Cluster/processing/meta_file_functions.php';
 
 function convert($b0,$b1,$b2,$b3,$b4,$b5,$b6,$b7,$comment)
 {
