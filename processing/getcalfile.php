@@ -9,16 +9,26 @@ Delete the following line for deployment or figure out why permission to normal 
 require_once '/home/ahk114/Cluster/processing/meta_file_functions.php';
 if (!(defined('RAW'))){define('RAW',"/cluster/data/raw/");}
 if (!(defined('EXT'))){define('EXT','/home/ahk114/extended/');}
-if (!(defined('CAL'))){define('CAL','/cluster/caa/calibration/');}
 
 $verbose = TRUE;
 
-function calfile_array($Year,$month,$day,$sc)
+function calfile_array($Year,$month,$day,$sc,$calibration_dir)
 {	
 	global $verbose;
-	
-	$cmd = 'find '.CAL.' -name "C'.$sc.'_CC_FGM_CALF__'.$Year.$month.$day.'_*'.'"';
-	#$cmd = 'find '.CAL.' -name "C'.$sc.'_CC_FGM_CALF__'.$Year.$month.'*'.'"'; #this would be for a whole month -testing
+	if ($calibration_dir==CAACAL)
+	{
+		$cmd = 'find '.$calibration_dir.' -name "C'.$sc.'_CC_FGM_CALF__'.$Year.$month.$day.'_*'.'"';
+		#$cmd = 'find '.$calibration_dir.' -name "C'.$sc.'_CC_FGM_CALF__'.$Year.$month.'*'.'"'; #this would be for a whole month -testing
+	}
+	elseif ($calibration_dir==DAILYCAL)
+	{
+		$cmd = 'find '.$calibration_dir.' -name "C'.$sc.'_'.$Year.$month.$day.'_*'.'"';
+	}
+	else
+	{
+		echo "Neither CAA or DAILY selected, aborting".PHP_EOL;
+		return 0;
+	}
 	if ($verbose)
 	{
 		echo "Executing:".$cmd;
@@ -34,7 +44,7 @@ function calfile_array($Year,$month,$day,$sc)
 	$values = array();
 	foreach ($output as $value)
 	{
-		if (substr($value,0,strlen(CAL)))
+		if (substr($value,0,strlen($calibration_dir))==$calibration_dir)
 		{
 			$calfiles[] = $value;
 			if ($verbose)
@@ -83,12 +93,11 @@ function calfile_select($calfiles)
 }
 
 #filepicked in my case, eg. /home/ahk114/extended/2016/01/C1_160101_B.E0
-function getcalfile($sc,$filepicked)
+function getcalfile($sc,$filepicked,$calibration_dir)
 {
 	global $verbose;
 	
 	$block = substr($filepicked,strlen($filepicked)-1,1);
-	#$sc=substr(basename($filepicked),1,1);
 	$meta_file = substr($filepicked,0,strlen($filepicked)-2).'META';
 	echo "Meta File:".$meta_file.PHP_EOL;
 	if (!(file_exists($meta_file))){echo "getcalfile, meta file not found!".PHP_EOL; return 0;}
@@ -106,7 +115,7 @@ function getcalfile($sc,$filepicked)
 	$version_list = array('B','K','A');
 	$found = FALSE;
 	
-	for($time_unix = $extmodeentry_unix; $time_unix > ($extmodeentry_unix-10*86400); $time_unix-=86400)
+	for($time_unix = $extmodeentry_unix; $time_unix > ($extmodeentry_unix-10*86400); $time_unix-=86400) #looking back a maximum of 10 days - is this too many days?
 	{
 		foreach ($version_list as $ver)
 		{
@@ -156,7 +165,7 @@ function getcalfile($sc,$filepicked)
 	{
 		echo "YYYY MM DD".PHP_EOL.$Year.' '.$month.' '.$day.PHP_EOL;	
 	}
-	$output = calfile_array($Year,$month,$day,$sc);
+	$output = calfile_array($Year,$month,$day,$sc,$calibration_dir);
 	$calfiles = $output[0];
 	if ($calfile = calfile_select($calfiles))
 	{
@@ -171,7 +180,7 @@ function getcalfile($sc,$filepicked)
 		if ($daytime_unix < $halfday_unix && $daytime_unix > 0)
 		{
 			echo "No calibration file for the START REVOLUTION parameter time found, trying day before then after".PHP_EOL;
-			$output = calfile_array($Year,$month,$day-1,$sc);
+			$output = calfile_array($Year,$month,$day-1,$sc,$calibration_dir);
 			$calfiles = $output[0];
 			if ($calfile = calfile_select($calfiles))
 			{
@@ -180,7 +189,7 @@ function getcalfile($sc,$filepicked)
 			else
 			{
 				echo "No calibration file for day before found, trying day after".PHP_EOL;
-				$output = calfile_array($Year,$month,$day+1,$sc);
+				$output = calfile_array($Year,$month,$day+1,$sc,$calibration_dir);
 				$calfiles = $output[0];
 				if($calfile = calfile_select($calfiles))
 				{
@@ -196,7 +205,7 @@ function getcalfile($sc,$filepicked)
 		elseif ($daytime_unix >= $halfday_unix && $daytime_unix <= $day_unix)
 		{
 			echo "No calibration file for the START REVOLUTION parameter time found, trying day after then before".PHP_EOL;
-			$output = calfile_array($Year,$month,$day+1,$sc);
+			$output = calfile_array($Year,$month,$day+1,$sc,$calibration_dir);
 			$calfiles = $output[0];
 			if ($calfile = calfile_select($calfiles))
 			{
@@ -205,7 +214,7 @@ function getcalfile($sc,$filepicked)
 			else
 			{
 				echo "No calibration file for day before found, trying day after".PHP_EOL;
-				$output = calfile_array($Year,$month,$day-1,$sc);
+				$output = calfile_array($Year,$month,$day-1,$sc,$calibration_dir);
 				$calfiles = $output[0];
 				if($calfile = calfile_select($calfiles))
 				{

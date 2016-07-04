@@ -8,12 +8,15 @@ session_destroy();
 #ini_set('session.save_path','/home/ahk114'. '/testing/'. 'session/'); 
 #session_start();
 
+$verbose = TRUE;
+
 define("RESETPERIOD",5.152);
 
 define("PREREAD",32768);
 
 #require 'meta_file_functions.php';
 require_once '/home/ahk114/Cluster/processing/meta_file_functions.php';
+
 require 'getcalfile.php';
 
 set_time_limit(120);
@@ -157,7 +160,7 @@ function lastextendedmode($year,$month,$day,$hour,$minute,$second,$sc,$version="
 	
 function getcal($sc,$filepicked)
 {
-	global $gainx,$gainy,$gainz,$offsetx,$offsety,$offsetz;
+	global $gainx,$gainy,$gainz,$offsetx,$offsety,$offsetz,$verbose;
 
 	// [adc 1..2][sensor 0..1 (OB..IB)][sc 1..4][range 2..5]
 	//
@@ -184,51 +187,82 @@ function getcal($sc,$filepicked)
 	// ----
 	// ----
 	// Gain Z
+	
+	# for non-default calibration files
+	# Range 2, 3, 4, 5, 6
+	# ----
+	# ...
+	# ----
+	#!Range7
+	# Offset X   Offset Y   Offset Z 
+	#   M1          M2			M3
+	#	M4			M5			M6
+	#	M7			M8			M9
+	
+	#we care about the diagonal elements M1,M5,M9, since these are the gains, + some re-orthogonalisation which
+	#is assumed to be negligible for ext mode data processing.
+	#thus, effectively  M1 = Gain X
+	#					M2 = Gain Y
+	#					M3 = Gain Z
+	
 	/*
 	$calfile = "/cluster/operations/calibration/default/C".$sc.".fgmcal";
 	$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!	
 	*/
-	
-	if ($calfile=getcalfile($sc,$filepicked))
+	$use_caa = FALSE;
+	$use_daily = FALSE;
+	$use_default = FALSE;
+	if ($calfile=getcalfile($sc,$filepicked,CAACAL))
 	{
+		$use_caa = TRUE;
 		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!		
+	}
+	elseif ($calfile=getcalfile($sc,$filepicked,DAILYCAL))
+	{
+		$use_daily = TRUE;
+		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!			
 	}
 	else
 	{
+		$use_default = TRUE;
+		echo "Using default calibration".PHP_EOL;
 		$calfile = "/cluster/operations/calibration/default/C".$sc.".fgmcal";
 		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!
 	}
-	
-	if ($cal)
+	if ($cal)			#if cal file can be opened!
 	{
 		$dummy=fgets($cal,256); 												#skips first line, containing date/time info
 		for($adc=1;$adc<3;$adc++)
 		{
 			for($sensor=0;$sensor<2;$sensor++)									#goes through 12 lines in total, which cover 1 configuration, eg. OB+ADC1, or IB+ADC2
 			{
-				fscanf($cal,"%f %f %f %f %f %s",&$offsetx[$adc][$sensor][2],	#only takes into account ranges 2,3,4,5 - skips range 7
+				fscanf($cal,"%f %f %f %f %f %s",&$offsetx[$adc][$sensor][2],	#only takes into account ranges 2,3,4,5,6 - 6 may be referred to as range 7 in the actual cal file
 				                                &$offsetx[$adc][$sensor][3],
 				                                &$offsetx[$adc][$sensor][4],
 				                                &$offsetx[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);				#here,range 7 (dummy1) and identifier string (dummy2) is skipped (eg. S2_32)
+				                                &$offsetx[$adc][$sensor][6],
+												&$dummy2);				#here, identifier string (dummy2) is skipped (eg. S2_32)
 
 				fscanf($cal,"%f %f %f %f %f %s",&$offsety[$adc][$sensor][2],
 				                                &$offsety[$adc][$sensor][3],
 				                                &$offsety[$adc][$sensor][4],
 				                                &$offsety[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);
+				                                &$offsety[$adc][$sensor][6],
+												&$dummy2);
 
 				fscanf($cal,"%f %f %f %f %f %s",&$offsetz[$adc][$sensor][2],
 				                                &$offsetz[$adc][$sensor][3],
 				                                &$offsetz[$adc][$sensor][4],
 				                                &$offsetz[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);
+				                                &$offsetz[$adc][$sensor][6],
+												&$dummy2);
 
 				fscanf($cal,"%f %f %f %f %f %s",&$gainx[$adc][$sensor][2],
 				                                &$gainx[$adc][$sensor][3],
 				                                &$gainx[$adc][$sensor][4],
 				                                &$gainx[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);
+				                                &$gainx[$adc][$sensor][6],
+												&$dummy2);
 
 				$dummy=fgets($cal,256); $dummy=fgets($cal,256); $dummy=fgets($cal,256);	#skips 3 lines
 
@@ -236,7 +270,8 @@ function getcal($sc,$filepicked)
 				                                &$gainy[$adc][$sensor][3],
 				                                &$gainy[$adc][$sensor][4],
 				                                &$gainy[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);
+				                                &$gainy[$adc][$sensor][6],
+												&$dummy2);
 
 				$dummy=fgets($cal,256); $dummy=fgets($cal,256); $dummy=fgets($cal,256);	#skips 3 lines
 
@@ -244,15 +279,88 @@ function getcal($sc,$filepicked)
 				                                &$gainz[$adc][$sensor][3],
 				                                &$gainz[$adc][$sensor][4],
 				                                &$gainz[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);
+				                                &$gainz[$adc][$sensor][6],
+												&$dummy2);
 			}
 		}
+		#fill in values for range7 now
+		if ($verbose){echo "trying to extract range7 calibration from:".$calfile.PHP_EOL;}
+		while(($line = fgets($cal)) !== false)
+		{
+			if (strpos(strtolower($line),"#!range7") !== false)
+			{
+				fscanf($cal,"%f %f %f",&$r7offsetx,&$r7offsety,&$r7offsetz);
+				fscanf($cal,"%f %f %f",&$r7gainx,  &$dummy1,   &$dummy2);
+				fscanf($cal,"%f %f %f",&$dummy1,   &$r7gainy,  &$dummy2);
+				fscanf($cal,"%f %f %f",&$dummy1,   &$dummy2,   &$r7gainz);
+				break;
+			}
+		}
+		if ($use_daily)
+		{
+			$meta_file = substr($filepicked,0,strlen($filepicked)-2).'META';			
+			echo "Meta File:".$meta_file.PHP_EOL;
+			if (!(file_exists($meta_file))){echo "getcalfile, meta file not found!".PHP_EOL; return 0;}
+			if (!(filesize($meta_file))){echo "getcafile, Meta file empty!".PHP_EOL; return 0;}			
+			if ($verbose && $extmodeentry_unix)
+			{
+				echo "Extended mode entry:".$extmodeentry_unix.PHP_EOL;
+			}
+			if (!($extmodeentry_unix))
+			{
+				echo "No extended mode data in this dump!".PHP_EOL;
+				return 0;
+			}
+			$daily_range7_dir = '/cluster/operations/calibration/daily/range7/'.date("Y",$extmodeentry_unix).'/'.date("m",$extmodeentry_unix).'/';
+			$daily_range7_file = $daily_range7_dir.'C'.$sc.'_range7.fgmcal';
+			$cal7 = fopen($daily_range7_file, "rb");
+			if ($cal7)
+			{
+				fscanf($cal7,"%f",&$r7offsetx);
+				fscanf($cal7,"%f",&$r7offsety);
+				fscanf($cal7,"%f",&$r7offsetz);
+				fscanf($cal7,"%f",&$r7gainx);
+				$dummy=fgets($cal7,256); $dummy=fgets($cal7,256); $dummy=fgets($cal7,256);	#skips 3 lines
+				fscanf($cal7,"%f",&$r7gainy);
+				$dummy=fgets($cal7,256); $dummy=fgets($cal7,256); $dummy=fgets($cal7,256);	#skips 3 lines
+				fscanf($cal7,"%f",&$r7gainz);
+			}
+			
+		}
+		if ((!(isset($r7offsetx))) 
+			||	(!(isset($r7offsety))) 
+			|| (!(isset($r7offsetz))) 
+			|| (!(isset($r7gainx)))
+			|| (!(isset($r7gainy)))
+			|| (!(isset($r7gainz)))
+		){	#if these are not set, then assume that no range7 info was there, and fill it in with unit values
+		
+			$r7offsetx = 0;
+			$r7offsety = 0;
+			$r7offsetz = 0;
+			$r7gainx = 1;
+			$r7gainy = 1;
+			$r7gainz = 1;
+		}
+		for($adc=1;$adc<3;$adc++)			#is it valid to fill this info in for all adcs/sensors?
+		{
+			for($sensor=0;$sensor<2;$sensor++)
+			{
+				$offsetx[$adc][$sensor][7]=$r7offsetx;
+				$offsety[$adc][$sensor][7]=$r7offsety;
+				$offsetz[$adc][$sensor][7]=$r7offsetz;
+				$gainx[$adc][$sensor][7]=$r7gainx;
+				$gainy[$adc][$sensor][7]=$r7gainy;
+				$gainz[$adc][$sensor][7]=$r7gainz;
+			}
+		}
+		
 	}
 	else
 	{
 		for($adc=1;$adc<3;$adc++)
 			for($sensor=0;$sensor<2;$sensor++)
-				for($range=2;$range<6;$range++)
+				for($range=2;$range<8;$range++)
 				{
 					$offsetx[$adc][$sensor][$range]=0;
 					$offsety[$adc][$sensor][$range]=0;
@@ -278,7 +386,7 @@ influence on this component.
 
 	for($adc=1;$adc<3;$adc++)
 		for($sensor=0;$sensor<2;$sensor++)
-			for($range=2;$range<6;$range++)
+			for($range=2;$range<8;$range++)
 			{
 				$offsety[$adc][$sensor][$range]=0;
 				$offsetz[$adc][$sensor][$range]=0;
@@ -299,12 +407,19 @@ function displaycal($sc)
 	{
 		for($sensor=0;$sensor<2;$sensor++)
 		{
-			echo "S/C ".$sc." ADC ".$adc." Sensor ".$sensor."<BR>";
-			for($range=2;$range<6;$range++)
+			echo "S/C ".$sc." ADC ".$adc." Sensor ".$sensor.PHP_EOL;
+			for($range=2;$range<8;$range++)
 			{
-				printf("%d : <FONT COLOR=GRAY>%3.3f,%3.3f,%3.3f %3.3f %3.3f %3.3f</FONT> ",$range,$gainx[$adc][$sensor][$range],$gainy[$adc][$sensor][$range],$gainz[$adc][$sensor][$range],$offsetx[$adc][$sensor][$range],$offsety[$adc][$sensor][$range],$offsetz[$adc][$sensor][$range]);
+				printf("%d : %3.6f,%3.6f,%3.6f %3.3f %3.3f %3.3f",  $range,
+																	$gainx[$adc][$sensor][$range],
+																	$gainy[$adc][$sensor][$range],
+																	$gainz[$adc][$sensor][$range],
+																	$offsetx[$adc][$sensor][$range],
+																	$offsety[$adc][$sensor][$range],
+																	$offsetz[$adc][$sensor][$range]);
+				echo PHP_EOL;
 			}
-				echo "<BR>";
+				echo PHP_EOL;
 		}
 	}
 }
@@ -316,6 +431,9 @@ if (!(defined('EXT'))){define('EXT','/home/ahk114/extended/');}
 define("PROC",'/home/ahk114/reference/');
 
 define("COORD",1);
+
+define('CAACAL','/cluster/caa/calibration/');
+define('DAILYCAL','/cluster/operations/calibration/daily/');
 
 #require("headfoot.php");
 
@@ -346,6 +464,7 @@ $block = substr($filepicked,strlen($filepicked)-1,1);
 To Do - get orbit times - and from there, get the proper calibration filename in the getcal method!
 -> in file getcalfile.php!
 */
+
 getcal($sc,$filepicked);		#need to modify this!!
 #echo '<PRE><FONT SIZE=-1>';
 #displaycal($sc);
@@ -353,9 +472,9 @@ getcal($sc,$filepicked);		#need to modify this!!
 
 modifycal($sc);											#modifies calibration for use in despun vectors
 #echo '<PRE><FONT SIZE=-1>';
-#displaycal($sc);										#displays modified calibration
+displaycal($sc);										#displays modified calibration
 #echo '</PRE></FONT>';
-
+exit("TEST");
 $satt_name=RAW.'20'.$year.'/'.$month.'/C'.$sc.'_'.$year.$month.$day.'_'.$version.'.SATT';	#constructs name of attitude file
 #eg. $satt_name='/cluster/data/raw/'.'20'.'16'.'/'.'01'.'/C'.'1'.'_'.'16'.'01'.'01'.'_'.'A'.'.SATT';
 if (file_exists($satt_name) && ($satt_h=fopen($satt_name,"rb")))	#opens attitude file
