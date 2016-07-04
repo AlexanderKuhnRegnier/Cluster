@@ -126,16 +126,7 @@ function getcalfile($filepicked)
 		{
 			echo "getcalfile, trying to use:".$steffile.PHP_EOL;
 		}
-		/*
-		$steffilecontents = file_get_contents($steffile);
-		$searchstringpos = strpos($steffilecontents, "START REVOLUTION");
-		echo "Position:".$searchstringpos.PHP_EOL;
-		if (!$searchstringpos)
-		{
-			echo "No match found, trying earlier file".PHP_EOL;
-			#need to implement this!!! -now implemented
-		}
-		*/
+
 		$handle = fopen($steffile,"rb");
 		if ($handle)
 		{
@@ -158,9 +149,9 @@ function getcalfile($filepicked)
 	$Year = substr($line,27,4);
 	$month = substr($line,32,2);
 	$day = substr($line,35,2);
-	#$hours = substr($line,38,2);
-	#$minutes = substr($line,41,2);
-	#$seconds = substr($line,44,2);
+	$hours = substr($line,38,2);
+	$minutes = substr($line,41,2);
+	$seconds = substr($line,44,2);
 	if ($verbose)
 	{
 		echo "YYYY MM DD".PHP_EOL.$Year.' '.$month.' '.$day.PHP_EOL;	
@@ -173,34 +164,70 @@ function getcalfile($filepicked)
 	}
 	else
 	{
-		echo "No calibration file for the START REVOLUTION parameter time found, trying day before then after".PHP_EOL;
-		$output = calfile_array($Year,$month,$day-1,$sc);
-		$calfiles = $output[0];
-		if ($calfile = calfile_select($calfiles))
+		$halfday_unix = 86400/2;
+		$day_unix = 86400;
+		$daytime_unix = mktime($hours,$minutes,$seconds,$month,$day,$Year)-mktime(0,0,0,$month,$day,$Year);
+			
+		if ($daytime_unix < $halfday_unix && $daytime_unix > 0)
 		{
-			echo "Calibration file selected:".$calfile.PHP_EOL;				
-		}
-		else
-		{
-			echo "No calibration file for day before found, trying day after".PHP_EOL;
-			$output = calfile_array($Year,$month,$day+1,$sc);
+			echo "No calibration file for the START REVOLUTION parameter time found, trying day before then after".PHP_EOL;
+			$output = calfile_array($Year,$month,$day-1,$sc);
 			$calfiles = $output[0];
-			if($calfile = calfile_select($calfiles))
+			if ($calfile = calfile_select($calfiles))
 			{
-				echo "Calibration file selected:".$calfile.PHP_EOL;					
+				echo "Calibration file selected:".$calfile.PHP_EOL;				
 			}
 			else
 			{
-				exit("No calibration file found for day, day before or day after!".PHP_EOL);
+				echo "No calibration file for day before found, trying day after".PHP_EOL;
+				$output = calfile_array($Year,$month,$day+1,$sc);
+				$calfiles = $output[0];
+				if($calfile = calfile_select($calfiles))
+				{
+					echo "Calibration file selected:".$calfile.PHP_EOL;					
+				}
+				else
+				{
+					exit("No calibration file found for day, day before or day after!".PHP_EOL);
+				}
 			}
+		}
+		elseif ($daytime_unix >= $halfday_unix && $daytime_unix <= $day_unix)
+		{
+			echo "No calibration file for the START REVOLUTION parameter time found, trying day after then before".PHP_EOL;
+			$output = calfile_array($Year,$month,$day+1,$sc);
+			$calfiles = $output[0];
+			if ($calfile = calfile_select($calfiles))
+			{
+				echo "Calibration file selected:".$calfile.PHP_EOL;				
+			}
+			else
+			{
+				echo "No calibration file for day before found, trying day after".PHP_EOL;
+				$output = calfile_array($Year,$month,$day-1,$sc);
+				$calfiles = $output[0];
+				if($calfile = calfile_select($calfiles))
+				{
+					echo "Calibration file selected:".$calfile.PHP_EOL;					
+				}
+				else
+				{
+					exit("No calibration file found for day, day before or day after!".PHP_EOL);
+				}
+			}
+		}
+		else
+		{
+			exit("Timing information from stef file is wrong".PHP_EOL);
 		}
 	}
 	return $calfile;
 }
 
 /* Testing */
+/*
 #$filepicked = "/home/ahk114/extended/2015/03/C4_150305_B.E0";
-$filepicked = "/home/ahk114/extended/2016/01/C1_160101_B.E0";
+$filepicked = "/home/ahk114/extended/2016/01/C1_160108_B.E0";
 getcalfile($filepicked);
-
+*/
 ?>
