@@ -176,7 +176,18 @@ if ($direction == FORWARDS)
 		echo "Processing output".PHP_EOL."++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 		echo $stringout.PHP_EOL;
 		echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
-		$time_unix = $time_unix + 86400; 
+		$time_unix = $time_unix + 86400;
+		$counter=0;
+		$nr = sprintf('%03d',$counter);
+		$filename = '/home/ahk114/logs/'.$year.$month.$day.$nr.'.log';
+		while (file_exists($filename))
+		{
+			$counter+=1;
+			$nr = sprintf('%03d',$counter);
+			$filename = '/home/ahk114/logs/'.$year.$month.$day.$nr.'.log';			
+		}
+		echo $filename.PHP_EOL;
+		file_put_contents($filename,$stringout);
 	}
 }
 elseif ($direction == BACKWARDS)
@@ -199,6 +210,17 @@ elseif ($direction == BACKWARDS)
 		echo $stringout.PHP_EOL;
 		echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 		$time_unix = $time_unix + 86400; 
+		$counter=0;
+		$nr = sprintf('%03d',$counter);
+		$filename = '/home/ahk114/logs/'.$year.$month.$day.$nr.'.log';
+		while (file_exists($filename))
+		{
+			$counter+=1;
+			$nr = sprintf('%03d',$counter);
+			$filename = '/home/ahk114/logs/'.$year.$month.$day.$nr.'.log';			
+		}
+		echo $filename.PHP_EOL;
+		file_put_contents($filename,$stringout);
 	}	
 }
 echo PHP_EOL;
