@@ -119,7 +119,7 @@ function getcalfile($sc,$filepicked,$calibration_dir)
 	{
 		foreach ($version_list as $ver)
 		{
-			$steffile = RAW.date('Y',$time_unix).'/'.date('m',$time_unix).'/'.'C'.$sc.'_'.date('ymd',$time_unix).'_'.$ver.'.STEF';	
+			$steffile = RAW.date('Y',$time_unix).'/'.date('m',$time_unix).'/'.'C'.'3'.'_'.date('ymd',$time_unix).'_'.$ver.'.STEF';	 #get STEF file for sc 3, since this is the reference sc!!!!
 			if (file_exists($steffile) && filesize($steffile))
 			{
 				break;
@@ -173,6 +173,9 @@ function getcalfile($sc,$filepicked,$calibration_dir)
 	}
 	else
 	{
+		echo "No calfile".PHP_EOL;
+		#should not happen anymore, since sc3, the reference sc is now always selected for the STEF file!
+		/*
 		$halfday_unix = 86400/2;
 		$day_unix = 86400;
 		$daytime_unix = mktime($hours,$minutes,$seconds,$month,$day,$Year)-mktime(0,0,0,$month,$day,$Year);
@@ -231,7 +234,7 @@ function getcalfile($sc,$filepicked,$calibration_dir)
 		{
 			echo "Timing information from stef file is wrong".PHP_EOL;
 			return 0;
-		}
+		}*/
 	}
 	return $calfile;
 }
