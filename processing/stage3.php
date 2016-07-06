@@ -157,6 +157,106 @@ function lastextendedmode($year,$month,$day,$hour,$minute,$second,$sc,$version="
 
 	return $extmode;
 }
+
+function getcaldefault($sc)
+{
+	global $gainx,$gainy,$gainz,$offsetx,$offsety,$offsetz;
+	// [adc 1..2][sensor 0..1 (OB..IB)][sc 1..4][range 2..5]
+	//
+	// Order in Cal File
+	// OB     ADC1
+	//    IB  ADC1
+	// OB          ADC2
+	//    IB       ADC2
+	//
+	// Range 2, 3, 4, 5, 7
+	//
+	// Offset X
+	// Offset Y
+	// Offset Z
+	//
+	// Gain X
+	// ----
+	// ----
+	//
+	// ----
+	// Gain Y
+	// ----
+	//
+	// ----
+	// ----
+	// Gain Z
+	$cal=fopen("/cluster/operations/calibration/default/C".$sc.".fgmcal","rb");
+	if ($cal)
+	{
+		$dummy=fgets($cal,256); 												#skips first line
+		for($adc=1;$adc<3;$adc++)
+		{
+			for($sensor=0;$sensor<2;$sensor++)
+			{
+				fscanf($cal,"%f %f %f %f %f %s",&$offsetx[$adc][$sensor][2],	#only takes into account ranges 2,3,4,5 - skips range 7
+				                                &$offsetx[$adc][$sensor][3],
+				                                &$offsetx[$adc][$sensor][4],
+				                                &$offsetx[$adc][$sensor][5],
+				                                &$offsetx[$adc][$sensor][6],
+												&$dummy2);						#here,range 7 and identifier string is skipped (eg. S2_32)
+				fscanf($cal,"%f %f %f %f %f %s",&$offsety[$adc][$sensor][2],
+				                                &$offsety[$adc][$sensor][3],
+				                                &$offsety[$adc][$sensor][4],
+				                                &$offsety[$adc][$sensor][5],
+				                                &$offsety[$adc][$sensor][6],
+												&$dummy2);
+				fscanf($cal,"%f %f %f %f %f %s",&$offsetz[$adc][$sensor][2],
+				                                &$offsetz[$adc][$sensor][3],
+				                                &$offsetz[$adc][$sensor][4],
+				                                &$offsetz[$adc][$sensor][5],
+				                                &$offsetz[$adc][$sensor][6],
+												&$dummy2);
+				fscanf($cal,"%f %f %f %f %f %s",&$gainx[$adc][$sensor][2],
+				                                &$gainx[$adc][$sensor][3],
+				                                &$gainx[$adc][$sensor][4],
+				                                &$gainx[$adc][$sensor][5],
+				                                &$gainx[$adc][$sensor][6],
+												&$dummy2);
+				$dummy=fgets($cal,256); $dummy=fgets($cal,256); $dummy=fgets($cal,256);	#skips 3 lines (IB sensor values)
+				fscanf($cal,"%f %f %f %f %f %s",&$gainy[$adc][$sensor][2],
+				                                &$gainy[$adc][$sensor][3],
+				                                &$gainy[$adc][$sensor][4],
+				                                &$gainy[$adc][$sensor][5],
+				                                &$gainy[$adc][$sensor][6],
+												&$dummy2);
+				$dummy=fgets($cal,256); $dummy=fgets($cal,256); $dummy=fgets($cal,256);
+				fscanf($cal,"%f %f %f %f %f %s",&$gainz[$adc][$sensor][2],
+				                                &$gainz[$adc][$sensor][3],
+				                                &$gainz[$adc][$sensor][4],
+				                                &$gainz[$adc][$sensor][5],
+				                                &$gainz[$adc][$sensor][6],
+												&$dummy2);
+				$offsetx[$adc][$sensor][7] = 0;
+				$offsety[$adc][$sensor][7] = 0;
+				$offsetz[$adc][$sensor][7] = 0;
+				$gainx[$adc][$sensor][7]=1;
+				$gainy[$adc][$sensor][7]=1;
+				$gainz[$adc][$sensor][7]=1;
+			}
+		}
+	}
+	else
+	{
+		for($adc=1;$adc<3;$adc++)
+			for($sensor=0;$sensor<2;$sensor++)
+				for($range=2;$range<8;$range++)
+				{
+					$offsetx[$adc][$sensor][$range]=0;
+					$offsety[$adc][$sensor][$range]=0;
+					$offsetz[$adc][$sensor][$range]=0;
+					$gainx[$adc][$sensor][$range]=1;
+					$gainy[$adc][$sensor][$range]=1;
+					$gainz[$adc][$sensor][$range]=1;
+				}
+	}
+}
+
 	
 function getcal($sc,$filepicked)
 {
@@ -465,7 +565,14 @@ To Do - get orbit times - and from there, get the proper calibration filename in
 -> in file getcalfile.php!
 */
 
-getcal($sc,$filepicked);		#need to modify this!!
+echo "DEFAULT CAL".PHP_EOL;
+getcaldefault($sc,$filepicked);
+modifycal($sc);
+displaycal($sc);
+
+/*
+echo "CAA CAL".PHP_EOL;
+getcal($sc,$filepicked);
 #echo '<PRE><FONT SIZE=-1>';
 #displaycal($sc);
 #echo '</PRE></FONT>';
@@ -474,7 +581,7 @@ modifycal($sc);											#modifies calibration for use in despun vectors
 #echo '<PRE><FONT SIZE=-1>';
 displaycal($sc);										#displays modified calibration
 #echo '</PRE></FONT>';
-exit("TEST");
+*/
 $satt_name=RAW.'20'.$year.'/'.$month.'/C'.$sc.'_'.$year.$month.$day.'_'.$version.'.SATT';	#constructs name of attitude file
 #eg. $satt_name='/cluster/data/raw/'.'20'.'16'.'/'.'01'.'/C'.'1'.'_'.'16'.'01'.'01'.'_'.'A'.'.SATT';
 if (file_exists($satt_name) && ($satt_h=fopen($satt_name,"rb")))	#opens attitude file
@@ -537,9 +644,6 @@ $current=$start;												#Extended Mode Entry
 // 2001-11-16T19:46:00.750Z   26.887    0.000    0.000
 // 2001-11-16T19:46:04.760Z   26.829    0.000    0.000
 // 2001-11-16T19:46:08.772Z   26.800    0.000    0.000
-
-
-
 
 
 $extfile=file($filepicked);			#reads entire file to array $extfile (eg. filepicked=/cluster/data/extended/2016/01/C1_160101_B.E0)
@@ -648,7 +752,7 @@ for($n=0;$n<$loopsize;$n++)			#goes through all vectors in file
 			$bz=$instrz/$scale;
 
 		$bx=$bx*$gainx[$extadc][$extsensor][$range]-$offsetx[$extadc][$extsensor][$range];			#applies calibration to the b-field components
-//		$bx=$bx-$offsetx[$extadc][$extsensor][$range];
+
 		$by=$by*$k2*$gainy[$extadc][$extsensor][$range]-$offsety[$extadc][$extsensor][$range];
 		$bz=$bz*$k2*$gainz[$extadc][$extsensor][$range]-$offsetz[$extadc][$extsensor][$range];
 		
@@ -666,14 +770,6 @@ for($n=0;$n<$loopsize;$n++)			#goes through all vectors in file
 	$time1=integer2hex($time);					#seconds
 	$time2=integer2hex(floatbit($time)*1e9);	#nanoseconds
 
-// 	$teststuff=array( (($sc-1)<<6)+1,128+(COORD&7),16,($range<<4)+14,
-// 	                  $time1[0],$time1[1],$time1[2],$time1[3],
-// 	                  $time2[0],$time2[1],$time2[2],$time2[3],
-// 	                  $hexbx[0],$hexbx[1],$hexbx[2],$hexbx[3],
-// 	                  $hexby[0],$hexby[1],$hexby[2],$hexby[3],
-// 	                  $hexbz[0],$hexbz[1],$hexbz[2],$hexbz[3],
-// 	                  0,0,0,0,
-// 	                  0,0,0,0);
 
 	$teststuff=array(	($range<<4)+14,
 						16,
