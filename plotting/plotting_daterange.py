@@ -3,6 +3,7 @@ from bokeh.plotting import figure, output_file, show
 from numpy import linalg as LA
 from datetime import date,time,datetime,timedelta
 import os
+from getcaafile import getcaafile
 
 class vector:
     def __init__(self):
@@ -33,25 +34,29 @@ class vectorlist:
             self.vectors.append(v)
         else:
             raise Exception("This is not a vector")
-    def read_file(self,filename,limit=-1): 
-        self.filename = filename
-        counter = 0
-        with open(filename) as f:
-            for line in f:
-                try:
-                    v = vector()
-                    v.assigndatetime(np.datetime64(line[0:24]))
-                    x_mag = float(line[24:33])
-                    y_mag = float(line[33:42])
-                    z_mag = float(line[42:51])
-                    v.assignvalue(np.array([x_mag,y_mag,z_mag]))
-                    v.calcmagnitude()
-                    self.add_vector_entry(v)                 
-                except ValueError:
-                    print "Something wrong with line"
-                counter+=1
-                if counter==limit:
-                    break
+    def read_file(self,filename,limit=-1):
+        if '.cef.gz' in filename and '/caa/ic_archive/' in filename: #this is caa file, needs to be read differently!
+            self.filename=filename
+            
+        else:  
+            self.filename = filename
+            counter = 0
+            with open(filename) as f:
+                for line in f:
+                    try:
+                        v = vector()
+                        v.assigndatetime(np.datetime64(line[0:24]))
+                        x_mag = float(line[24:33])
+                        y_mag = float(line[33:42])
+                        z_mag = float(line[42:51])
+                        v.assignvalue(np.array([x_mag,y_mag,z_mag]))
+                        v.calcmagnitude()
+                        self.add_vector_entry(v)                 
+                    except ValueError:
+                        print "Something wrong with line"
+                    counter+=1
+                    if counter==limit:
+                        break
     def returndatetimes(self):
         return [vector.datetime for vector in self.vectors]
     def returnmagnitudes(self):
@@ -143,8 +148,8 @@ vfiles = vectorfiles()
 reffolderahk114 = "Y:/reference/"
 reffolder = "Z:/data/reference/"
 sc = 1
-start_date = date(2016,01,01)
-end_date = date(2016,01,5)
+start_date = date(2016,01,9)
+end_date = date(2016,01,14)
 dates = [start_date+timedelta(days=1)*i for i in range(abs(end_date-start_date).days)]
 for datev in dates:
     file_dict = {}
