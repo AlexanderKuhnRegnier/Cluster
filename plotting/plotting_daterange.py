@@ -32,6 +32,19 @@ class vectorlist:
                 print "Done merging list into current list"
         else:
             raise Exception("Not a vector list")
+    def prune(self,n=0,start_date=datetime(1,1,1),end_date=datetime(1,1,1)):
+        print "Before:",len(self.vectors)
+        td = end_date-start_date
+        if td.days > 0 and td.seconds >= 0:
+            self.vectors=[v for v in self.vectors if v.datetime > start_date
+                            if v.datetime < end_date]
+        elif td.days >= 0 and td.seconds > 0:
+            self.vectors=[v for v in self.vectors if v.datetime > start_date
+                            if v.datetime < end_date]
+        #decrease density of vectors
+        if n > 0:
+            self.vectors=[v for (i,v) in enumerate(self.vectors) if not i%n] 
+        print "After:",len(self.vectors)
     def add_vector_entry(self,v):
         if isinstance(v,vector):
             self.vectors.append(v)
@@ -135,7 +148,8 @@ class vectorlist:
                 print dates[i],data[i],self.filename
             '''
             if scatter:
-                p.circle(dates,data,color=color,legend=legend+' ('+plotwhich+')',size=1)
+                p.circle(dates,data,color=color,legend=legend+' ('+plotwhich+')',
+                         size=1)
             else:
                 p.line(dates,data,color=color,legend=legend)
         p.xaxis.axis_label = 'Time'
@@ -164,6 +178,11 @@ class vectorfiles:
         for array in self.array:
             #print array,array[0].filename
             print array[0].filename
+    def prune(self,n=0,start_date=datetime(1,1,1),end_date=datetime(1,1,1)):
+        for entry in self.array:
+            vlist = entry[0]
+            vlist.prune(n=n,start_date=start_date,end_date=end_date)
+        print "Done Pruning"
 
 def plot(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs):
     if start_date==end_date or end_date=='':
@@ -197,6 +216,8 @@ def plot(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs):
         log=False
     else:
         log=True
+        
+    vfiles.prune(start_date=datetime(2016,01,12,22),end_date=datetime(2016,01,13,8))
     vfiles.plotfiles(scatter=True,log=log)
             
 #filename = "Y:/reference/2015/12/C1_151231_B.EXT.GSE"
