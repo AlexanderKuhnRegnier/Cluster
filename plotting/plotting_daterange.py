@@ -6,6 +6,11 @@ import os
 from getfile import getfile
 import gzip
 
+prune_start=datetime(1,1,1)
+prune_end=datetime(1,1,1)
+prune_n=1
+end_date = ''
+
 class vector:
     def __init__(self):
         self.v = 0
@@ -109,6 +114,7 @@ class vectorlist:
         # show the results
         show(p)   
     def plotlists(self,array,scatter=True,log=False):
+        global scatter_size
         labels = [','.join([entry[2],entry[3]]) for entry in array]
         labels = '-'.join(set(labels))
         #array = [vlist,color,legend,plotwhich]
@@ -149,7 +155,7 @@ class vectorlist:
             '''
             if scatter:
                 p.circle(dates,data,color=color,legend=legend+' ('+plotwhich+')',
-                         size=1)
+                         size=scatter_size)
             else:
                 p.line(dates,data,color=color,legend=legend)
         p.xaxis.axis_label = 'Time'
@@ -185,6 +191,7 @@ class vectorfiles:
         print "Done Pruning"
 
 def plot(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs):
+    global prune_start,prune_end,prune_n
     if start_date==end_date or end_date=='':
         dates = start_date
     else:
@@ -197,7 +204,7 @@ def plot(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs):
         month = '{0:02d}'.format(datev.month)
         day = '{0:02d}'.format(datev.day)
 
-        for dir,colour,legend,plotwhich in zip(dirs,colours,legends,plotwhichs):
+        for [dir,ext],colour,legend,plotwhich in zip(dirs,colours,legends,plotwhichs):
             directory = dir+Year+'/'+month+'/'
             if 'Y:' in directory:
                 file = getfile(sc,Year,month,day,directory,ext=True)
@@ -217,36 +224,79 @@ def plot(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs):
     else:
         log=True
         
-    vfiles.prune(start_date=datetime(2016,01,12,22),end_date=datetime(2016,01,13,8))
+    if prune_start != datetime(1,1,1) and prune_end != datetime(1,1,1):
+        print "Pruning Dates"
+        vfiles.prune(start_date=prune_start,end_date=prune_end)
+    if prune_n > 1:
+        print "Pruning Points"
+        vfiles.prune(n=prune_n)
     vfiles.plotfiles(scatter=True,log=log)
             
 #filename = "Y:/reference/2015/12/C1_151231_B.EXT.GSE"
 
-
 vfiles = vectorfiles()
 refdirahk114 = "Y:/reference/"
-refdir = "Z:/data/reference/"
+refdir = "Z:/data/reference/" 
 caadir = 'Z:/caa/ic_archive/'
+#refdirahk114 = refdir
 sc = 1
-
-end_date = ''
 start_date = date(2016,01,8)
 end_date = date(2016,01,14)
+'''
+input = [directory,extmode 0 or 1 (off or on), colour, legend, whichdata ('mag','x','y','z')]
+'''
+input = [[caadir,0,'green','caa','mag'],
+         [refdirahk114,1,'red','ext mode caa','mag']
+]
 
+################
+'''
+pruning of output - fine date selection & point count reduction
+'''
+prune_start = datetime(2016,1,10,20)
+prune_end   = datetime(2016,1,10,22)
+prune_n     = 1
+#################
+scatter_size = 6
+#################
+
+dirs = [[entry[0],entry[1]] for entry in input]
+colours = [entry[2] for entry in input]
+legends = [entry[3] for entry in input]
+plotwhichs=[entry[4] for entyr in input] 
+'''
 dirs=[
-caadir,
-refdirahk114
+[caadir,0],
+[refdirahk114,1],
+[refdirahk114,1],
+[refdirahk114,1],
+[refdirahk114,1]
 ]
 colours=[
 'green',
-'red'
+'red',
+'purple',
+'blue',
+'olive'
 ]
 legends=[
-'caa','ext mode caa'
+'caa','ext mode caa','x','y','z'
 ]
 plotwhichs=[
 'mag',
-'mag'
+'mag',
+'x',
+'y',
+'z'
 ]
 
+for entry in dirs:
+    print "entry", entry,len(entry)
+    if len(entry)==1:
+        entry.append(0)
+    elif entry[1]!=1 and entry[1]!=0:
+        raise Exception("Invalid Ext mode selection")
+
+print dirs
+'''
 plot(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs)
