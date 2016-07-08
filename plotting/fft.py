@@ -6,10 +6,14 @@ import os
 from getfile import getfile
 import gzip
 import numpy.fft as fft
+import matplotlib.pyplot as plt
+import cPickle as pickle
+import csv
 
 prune_start=datetime(1,1,1)
 prune_end=datetime(1,1,1)
 prune_n=1
+prune_value = 0
 end_date = ''
 
 class vector:
@@ -38,7 +42,7 @@ class vectorlist:
                 print "Done merging list into current list"
         else:
             raise Exception("Not a vector list")
-    def prune(self,n=0,start_date=datetime(1,1,1),end_date=datetime(1,1,1)):
+    def prune(self,n=0,start_date=datetime(1,1,1),end_date=datetime(1,1,1),value=0):
         print "Before:",len(self.vectors)
         td = end_date-start_date
         if td.days > 0 and td.seconds >= 0:
@@ -51,6 +55,9 @@ class vectorlist:
         if n > 0:
             self.vectors=[v for (i,v) in enumerate(self.vectors) if not i%n] 
         print "After:",len(self.vectors)
+        if value > 0:
+            self.vectors=[v for v in self.vectors if v.magnitude>value]
+            print "After value pruning:",len(self.vectors)
     def add_vector_entry(self,v):
         if isinstance(v,vector):
             self.vectors.append(v)
@@ -185,10 +192,10 @@ class vectorfiles:
         for array in self.array:
             #print array,array[0].filename
             print array[0].filename
-    def prune(self,n=0,start_date=datetime(1,1,1),end_date=datetime(1,1,1)):
+    def prune(self,n=0,start_date=datetime(1,1,1),end_date=datetime(1,1,1),value=0):
         for entry in self.array:
             vlist = entry[0]
-            vlist.prune(n=n,start_date=start_date,end_date=end_date)
+            vlist.prune(n=n,start_date=start_date,end_date=end_date,value=value)
         print "Done Pruning"
     def returnall_magnitudes(self):
         mags=[]
@@ -203,8 +210,12 @@ class vectorfiles:
             dates.extend(vlist.returndatetimes())
         return dates
 
-def process(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs):
-    global prune_start,prune_end,prune_n
+def process(vfiles,sc,start_date,end_date,input):
+    global prune_start,prune_end,prune_n,prune_value
+    dirs = [[entry[0],entry[1]] for entry in input]
+    colours = [entry[2] for entry in input]
+    legends = [entry[3] for entry in input]
+    plotwhichs=[entry[4] for entyr in input] 
     if start_date==end_date or end_date=='':
         dates = start_date
     else:
@@ -219,10 +230,8 @@ def process(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs):
 
         for [dir,ext],colour,legend,plotwhich in zip(dirs,colours,legends,plotwhichs):
             directory = dir+Year+'/'+month+'/'
-            if 'Y:' in directory:
-                file = getfile(sc,Year,month,day,directory,ext=True)
-            else:
-                file = getfile(sc,Year,month,day,directory)
+            print "Getting file:",sc,Year,month,day,directory,ext
+            file = getfile(sc,Year,month,day,directory,ext=ext)
 
             if file:
                 print "filefound:",file
@@ -230,15 +239,22 @@ def process(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs):
                 vlist.read_file(file)
                 vfiles.add_vectorlist(vlist,colour,legend,plotwhich)
                 #vlist.print_values(0)
-        
+    print "Prune Start"
     if prune_start != datetime(1,1,1) and prune_end != datetime(1,1,1):
         print "Pruning Dates"
         vfiles.prune(start_date=prune_start,end_date=prune_end)
     if prune_n > 1:
         print "Pruning Points"
         vfiles.prune(n=prune_n)
+    if prune_value > 0:
+        print "Pruning Values"
+        vfiles.prune(value=prune_value)
 
-def plot(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs):
+def plot(vfiles,sc,start_date,end_date,input):
+    #dirs = [[entry[0],entry[1]] for entry in input]
+    #colours = [entry[2] for entry in input]
+    #legends = [entry[3] for entry in input]
+    plotwhichs=[entry[4] for entry in input] 
     '''
     global prune_start,prune_end,prune_n
     if start_date==end_date or end_date=='':
@@ -281,7 +297,63 @@ def plot(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs):
         vfiles.prune(n=prune_n)
     '''
     vfiles.plotfiles(scatter=True,log=log)
-            
+ 
+def fftexecute():
+    global vfiles
+    mags = vfiles.returnall_magnitudes()
+    dates =vfiles.returnall_dates()
+    
+    dt = np.mean(np.diff(dates)/np.timedelta64(1,'s'))
+    print "Spin period estimate:",dt
+    print "Number of samples:",len(mags),len(dates)
+    fftout = fft.fft(mags)
+    freq = fft.fftfreq(len(mags))   #frequency bin centers in cycles per unit of the sample spacing
+                                    #in this case the spin period (arund 4s) - dt
+    #plt.close('all')
+    plt.figure()
+    #dt = 4.255
+    freq = freq/dt #now in cycles per second!!
+    plt.scatter(freq[1:],fftout.real[1:],c='r',s=50) #ignoring 0 component
+    #plt.scatter(freq,fftout.imag,c='b',s=50)
+    plt.title('cumulative')
+    plt.show()
+
+def fftexecutedaily():
+    global vfiles,ffts
+    #plt.close('all')
+    plt.figure()
+    amplitudes=[]
+    freqs = []
+    for entry in vfiles.array:
+        vlist = entry[0]
+        mags = vlist.returnmagnitudes()
+        dates= vlist.returndatetimes()
+        if len(mags)>800:
+            ffts+=1
+            dt = np.mean(np.diff(dates)/np.timedelta64(1,'s'))
+            print "Spin period estimate:",dt
+            print "Number of samples:",len(mags),len(dates)
+            fftout = fft.fft(mags)
+            freq = fft.fftfreq(len(mags))   #frequency bin centers in cycles per unit of the sample spacing
+                                            #in this case the spin period (arund 4s) - dt
+
+            #dt = 4.255
+            freq = freq/dt #now in cycles per second!!
+            freqs.extend(freq[1:])
+            #fftout_ = fftout.real[1:]
+            #fftout_i = fftout.imag[1:]
+            #print fftout_[:10]
+            #print fftout_i[:10]
+            fftout = np.absolute(fftout)
+            amplitudes.extend(fftout[1:])#ignoring 0 component
+    
+    plt.scatter(freqs,amplitudes,c='r',s=50) 
+    plt.title('daily')
+    #plt.scatter(freq,fftout.imag,c='b',s=50)
+    print "distinct periods:",ffts
+    plt.show()
+
+           
 #filename = "Y:/reference/2015/12/C1_151231_B.EXT.GSE"
 
 vfiles = vectorfiles()
@@ -290,45 +362,98 @@ refdir = "Z:/data/reference/"
 caadir = 'Z:/caa/ic_archive/'
 #refdirahk114 = refdir
 sc = 1
-start_date = date(2016,01,8)
-end_date = date(2016,01,14)
+start_date = datetime(2010,1,1)
+end_date = datetime(2014,8,10)
+
 '''
 input = [directory,extmode 0 or 1 (off or on), colour, legend, whichdata ('mag','x','y','z')]
 '''
 input = [
-         [refdirahk114,1,'red','ext mode caa','mag']
+         [refdir,1,'red','ext mode default','mag']
 ]
 
 ################
 '''
 pruning of output - fine date selection & point count reduction
 '''
-prune_start = datetime(2016,1,10,20)
-prune_end   = datetime(2016,1,10,22)
-prune_n     = 1
+#prune_start = datetime(2015,1,1)
+#prune_end   = datetime(2015,5,1)
+#prune_n     = 20
+prune_value = 80
 #################
 scatter_size = 6
 #################
 
-dirs = [[entry[0],entry[1]] for entry in input]
-colours = [entry[2] for entry in input]
-legends = [entry[3] for entry in input]
-plotwhichs=[entry[4] for entyr in input] 
+#plot(vfiles,sc,start_date,end_date,input)
 
-process(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs)
-#plot(vfiles,sc,start_date,end_date,dirs,colours,legends,plotwhichs)
-#print vfiles.returnall_magnitudes()
-mags = vfiles.returnall_magnitudes()
-dates =vfiles.returnall_dates()
+FFT = 1
+
+TEST = 0
+ffts = 0
+if prune_start != datetime(1,1,1):
+    dt_label_start = prune_start.isoformat()
+else:
+    dt_label_start = start_date.isoformat()
+if prune_start != datetime(1,1,1):
+    dt_label_end = prune_end.isoformat()
+else:
+    dt_label_end = end_date.isoformat()
+    
+descriptor_string = '_pruningvalue{0:03d}_pruningnumber{1:03d}'.format(prune_value,prune_n)
+pickle_file = dt_label_start+'__'+dt_label_end+descriptor_string+'.pickle'
+pickle_file = pickle_file.replace(':','')
 
 
-dt = np.mean(np.diff(dates)/np.timedelta64(1,'s'))
-print "Spin period estimate:",dt
-fftout = fft.fft(mags)
-freq = fft.fftfreq(len(mags))   #frequency bin centers in cycles per unit of the sample spacing
-                                #in this case the spin period (arund 4s) - dt
-plt.close('all')
+if FFT:
+    vfiles = pickle.load(open(pickle_file,'rb'))
+    #fftexecute()
+    fftexecutedaily()
+elif TEST:
+    vfiles = pickle.load(open(pickle_file,'rb'))  
+    plot(vfiles,sc,start_date,end_date,input)
+else:
+    process(vfiles,sc,start_date,end_date,input)
+    plot(vfiles,sc,start_date,end_date,input)
+    pickle.dump(vfiles,open(pickle_file,'wb'))
 
-freq = freq/dt #now in cycles per second!!
-plt.scatter(freq[1:],fftout.real[1:],c='r',s=50) #ignoring 0 component
-#plt.scatter(freq,fftout.imag,c='b',s=50)
+'''
+vfiles = pickle.load(open(pickle_file,'rb')) 
+with open(pickle_file[0:-6]+'csv','wb') as csvfile:
+    print "Starting to write"
+    writer = csv.writer(csvfile,delimiter=',')
+    for entry in vfiles.array:
+        vlist = entry[0]
+        for ventry in vlist.vectors:
+            mag = ventry.magnitude
+            dt  = ventry.datetime.astype(datetime).isoformat()
+            writer.writerow([dt,mag])
+print "Finished writing"
+ '''           
+
+
+
+'''
+Looking for a link between 'beating' of a combination of the spin period and the rest period
+spin period varies, usually around 4.2 seconds
+reset period is relatively constant at 5.152 seconds
+a beating pattern would repeat with a period given by
+spin period * reset period
+so around 22 seconds, leading to a frequency of around 0.05 Hz.
+08/07
+SC 1
+For 2016,1,10, between 20hours and 22hours,
+relatively wide peak at 0.052Hz, close to expected 0.0456 Hz.
+
+
+##########
+Frequency output of fft given in cycles per unit of sample spacing, ie.
+cycles per spin period - so in these units, the beating frequency
+should show up at a frequency given by the reset period,
+ie. (1/5.152s)=0.1940994Hz
+-even IF this were true, it would not be of much use when analysing data
+over a large time period range, since the spin period changes over time!
+##########
+08/07
+Set threshold at 80 nT, don't analyse anything under that using a FFT,
+since there is too much noise and would shroud the desired observations.
+'''
