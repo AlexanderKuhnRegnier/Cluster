@@ -3,6 +3,7 @@ from getscchfile import getscchfiles
 from datetime import datetime,timedelta
 import matplotlib.pyplot as plt
 import matplotlib
+from copy import deepcopy as deepcop
 end_date=datetime(9999,1,1)
 EXTMODE_INITIATE = ["SFGMJ059","SFGMJ064","SFGMSEXT","SFGMM002"]
 EXTMODE_TERMINATE = ["SFGMJ065","SFGMJ050"]
@@ -13,7 +14,7 @@ def getcommands(start_date,end_date):
     for s in range(4):
         sc=1+s
         extmode_commanding=np.zeros((0,3))
-        print extmode_commanding
+        #print extmode_commanding
         scch_files = getscchfiles(sc,start_date,end_date)
         print scch_files
         for file in scch_files:
@@ -71,12 +72,16 @@ def eliminate_adjacent_identical(extmode_commanding):
         return []
 
 
-
+print "start"
 #time   commmand    sc
-start_date = datetime(2015,7,6)
-end_date = datetime(2016,1,30)
+start_date = datetime(2015,11,6)
+end_date = datetime(2015,11,16)
 
 extmode_commanding_list=getcommands(start_date,end_date)
+print "got commmands"
+print "before"
+for a in extmode_commanding_list:
+    print a
 #print "Before filter"
 #print extmode_commanding_list
 templist=[]
@@ -88,11 +93,16 @@ for extmode_commanding in extmode_commanding_list:
     templist.append(extmode_commanding)
     
 extmode_commanding_list=templist
+print "after"
+for a in extmode_commanding_list:
+    print a
 
 plt.close('all')
 
 fig,axarr=plt.subplots(4,sharex=True)
 print "Plotting"
+cmdlist = []
+datelist=[]
 for i in range(len(extmode_commanding_list)):
     extmode_cmds=extmode_commanding_list[i]
     dates = [line[0] for line in extmode_cmds]
@@ -109,6 +119,51 @@ for i in range(len(extmode_commanding_list)):
         else:
             tempcmds.append(0)
             print "Error:Not valid command"
+    '''
+    write the following data to file, and do more processing on it as well!!
+    '''
     print tempcmds
     print tempdates
-    axarr[i].plot_date(tempdates,tempcmds, '-')
+    cmds = tempcmds
+    dates = tempdates
+    cmdlist.append(cmds)
+    datelist.append(dates)
+    #axarr[i].plot_date(tempdates,tempcmds, '-') #this plots triangle wave - modify data in next stage
+    
+print "modifying data"
+for cs,ds in zip(cmdlist,datelist):
+    if len(cs) != len(ds):
+        raise Exception("Not of equal lenght!!")
+
+c=0
+for cs,ds in zip(cmdlist,datelist):
+    #tempcs = deepcop(cs)
+    #tempds = deepcop(ds)
+    tempcs = []
+    tempds = []
+    print cs
+    print ds
+    if len(cs)>1:
+        for i in range(len(cs)-1):
+            command = cs[i]
+            next_command = cs[i+1]
+            date = ds[i]
+            next_date = ds[i+1]
+            tempcs.append(command)
+            tempcs.append(command)
+            tempds.append(date)
+            tempds.append(next_date)
+            
+            '''
+            print "current, then next"
+            print command,date
+            print next_command,next_date
+            '''
+    print "output"
+    print tempcs
+    print tempds  
+    axarr[c].plot_date(tempds,tempcs, '-')
+    c+=1
+
+for c in range(4):
+    axarr[c].set_ylim(-0.2,1.2)
