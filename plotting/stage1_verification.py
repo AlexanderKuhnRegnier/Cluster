@@ -59,21 +59,38 @@ class vectorlist:
     def read_file(self,filename,limit=-1):
         self.filename = filename
         with open(filename,'rb') as f:
-            count = 0
-            for line in f:
-                #print "line", line
-                count += 1
-                try:
-                    v = vector()
-                    array = [i for i in line.split(" ") if i != '']
-                    #print "array",array
-                    
-                    v.assigndatetime(count)
-                    v.assignvalue(np.array([float(array[0]),float(array[1]),float(array[2])]))
-                    v.calcmagnitude()
-                    self.add_vector_entry(v)                 
-                except ValueError:
-                    print "Something wrong with line"
+            if 'EXT.GSE' in filename:
+                count = 0
+                for line in f:
+                    #print "line", line
+                    count += 1
+                    try:
+                        v = vector()
+                        array = [i for i in line.split(" ") if i != '']
+                        #print "array",array
+                        
+                        v.assigndatetime(count)
+                        v.assignvalue(np.array([float(array[1]),float(array[2]),float(array[3])]))
+                        v.calcmagnitude()
+                        self.add_vector_entry(v)                 
+                    except ValueError:
+                        print "Something wrong with line"
+            else:
+                count = 0
+                for line in f:
+                    #print "line", line
+                    count += 1
+                    try:
+                        v = vector()
+                        array = [i for i in line.split(" ") if i != '']
+                        #print "array",array
+                        
+                        v.assigndatetime(count)
+                        v.assignvalue(np.array([float(array[0]),float(array[1]),float(array[2])]))
+                        v.calcmagnitude()
+                        self.add_vector_entry(v)                 
+                    except ValueError:
+                        print "Something wrong with line"
 
     def returndatetimes(self):
         return [vector.datetime for vector in self.vectors]
@@ -87,18 +104,43 @@ class vectorlist:
         return [vector.v[2] for vector in self.vectors]
 
     def plot(self):
-        global filename
-        f,axarr = plt.subplots(4,1)
-        axarr[0].scatter(self.returndatetimes(),self.returnmagnitudes(),s=100)
-        axarr[0].set_title('mag')
-        axarr[1].scatter(self.returndatetimes(),self.returnx(),s=100)
-        axarr[1].set_title('x')
-        axarr[2].scatter(self.returndatetimes(),self.returny(),s=100)
-        axarr[2].set_title('y')
-        axarr[3].scatter(self.returndatetimes(),self.returnz(),s=100)
-        axarr[3].set_title('z')
+        f,axarr = plt.subplots(2,2) 
+        axarr[0,0].scatter(self.returndatetimes(),self.returnmagnitudes(),s=100,c='r')
+        axarr[0,0].set_title('mag')
+        axarr[0,1].scatter(self.returndatetimes(),self.returnx(),s=100,c='r')
+        axarr[0,1].set_title('x')
+        axarr[1,0].scatter(self.returndatetimes(),self.returny(),s=100,c='r')
+        axarr[1,0].set_title('y')
+        axarr[1,1].scatter(self.returndatetimes(),self.returnz(),s=100,c='r')
+        axarr[1,1].set_title('z')
         #ax.set_yscale('log')
-        f.suptitle(filename)
+        f.suptitle(self.filename)
+
+    def plot2(self,vlist1,vlist2):
+        global filename1,filename2
+        f,axarr = plt.subplots(2,2)
+        
+        axarr[0,0].scatter(vlist1.returndatetimes(),vlist1.returnmagnitudes(),s=100,c='r')
+        axarr[0,0].set_title('mag')
+        axarr[0,1].scatter(vlist1.returndatetimes(),vlist1.returnx(),s=100,c='r')
+        axarr[0,1].set_title('x')
+        axarr[1,0].scatter(vlist1.returndatetimes(),vlist1.returny(),s=100,c='r')
+        axarr[1,0].set_title('y')
+        axarr[1,1].scatter(vlist1.returndatetimes(),vlist1.returnz(),s=100,c='r')
+        axarr[1,1].set_title('z')
+        
+        scale_factor = np.mean(vlist1.returnmagnitudes())/np.mean(vlist2.returnmagnitudes())        
+        
+        axarr[0,0].scatter(vlist2.returndatetimes(),np.array(vlist2.returnmagnitudes())*scale_factor,s=100,c='b')
+        axarr[0,0].set_title('mag')
+        axarr[0,1].scatter(vlist2.returndatetimes(),np.array(vlist2.returnx())*scale_factor,s=100,c='b')
+        axarr[0,1].set_title('x')
+        axarr[1,0].scatter(vlist2.returndatetimes(),np.array(vlist2.returny())*scale_factor,s=100,c='b')
+        axarr[1,0].set_title('y')
+        axarr[1,1].scatter(vlist2.returndatetimes(),np.array(vlist2.returnz())*scale_factor,s=100,c='b')
+        axarr[1,1].set_title('z')
+        #ax.set_yscale('log')
+        f.suptitle(filename1+'(r)'+' '+filename2+'(b)')
 
     def print_values(self,limit):
         counter = 0
@@ -110,9 +152,21 @@ class vectorlist:
             print vector.datetime, vector.v, vector.magnitude
             
 #filename = 'Y:/extended/2016/01/C1_160101_B.E1'
-filename = 'Z:/data/extended/2006/01/C1_060113_B.E0'
+#filename1 = 'Z:/data/extended/2006/01/C1_060113_B.E0'
+#filename2 = 'Z:/data/reference/2006/01/C1_060113_B.EXT.GSE'
+plt.close('all')
+filename1 = 'Z:/data/extended/2016/01/C1_160114_B.E0'
+filename2 = 'Z:/data/reference/2016/01/C1_160113_B.EXT.GSE'
+vlist1 = vectorlist()
+vlist1.read_file(filename1)
+#vlist1.print_values(10)
+#vlist.plot()
+vlist2 = vectorlist()
+vlist2.read_file(filename2)
+#vlist2.print_values(10)
 
 vlist = vectorlist()
-vlist.read_file(filename)
-vlist.print_values(10)
-vlist.plot()
+
+#vlist.plot2(vlist1,vlist2)
+vlist1.plot()
+vlist2.plot()
