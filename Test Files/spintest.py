@@ -1,17 +1,6 @@
 import numpy as np
 #from math import pi
 import matplotlib.pyplot as plt
-plt.close('all')
-f,axarr = plt.subplots(1,figsize=(20,15))
-#import time
-reset = 5.152
-#spin = 4.260732 #Rumba
-#spin = 4.168264 #Salsa
-#spin =4.210481 #Samba
-#spin =4.134934 #Tango
-
-spins=[4.260732,4.168264,4.210481,4.134934]
-
 
 
 def func(spin,widthreset=0.08):
@@ -113,11 +102,44 @@ def func(spin,widthreset=0.08):
     print "product of spin and reset times:", reset*spin
     print "  mean separation of low points:", (max(x_low)-min(x_low))/len(x_low)
     print "                     difference:", reset*spin-(max(x_low)-min(x_low))/len(x_low)
-    axarr.scatter(spin,reset*spin-(max(x_low)-min(x_low))/len(x_low))
+    
+    for axes in axarr:
+        axes[0].scatter(x,y)
     '''
     end = time.time()
     print "Duration time:",end-start
     '''
-    
+
+
+plt.close('all')
+f,axarr = plt.subplots(4,2,figsize=(20,15))
+'''
+#eg.
+axarr[0, 0].plot(x, y)
+axarr[0, 0].set_title('Axis [0,0]')
+axarr[0, 1].scatter(x, y)
+axarr[0, 1].set_title('Axis [0,1]')
+axarr[1, 0].plot(x, y ** 2)
+axarr[1, 0].set_title('Axis [1,0]')
+axarr[1, 1].scatter(x, y ** 2)
+axarr[1, 1].set_title('Axis [1,1]')
+'''
+#import time
+reset = 5.152
+reset = 5.15
+#spin = 4.260732 #Rumba
+#spin = 4.168264 #Salsa
+#spin =4.210481 #Samba
+#spin =4.134934 #Tango
+
+spins=[4.260732,4.168264,4.210481,4.134934]
+
+spins = [float('{:.2f}'.format(spin)) for spin in spins]
+
+print spins
+print [spin*reset*10000 for spin in spins]
+
+min_ns = [int(spin*reset*10000) for spin in spins]
+  
 for spin in spins:
-    func(spin)
+    func(spin,min_ns,axarr)
