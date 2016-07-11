@@ -180,7 +180,7 @@ class vectorlist:
 class vectorfiles:
     def __init__(self):
         self.array = []
-    def add_vectorlist(self,vlist,color,legend,plotwhich='mag'):
+    def add_vectorlist(self,vlist,color='red',legend='data',plotwhich='mag'):
         if not isinstance(vlist, vectorlist):
             raise Exception('Object supplied must be a vector list')
         else:         
@@ -334,11 +334,11 @@ def fftexecutedaily():
             print "Spin period estimate:",dt
             print "Number of samples:",len(mags),len(dates)
             fftout = fft.fft(mags)
-            freq = fft.fftfreq(len(mags))   #frequency bin centers in cycles per unit of the sample spacing
-                                            #in this case the spin period (arund 4s) - dt
+            freq = fft.fftfreq(len(mags),d=dt)   #frequency bin centers in cycles per unit of the sample spacing
+            #in this case the spin period (arund 4s) - dt
 
             #dt = 4.255
-            freq = freq/dt #now in cycles per second!!
+            #freq = freq/dt #now in cycles per second!!
             freqs.extend(freq[1:])
             #fftout_ = fftout.real[1:]
             #fftout_i = fftout.imag[1:]
@@ -353,17 +353,79 @@ def fftexecutedaily():
     print "distinct periods:",ffts
     plt.show()
 
+def plot_timeseries():
+    global vfiles
+    plt.figure()
+    mags=[]
+    for entry in vfiles.array:
+        vlist = entry[0]
+        mags.extend(vlist.returnmagnitudes())
+        
+    plt.scatter(np.linspace(0,len(mags),len(mags)),mags,s=80,c='r')
+    ax = plt.gca()
+    ax.set_yscale('log')
+def remove_outliers():
+    global vfiles
+    newvfiles = vectorfiles()
+    '''
+    remove outlying values by filtering out the number of values in one ext mode
+    data set, setting an upper limit - eg. 800 points per day for example
+    
+    if this is not enough, one could compile a list of the differences in the 
+    mag field values, and if the differences between two points are too large,
+    replace the point with something suitable, like the previous value
+    + the previous normal difference, and then go from there.
+    '''
+    print "Vfiles before:",len(vfiles.array)
+    for entry in vfiles.array:
+        vlist = entry[0]
+        mags = vlist.returnmagnitudes()
+        #dates= vlist.returndatetimes()    
+        if len(mags)>1300:
+            newvfiles.add_vectorlist(vlist)
+    vfiles = newvfiles
+    print "Done selecting based on sample length"
+    print "Vfiles after:",len(vfiles.array)
+    
+    print "Now selecting based on differences"
+    diffarray = np.array([],dtype=np.float64).reshape(0,1)
+    for entry in vfiles.array:
+        vlist = entry[0]
+        mags = vlist.returnmagnitudes()
+        
+        for i in range(5,len(mags)-10,1):
+            mags[i]
+            if abs(mags[i]-mags[i-1]) > 100 and abs(mags[i]-mags[i+1])>100:
+                    mags[i] = np.mean(mags[i-5:i]+mags[i+1:i+10])
+                    
+        for mag,v in zip(mags,vlist.vectors):
+            v.magnitude = mag
+        vlist.vectors = vlist.vectors[5:]
+        
+    plt.figure()
+    #plt.scatter(np.linspace(0,len(diffarray),len(diffarray)),diffarray)
+    plt.hist(diffarray,bins=300)   
            
 #filename = "Y:/reference/2015/12/C1_151231_B.EXT.GSE"
-
+plt.close('all')
 vfiles = vectorfiles()
 refdirahk114 = "Y:/reference/"
 refdir = "Z:/data/reference/" 
 caadir = 'Z:/caa/ic_archive/'
 #refdirahk114 = refdir
 sc = 1
+
+'''
+#large pickle file!!
 start_date = datetime(2010,1,1)
 end_date = datetime(2014,8,10)
+'''
+
+
+#test date
+start_date = datetime(2016,1,1)
+end_date  = datetime(2016,1,10)
+
 
 '''
 input = [directory,extmode 0 or 1 (off or on), colour, legend, whichdata ('mag','x','y','z')]
@@ -379,14 +441,16 @@ pruning of output - fine date selection & point count reduction
 #prune_start = datetime(2015,1,1)
 #prune_end   = datetime(2015,5,1)
 #prune_n     = 20
-prune_value = 80
+
+#prune_value = 80
 #################
 scatter_size = 6
 #################
 
+rm_outliers = 0
 #plot(vfiles,sc,start_date,end_date,input)
 
-FFT = 1
+FFT = 0
 
 TEST = 0
 ffts = 0
@@ -410,12 +474,22 @@ if FFT:
     fftexecutedaily()
 elif TEST:
     vfiles = pickle.load(open(pickle_file,'rb'))  
-    plot(vfiles,sc,start_date,end_date,input)
+    #plot(vfiles,sc,start_date,end_date,input)
 else:
     process(vfiles,sc,start_date,end_date,input)
+    #plot(vfiles,sc,start_date,end_date,input)
+    #pickle.dump(vfiles,open(pickle_file,'wb'))
+    
+if rm_outliers:
+    plot(vfiles,sc,start_date,end_date,input)
+    remove_outliers()
     plot(vfiles,sc,start_date,end_date,input)
     pickle.dump(vfiles,open(pickle_file,'wb'))
+else:
+    plot(vfiles,sc,start_date,end_date,input)
+    #pickle.dump(vfiles,open(pickle_file,'wb'))
 
+plot_timeseries()
 '''
 vfiles = pickle.load(open(pickle_file,'rb')) 
 with open(pickle_file[0:-6]+'csv','wb') as csvfile:
@@ -427,9 +501,8 @@ with open(pickle_file[0:-6]+'csv','wb') as csvfile:
             mag = ventry.magnitude
             dt  = ventry.datetime.astype(datetime).isoformat()
             writer.writerow([dt,mag])
-print "Finished writing"
- '''           
-
+print "Finished writing"        
+'''
 
 
 '''
