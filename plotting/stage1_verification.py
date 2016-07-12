@@ -92,16 +92,26 @@ class vectorlist:
                     except ValueError:
                         print "Something wrong with line"
 
-    def returndatetimes(self):
-        return [vector.datetime for vector in self.vectors]
-    def returnmagnitudes(self):
-        return [vector.magnitude for vector in self.vectors]
-    def returnx(self):
-        return [vector.v[0] for vector in self.vectors]
-    def returny(self):
-        return [vector.v[1] for vector in self.vectors]
-    def returnz(self):
-        return [vector.v[2] for vector in self.vectors]
+    def returndatetimes(self,start=0,end=len(self.vectors)):
+        for i in range(start,len(end)):
+            return self.vectors[i].datetime
+        #return [vector.datetime for vector in self.vectors]
+    def returnmagnitudes(self,start=0,end=len(self.vectors)):
+        for i in range(start,len(end)):
+            return self.vectors[i].magnitude
+        #return [vector.magnitude for vector in self.vectors]
+    def returnx(self,start=0,end=len(self.vectors)):
+        for i in range(start,len(end)):
+            return self.vectors[i].v[0]
+        #return [vector.v[0] for vector in self.vectors]
+    def returny(self,start=0,end=len(self.vectors)):
+        for i in range(start,len(end)):
+            return self.vectors[i].v[1]
+        #return [vector.v[1] for vector in self.vectors]
+    def returnz(self,start=0,end=len(self.vectors)):
+        for i in range(start,len(end)):
+            return self.vectors[i].v[2]
+        #return [vector.v[2] for vector in self.vectors]
 
     def plot(self):
         f,axarr = plt.subplots(2,2) 
@@ -116,21 +126,13 @@ class vectorlist:
         #ax.set_yscale('log')
         f.suptitle(self.filename)
 
-    def plot2(self,vlist1,vlist2):
+    def plot2(self,vlist1,vlist2,start=100):
         global filename1,filename2
-        f,axarr = plt.subplots(2,2)
-        
-        axarr[0,0].scatter(vlist1.returndatetimes(),vlist1.returnmagnitudes(),s=100,c='r')
-        axarr[0,0].set_title('mag')
-        axarr[0,1].scatter(vlist1.returndatetimes(),vlist1.returnx(),s=100,c='r')
-        axarr[0,1].set_title('x')
-        axarr[1,0].scatter(vlist1.returndatetimes(),vlist1.returny(),s=100,c='r')
-        axarr[1,0].set_title('y')
-        axarr[1,1].scatter(vlist1.returndatetimes(),vlist1.returnz(),s=100,c='r')
-        axarr[1,1].set_title('z')
-        
-        scale_factor = np.mean(vlist1.returnmagnitudes())/np.mean(vlist2.returnmagnitudes())        
-        
+        f,axarr = plt.subplots(2,4,figsize=(35,25))
+        f1 = filename1.split('/')[-1]
+        f2 = filename2.split('/')[-1]
+        #scale_factor = np.mean(vlist1.returnmagnitudes())/np.mean(vlist2.returnmagnitudes())        
+        '''
         axarr[0,0].scatter(vlist2.returndatetimes(),np.array(vlist2.returnmagnitudes())*scale_factor,s=100,c='b')
         axarr[0,0].set_title('mag')
         axarr[0,1].scatter(vlist2.returndatetimes(),np.array(vlist2.returnx())*scale_factor,s=100,c='b')
@@ -140,7 +142,44 @@ class vectorlist:
         axarr[1,1].scatter(vlist2.returndatetimes(),np.array(vlist2.returnz())*scale_factor,s=100,c='b')
         axarr[1,1].set_title('z')
         #ax.set_yscale('log')
-        f.suptitle(filename1+'(r)'+' '+filename2+'(b)')
+        '''
+        #plot 45 entries at a time!
+        end = start+45
+        dt1  = vlist1.returndatetimes(start,end)
+        mag1 = vlist1.returnmagnitudes(start,end)
+        x1   = vlist1.returnx(start,end)
+        y1   = vlist1.returny(start,end)
+        z1   = vlist1.returnz(start,end)
+    
+        axarr[0,0].scatter(dt1,mag1,s=100,c='r')
+        axarr[0,0].set_title('mag')
+        axarr[0,1].scatter(dt1,x1,s=100,c='r')
+        axarr[0,1].set_title('x')
+        axarr[0,2].scatter(dt1,y1,s=100,c='r')
+        axarr[0,2].set_title('y')
+        axarr[0,3].scatter(dt1,z1,s=100,c='r')
+        axarr[0,3].set_title('z')      
+
+        dt2  = vlist2.returndatetimes(start,end)
+        if dt1 != dt2:
+            raise Exception("Lines don't match up!")
+        mag2 = vlist2.returnmagnitudes(start,end)
+        x2   = vlist2.returnx(start,end)
+        y2   = vlist2.returny(start,end)
+        z2   = vlist2.returnz(start,end)
+        
+        axarr[1,0].scatter(dt2,mag2,s=100,c='r')
+        axarr[1,0].set_title('mag')
+        axarr[1,1].scatter(dt2,x2,s=100,c='r')
+        axarr[1,1].set_title('x')
+        axarr[1,2].scatter(dt2,y2,s=100,c='r')
+        axarr[1,2].set_title('y')
+        axarr[1,3].scatter(dt2,z2,s=100,c='r')
+        axarr[1,3].set_title('z')            
+        
+        f.suptitle(f1+'(r)'+' '+f2+'(b)',fontsize = 20)
+        
+        f.savefig('Y:/comparisons/'+f1+'-'+f2+'.png')
 
     def print_values(self,limit):
         counter = 0
