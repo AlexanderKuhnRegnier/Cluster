@@ -162,13 +162,13 @@ class vectorlist:
         for vect in self.vectors:
             for i in range(3):
                 value = vect.v[i]
-                print "value:",value,"range:",vect.range,"scale:",scale(vect.range)
+                #print "value:",value,"range:",vect.range,"scale:",scale(vect.range)
                 if value>32767:
                     value = (vect.v[i]-65536.)/scale(vect.range)
                 else:
                     value = (vect.v[i])/scale(vect.range)
                 vect.v[i] = value
-                print "value:",value,vect.v[i]
+                #print "value:",value,vect.v[i]
                 
     def plot(self):
         f,axarr = plt.subplots(2,2) 
