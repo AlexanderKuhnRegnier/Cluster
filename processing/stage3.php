@@ -668,6 +668,7 @@ if (!$outhandle)																						#error message if file can't be opened for
 }
 
 $tmp=tempnam('/var/tmp','ExtProcRaw_');																	#creates file with unique file name in '/var/tmp'
+#$tmp='/home/ahk114/testdata/ExtProcRaw_1';
 $testhandle=fopen($tmp,'wb'); // NB wb not ab															#opens file for writing 'wb' (not append)
 if (!$testhandle)
 {
@@ -898,7 +899,6 @@ fclose($testhandle);
 $tmp2=tempnam('/var/tmp','ExtProcDecoded_');
 echo "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile;
 exec("FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile);
-
 
 #session_destroy();
 ?>
