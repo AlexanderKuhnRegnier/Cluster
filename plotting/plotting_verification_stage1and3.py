@@ -26,8 +26,8 @@ def float2hex(f):
     f = abs(f)
     exp = int(math.log10(f)/math.log10(2))
     remainder = int(8388608*((f/math.pow(2,exp))-1))
-    upperexp = int((exp+127/2.))
-    lowerexp = int(exp+127&1)
+    upperexp = int(((exp+127)/2.))
+    lowerexp = int((exp+127)&1)
     return [remainder&255,(remainder>>8)&255,
             (lowerexp*128)+((remainder>>16)&127),
             (sign*128)+upperexp]
@@ -60,9 +60,9 @@ tshift2 = t+2*np.pi/3.
 #y = (np.sin(tshift1)+1)
 #z = (np.sin(tshift2)+1)
 
-x = 10*np.ones((t.shape[0],1))
-y = 64*np.ones((t.shape[0],1))
-z = 256*np.ones((t.shape[0],1))
+x = 1*np.ones((t.shape[0],1))
+y = 1*np.ones((t.shape[0],1))
+z = 1*np.ones((t.shape[0],1))
 
 
 #10%period
@@ -157,7 +157,7 @@ datahandle = open(tmp,'wb')
 
 for i in range(len(t)):
     #timestring = datetime.datetime.fromtimestamp(EventTime_Unix+1).strftime('%Y-%m-%d\T%H:%M:%S)
-    time = EventTime_Unix+i*0.02
+    time = EventTime_Unix+i*0.01
     hexbx = float2hex(vector[i,0])
     hexby = float2hex(vector[i,1])
     hexbz = float2hex(vector[i,2])
@@ -171,10 +171,12 @@ for i in range(len(t)):
         #value = [204, 76, 200, 69] #100.15
     #else:
         #value = [204, 76, 72, 70]#200.3
-    value = [153, 9, 122, 72]#1000.15
+    '''
+    value = float2hex(100.15)
     hexbx = value
     hexby = value
     hexbz = value
+    '''
     
     data.extend(hexbx)
     data.extend(hexby)

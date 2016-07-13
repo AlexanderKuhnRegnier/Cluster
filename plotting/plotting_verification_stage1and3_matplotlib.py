@@ -29,8 +29,8 @@ def float2hex(f):
     f = abs(f)
     exp = int(math.log10(f)/math.log10(2))
     remainder = int(8388608*((f/math.pow(2,exp))-1))
-    upperexp = int((exp+127/2.))
-    lowerexp = int(exp+127&1)
+    upperexp = int(((exp+127)/2.))
+    lowerexp = int((exp+127)&1)
     return [remainder&255,(remainder>>8)&255,
             (lowerexp*128)+((remainder>>16)&127),
             (sign*128)+upperexp]
@@ -61,7 +61,7 @@ r = pickle.load(open(picklefilename,'rb'))
 picklefilename = testdata+'vectors_raw.pickle'
 vectors = pickle.load(open(picklefilename,'rb'))
 picklefilename = testdata+'magnitude_raw.pickle'
-magnitude =  pickle.load(open(picklefilename,'rb'))
+magnitude_raw =  pickle.load(open(picklefilename,'rb'))
 
 
 f,axes = plt.subplots(4,1,figsize=(20,15))
@@ -71,8 +71,8 @@ axes[1].scatter(t,vectors[:,1],color='b')
 axes[1].set_title(list(set(vectors[:,1]))[:8])
 axes[2].scatter(t,vectors[:,2],color='g')
 axes[2].set_title(list(set(vectors[:,2]))[:8])
-axes[3].scatter(t,magnitude,color='y')
-axes[3].set_title(list(set(magnitude))[:8])
+axes[3].scatter(t,magnitude_raw,color='y')
+axes[3].set_title(list(set(magnitude_raw))[:8])
 f.canvas.set_window_title('Raw')
 
 ###################
@@ -129,5 +129,40 @@ axes[1].set_title(list(set(extvector[:,2]))[:3])
 axes[3].scatter(t,extmags,color='y')
 axes[3].set_title(str(list(set(extmags))[:3])+' '+str(len(set(extmags))))
 f.canvas.set_window_title('After DP pipeline, caution: axes matched to raw data axes')			
-f.savefig(testdata+'0.02timestep1000.15input.png')
+#f.savefig(testdata+'0.02improvedtimestep100.15input.png')
+
+
+f,axes = plt.subplots(4,3,figsize=(20,15))
+axes[0,0].scatter(t,vectors[:,0],color='r')
+axes[0,0].set_title(sorted(list(set(vectors[:,0]))[:8]))
+axes[1,0].scatter(t,vectors[:,1],color='b')
+axes[1,0].set_title(sorted(list(set(vectors[:,1]))[:8]))
+axes[2,0].scatter(t,vectors[:,2],color='g')
+axes[2,0].set_title(sorted(list(set(vectors[:,2]))[:8]))
+axes[3,0].scatter(t,magnitude_raw,color='y')
+axes[3,0].set_title(sorted(list(set(magnitude_raw))[:8]))
+#f.canvas.set_window_title('Raw')
+
+axes[0,1].scatter(t,vector[:,0],color='r')
+axes[0,1].set_title(sorted(list(set(vector[:,0]))[:8]))
+axes[1,1].scatter(t,vector[:,1],color='b')
+axes[1,1].set_title(sorted(list(set(vector[:,1]))[:8]))
+axes[2,1].scatter(t,vector[:,2],color='g')
+axes[2,1].set_title(sorted(list(set(vector[:,2]))[:8]))
+axes[3,1].scatter(t,magnitude,color='y')
+axes[3,1].set_title(sorted(list(set(magnitude))[:8]))
+#f.canvas.set_window_title('Converted')
+
+axes[1,2].scatter(t,extvector[:,0],color='r')
+axes[1,2].set_title(sorted(list(set(extvector[:,0]))[:3],key=abs))
+axes[2,2].scatter(t,extvector[:,1],color='b')
+axes[2,2].set_title(sorted(list(set(extvector[:,1]))[:3],key=abs))
+axes[0,2].scatter(t,extvector[:,2],color='g')
+axes[0,2].set_title(sorted(list(set(extvector[:,2]))[:3],key=abs))
+axes[3,2].scatter(t,extmags,color='y')
+axes[3,2].set_title(str(sorted(list(set(extmags))[:3]))+' '+str(len(set(extmags))))
+f.canvas.set_window_title('Raw   ----     Converted   -----   After DP pipeline, caution: axes matched to raw data axes')			
+figManager = plt.get_current_fig_manager()
+figManager.window.showMaximized()
+
 plt.show()
