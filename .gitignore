@@ -3,3 +3,4 @@
 **/*.pickle
 **/*.csv
 **/tmp*
+**/filenumber
