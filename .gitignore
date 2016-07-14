@@ -1,3 +1,7 @@
 **/session
 **/*.html
 **/*.pyc
+**/*.pickle
+**/*tmp*
+**/*.csv
+filenumber

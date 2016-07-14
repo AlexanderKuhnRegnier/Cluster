@@ -75,7 +75,7 @@ def eliminate_adjacent_identical(extmode_commanding):
 print "start"
 #time   commmand    sc
 start_date = datetime(2015,11,6)
-end_date = datetime(2015,11,16)
+end_date = datetime(2015,11,10)
 
 extmode_commanding_list=getcommands(start_date,end_date)
 print "got commmands"
@@ -135,6 +135,7 @@ for cs,ds in zip(cmdlist,datelist):
     if len(cs) != len(ds):
         raise Exception("Not of equal lenght!!")
 
+
 c=0
 for cs,ds in zip(cmdlist,datelist):
     #tempcs = deepcop(cs)
@@ -167,3 +168,24 @@ for cs,ds in zip(cmdlist,datelist):
 
 for c in range(4):
     axarr[c].set_ylim(-0.2,1.2)
+
+
+spacecrafts = [0,1,2,3]
+otherspacecrafts = lambda x: spacecrafts[:x]+spacecrafts[x+1:]
+for spacecraft in range(4):
+    dates = datelist[spacecraft]    #get list of date for a spacecraft - cmdlist[spacecraft] is the associated event list
+    for eventid in range(len(dates)): #looping through all of the events for the selected spacecraft
+        '''
+        if ext mode is initiated, check if this has been the case for other spacecraft before,
+        but we only care about the event immediately before the current spacecraft ext mode has 
+        been initiated!
+        '''
+        currentdate = dates[eventid]
+        currentcommand = cmdlist[spacecraft][eventid]
+        if currentcommand==1:   #if currently, ext mode is being initiaed, check if this was the case earlier for other sc
+            other_scs = otherspacecrafts(spacecraft)
+            for othersc in other_scs:
+                #previous = np.datetime64(datetime(1,1,1))
+                other_dates = np.array(datelist[othersc])
+                
+    
