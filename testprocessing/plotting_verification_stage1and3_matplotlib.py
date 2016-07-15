@@ -46,111 +46,20 @@ def integer2hex(i):
 def scale(r):
     scale_list = [1024.,256.,64.,16.,4.,1.,.25]
     return scale_list[r-1]
-    
-'''
-#reset counter
-f = open('Y:/Cluster/plotting/filenumber','w')
-f.write(str(0))
-f.close()  
-'''
-'''
-fn = 0
-f = open('Y:/Cluster/plotting/filenumber','r')
-fn = int(f.read())
-f.close()
-f = open('Y:/Cluster/plotting/filenumber','w')
-f.write(str(int(fn+1)))
-f.close()
-'''
-testdata = 'Y:/testdata/'  
-for f in os.listdir(testdata):
-    if '.pickle' in f:
-        fn = f.split('pickle')[-1]
-        print "Found pickle file:",f," filenumber:",fn
-        break
-#print "Filenumber:",fn
-#fn = str(fn)
-    
 
-#testdata = '/home/ahk114/testdata/'
 
-#plt.close('all')
-#os.system('python /home/ahk114/Cluster/plotting/plotting_verification_stage1and3.py')
-
-picklefilename = testdata+'t_data.pickle'+fn
-print "Trying to open:",picklefilename
-f = open(picklefilename,'r')
-t = pickle.load(f)
-f.close()
-print "Loaded t data, length:",len(t)
-
-picklefilename = testdata+'r_data.pickle'+fn
-print "Trying to open:",picklefilename
-f = open(picklefilename,'r')
-r = pickle.load(f)
-f.close()
-print "Loaded r data, len:",len(r)
-
-picklefilename = testdata+'vectors_raw.pickle'+fn
-print "Trying to open:",picklefilename
-f = open(picklefilename,'r')
-vectors = pickle.load(f)
-f.close()
-print "Loaded raw vectors, shape:",vectors.shape
-
-picklefilename = testdata+'magnitude_raw.pickle'+fn
-print "Trying to open:",picklefilename
-f = open(picklefilename,'r')
-magnitude_raw =  pickle.load(f)
-f.close()
-print "Loaded raw mags, shape:",magnitude_raw.shape
-
-'''
-f,axes = plt.subplots(4,1,figsize=(20,15))
-axes[0].scatter(t,vectors[:,0],color='r')
-axes[0].set_title(list(set(vectors[:,0]))[:8])
-axes[1].scatter(t,vectors[:,1],color='b')
-axes[1].set_title(list(set(vectors[:,1]))[:8])
-axes[2].scatter(t,vectors[:,2],color='g')
-axes[2].set_title(list(set(vectors[:,2]))[:8])
-axes[3].scatter(t,magnitude_raw,color='y')
-axes[3].set_title(list(set(magnitude_raw))[:8])
-f.canvas.set_window_title('Raw')
-'''
 ###################
 '''
-Stage3 recreation here
+Stage3 reading here
 '''
 ###################
 
-picklefilename = testdata+'vector_scaled.pickle'+fn
-print "Trying to open:",picklefilename
-f = open(picklefilename,'r')
-vector=pickle.load(f)
-f.close()
-print "Loaded scaled vector, shape:",vector.shape
-
-picklefilename = testdata+'magnitude_scaled.pickle'+fn
-print "Trying to open:",picklefilename
-f = open(picklefilename,'r')
-magnitude= pickle.load(f)
-f.close()
-print "Loaded scaled mags, shape:",magnitude.shape
-'''
-f,axes = plt.subplots(4,1,figsize=(20,15))
-axes[0].scatter(t,vector[:,0],color='r')
-axes[0].set_title(list(set(vector[:,0]))[:8])
-axes[1].scatter(t,vector[:,1],color='b')
-axes[1].set_title(list(set(vector[:,1]))[:8])
-axes[2].scatter(t,vector[:,2],color='g')
-axes[2].set_title(list(set(vector[:,2]))[:8])
-axes[3].scatter(t,magnitude,color='y')
-axes[3].set_title(list(set(magnitude))[:8])
-f.canvas.set_window_title('Converted')
-'''
 #PROC = '/home/ahk114/testdata/'
-PROC = 'Y:/testdata/'
-procfile=PROC+'C'+'1'+'_'+'160122'+'_'+'B'+'.EXT.GSE'+fn #Where the data goes - into the reference folder!
+#PROC = 'Y:/testdata/'
+#procfile=PROC+'C'+'1'+'_'+'160122'+'_'+'B'+'.EXT.GSE'+fn #Where the data goes - into the reference folder!
+
+#procfile = 'C1_160119_B.EXT.GSEtest'
+procfile = 'C1_160122_B.EXT.GSE103'
 
 extvector = np.array([],dtype=np.float64).reshape(-1,3)
 extmags = np.array([],dtype=np.float64)
@@ -162,8 +71,8 @@ with open(procfile,'r') as f:
 		count += 1
 		try:
 			array = [i for i in line.split(" ") if i != '']
-			#if 10<count<20:
-				#print "EXT GSE array",array
+			if 10<count<20:
+				print "EXT GSE array",array
 			extvector=np.vstack((extvector,np.array([float(array[1]),float(array[2]),float(array[3])])))
 			extmags = np.append(extmags,np.linalg.norm(extvector[-1:][0]))
 		except ValueError:
@@ -173,8 +82,10 @@ print "Read procfile:",procfile
 print "extvector, shape:",extvector.shape
 print "extmags,shape:",extmags.shape
 
-plt.close('all')
-'''
+t = np.linspace(0,len(extmags),num=len(extmags))
+
+#plt.close('all')
+
 f,axes = plt.subplots(4,1,figsize=(20,15))
 axes[0].scatter(t,extvector[:,0],color='r')
 axes[0].set_title(list(set(extvector[:,0]))[:3])
@@ -184,11 +95,11 @@ axes[1].scatter(t,extvector[:,2],color='g')
 axes[1].set_title(list(set(extvector[:,2]))[:3])
 axes[3].scatter(t,extmags,color='y')
 axes[3].set_title(str(list(set(extmags))[:3])+' '+str(len(set(extmags))))
-f.canvas.set_window_title('After DP pipeline, caution: axes matched to raw data axes')			
+#f.canvas.set_window_title('After DP pipeline, caution: axes matched to raw data axes')			
 #f.savefig(testdata+'10.0timestep1000.15input.png')
+
+
 '''
-
-
 picklefilename = testdata+'dt.pickle'
 print "Trying to open:",picklefilename
 f = open(picklefilename+fn,'r')
@@ -410,3 +321,4 @@ if save:
     filename += '.png'
     fig.savefig(testdata+filename,dpi=280)#
     print "Saved as:",testdata+filename
+'''

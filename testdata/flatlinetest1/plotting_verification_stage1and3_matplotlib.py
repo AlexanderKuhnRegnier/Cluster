@@ -173,7 +173,6 @@ print "Read procfile:",procfile
 print "extvector, shape:",extvector.shape
 print "extmags,shape:",extmags.shape
 
-plt.close('all')
 '''
 f,axes = plt.subplots(4,1,figsize=(20,15))
 axes[0].scatter(t,extvector[:,0],color='r')
@@ -185,9 +184,9 @@ axes[1].set_title(list(set(extvector[:,2]))[:3])
 axes[3].scatter(t,extmags,color='y')
 axes[3].set_title(str(list(set(extmags))[:3])+' '+str(len(set(extmags))))
 f.canvas.set_window_title('After DP pipeline, caution: axes matched to raw data axes')			
-#f.savefig(testdata+'10.0timestep1000.15input.png')
+f.savefig(testdata+'10.0timestep1000.15input.png')
 '''
-
+plt.close('all')
 
 picklefilename = testdata+'dt.pickle'
 print "Trying to open:",picklefilename
@@ -201,18 +200,18 @@ timesd = [datetime.datetime(1,1,1,0,0,0)+i*datetime.timedelta(microseconds=dt*1e
 times = [ti.time() for ti in timesd]
 #print times
 
-scattersize = 50
+scattersize = 200
 
-mod = 1#if zoomed in or not!!
+mod = 0 #if zoomed in or not!!
 
-save = 0
-filename = ''
-
-min_scale = 0.999
-max_scale = 1.001
+save = 1
+filename = 'flat line test1'
 
 if mod:
     fig,axes = plt.subplots(4,3,figsize=(20,15))
+
+    min_scale = 0.999
+    max_scale = 1.001
 
     start = 0
     end = len(times)
@@ -234,8 +233,8 @@ if mod:
     
     start = 0
     end = len(times)
-    start=0
-    end = 15
+    start=2
+    end = 5
     
     axes[1,1].scatter(times[start:end],extvector[:,0][start:end],color='r',s=scattersize)
     axes[1,1].set_ylim((np.min(extvector[:,0][start:end])*min_scale,np.max(extvector[:,0][start:end])*max_scale))
@@ -252,8 +251,8 @@ if mod:
 
     start = 0
     end = len(times)
-    start=75
-    end = 90
+    start=3
+    end = 5
     
     axes[1,2].scatter(times[start:end],extvector[:,0][start:end],color='r',s=scattersize)
     axes[1,2].set_ylim((np.min(extvector[:,0][start:end])*min_scale,np.max(extvector[:,0][start:end])*max_scale))
@@ -293,16 +292,16 @@ if not mod:
     start = 0
     end = len(times)
     axes[1,2].scatter(times[start:end],extvector[:,0][start:end],color='r',s=scattersize)
-    axes[1,2].set_ylim((np.min(extvector[:,0][start:end])*min_scale,np.max(extvector[:,0][start:end])*max_scale))
+    axes[1,2].set_ylim((np.min(extvector[:,0][start:end]),np.max(extvector[:,0][start:end])))
     #axes[1,2].set_title(sorted(list(set(extvector[:,0]))[:1],key=abs))
     axes[2,2].scatter(times[start:end],-1*extvector[:,1][start:end],color='b',s=scattersize)
-    axes[2,2].set_ylim((np.min(-1*extvector[:,1][start:end])*min_scale,np.max(-1*extvector[:,1][start:end])*max_scale))
+    axes[2,2].set_ylim((np.min(-1*extvector[:,1][start:end]),np.max(-1*extvector[:,1][start:end])))
     #axes[2,2].set_title(sorted(list(set(extvector[:,1]))[:1],key=abs))
     axes[0,2].scatter(times[start:end],-1*extvector[:,2][start:end],color='g',s=scattersize)
-    axes[0,2].set_ylim((np.min(-1*extvector[:,2][start:end])*min_scale,np.max(-1*extvector[:,2][start:end])*max_scale))
+    axes[0,2].set_ylim((np.min(-1*extvector[:,2][start:end]),np.max(-1*extvector[:,2][start:end])))
     #axes[0,2].set_title(sorted(list(set(extvector[:,2]))[:1],key=abs))
     axes[3,2].scatter(times[start:end],extmags[start:end],color='y',s=scattersize)
-    axes[3,2].set_ylim((np.min(extmags[start:end])*min_scale,np.max(extmags[start:end])*max_scale))
+    axes[3,2].set_ylim((np.min(extmags[start:end]),np.max(extmags[start:end])))
     #axes[3,2].set_title(str(sorted(list(set(extmags))[:1]))+' '+str(len(set(extmags))))
  
 

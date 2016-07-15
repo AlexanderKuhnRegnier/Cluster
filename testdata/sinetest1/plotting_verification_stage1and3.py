@@ -93,36 +93,22 @@ mini = 10
 maxi = 2000
 
 dt = 10.
-t = np.linspace(3.01,3+4*np.pi+0.5,num=200)[3:]
-t= t+np.pi/3.
+t = np.linspace(3.6,4,num=30)
+
 tshift1 = t+np.pi/3.
-tshift2 = t+np.pi/3.
+tshift2 = t+2*np.pi/3.
 
 sin=True
 
 if sin==True:
-    offset = 0.052
-    x = (np.sin(t)+1+offset).reshape(t.shape[0],1)*5000
-    y = (np.sin(t)+1+offset).reshape(t.shape[0],1)*5000
-    z = (np.sin(t)+1+offset).reshape(t.shape[0],1)*5000
+    x = (np.sin(t)+1).reshape(t.shape[0],1)*5000
+    y = (np.sin(tshift1)+1).reshape(t.shape[0],1)*5000
+    z = (np.sin(tshift2)+1).reshape(t.shape[0],1)*5000
 else:
-    num = t.shape[0]
-    gradient = 0
-    offset =10000
-    scalex=20
-    scaley=10
-    scalez=10
-    scales = [scalex,scaley,scalez]
-    if abs(np.max(scales)*(gradient)*num+offset) > 65000:
-        raise Exception("Gradient,scale and offset are too large")
-    x = scalex*(np.linspace(0,gradient*num,num=num)+offset).reshape(-1,1)
-    y = scaley*(np.linspace(0,gradient*num,num=num)+offset).reshape(-1,1)
-    z = scalez*(np.linspace(0,gradient*num,num=num)+offset).reshape(-1,1)
+    x = 10000*np.ones((t.shape[0],1))
+    y = 10000*np.ones((t.shape[0],1))
+    z = 10000*np.ones((t.shape[0],1))
 
-print "max, min values:"
-print np.max(x),np.min(x)
-print np.max(y),np.min(y)
-print np.max(z),np.min(z)
 
 #10%period
 div = 1  #the higher div, the more range changes there are!!
@@ -191,7 +177,7 @@ for rvalue,v in zip(r,vector):
     for i in range(3):
         value = v[i]
         if value>32767:
-            #print "negative"
+            print "negative"
             value = (v[i]-65536.)/scale(rvalue)
         else:
             value = (v[i])/scale(rvalue)
@@ -239,47 +225,33 @@ print "End time:",datetime.datetime.fromtimestamp(EventTime_Unix+dt*len(t)).strf
 
 for i in range(len(t)):
     #timestring = datetime.datetime.fromtimestamp(EventTime_Unix+1).strftime('%Y-%m-%dT%H:%M:%S')
-    #time = EventTime_Unix+i*dt
-    #time = EventTime_Unix
-    time = 1453435194+i*4.2
-    r_range = 2
-    #hexbx = float2hex(vector[i,0])
-    #hexby = float2hex(vector[i,1])
-    #hexbz = float2hex(vector[i,2])
-    #val = (np.sin(i/30.)+1)*8.6
-    val = 100.2
-    hexbx = float2hex(val)
-    hexby = float2hex(val)
-    hexbz = float2hex(val)
+    time = EventTime_Unix+i*dt
+    hexbx = float2hex(vector[i,0])
+    hexby = float2hex(vector[i,1])
+    hexbz = float2hex(vector[i,2])
     time1 = integer2hex(time)
     time2 = integer2hex(floatbit(time)*1e9)
-    data = [(r_range<<4)+14,
-    16,
-    128+(1&7),
-    1,
-    time1[0],time1[1],time1[2],time1[3],
-    time2[0],time2[1],time2[2],time2[3]]  
+    data = [(r[i]<<4)+14,16,128+(1&7),1,
+            time1[0],time1[1],time1[2],time1[3],
+            time2[0],time2[1],time2[2],time2[3]]  
     #testing only
     #if i<15:
-    	#value = [204, 76, 200, 69] #100.15
+        #value = [204, 76, 200, 69] #100.15
     #else:
-    	#value = [204, 76, 72, 70]#200.3
+        #value = [204, 76, 72, 70]#200.3
     '''
     value = float2hex(1000.15)
     hexbx = value
     hexby = value
     hexbz = value
     '''
+    
     data.extend(hexbx)
     data.extend(hexby)
     data.extend(hexbz)
     data.extend([0,0,0,0,0,0,0,0])
-    print "data lenght:",len(data)
-    print data
-    #raise Exception("Testing")
     for content in data:
         datahandle.write(chr(content))	
-		
 datahandle.close()
 
 #tmp = '/home/ahk114/testdata/ExtProcRaw_1'

@@ -1,6 +1,12 @@
+**/*.html*
 **/session
 **/*.pyc
-**/*.pickle
-**/*.csv
+**/*.pickle*
+**/*.csv*
 **/tmp*
-**/filenumber
+**/filenumber*
+**/*.png
+**/*.zip
+**/*.hex*
+**/*ExtProc*
+**/*EXT.GSE*

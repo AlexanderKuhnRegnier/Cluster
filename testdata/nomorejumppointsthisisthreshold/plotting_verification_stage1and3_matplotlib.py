@@ -205,8 +205,8 @@ scattersize = 50
 
 mod = 1#if zoomed in or not!!
 
-save = 0
-filename = ''
+save = 1
+filename = 'no more jump points this is threshold'
 
 min_scale = 0.999
 max_scale = 1.001

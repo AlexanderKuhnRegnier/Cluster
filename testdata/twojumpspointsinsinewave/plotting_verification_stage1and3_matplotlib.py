@@ -173,7 +173,7 @@ print "Read procfile:",procfile
 print "extvector, shape:",extvector.shape
 print "extmags,shape:",extmags.shape
 
-plt.close('all')
+#plt.close('all')
 '''
 f,axes = plt.subplots(4,1,figsize=(20,15))
 axes[0].scatter(t,extvector[:,0],color='r')
@@ -205,8 +205,8 @@ scattersize = 50
 
 mod = 1#if zoomed in or not!!
 
-save = 0
-filename = ''
+save = 1
+filename = 'two jumps points in sine wave'
 
 min_scale = 0.999
 max_scale = 1.001

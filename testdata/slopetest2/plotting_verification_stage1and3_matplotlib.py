@@ -173,7 +173,6 @@ print "Read procfile:",procfile
 print "extvector, shape:",extvector.shape
 print "extmags,shape:",extmags.shape
 
-plt.close('all')
 '''
 f,axes = plt.subplots(4,1,figsize=(20,15))
 axes[0].scatter(t,extvector[:,0],color='r')
@@ -185,9 +184,9 @@ axes[1].set_title(list(set(extvector[:,2]))[:3])
 axes[3].scatter(t,extmags,color='y')
 axes[3].set_title(str(list(set(extmags))[:3])+' '+str(len(set(extmags))))
 f.canvas.set_window_title('After DP pipeline, caution: axes matched to raw data axes')			
-#f.savefig(testdata+'10.0timestep1000.15input.png')
+f.savefig(testdata+'10.0timestep1000.15input.png')
 '''
-
+plt.close('all')
 
 picklefilename = testdata+'dt.pickle'
 print "Trying to open:",picklefilename
@@ -201,15 +200,15 @@ timesd = [datetime.datetime(1,1,1,0,0,0)+i*datetime.timedelta(microseconds=dt*1e
 times = [ti.time() for ti in timesd]
 #print times
 
-scattersize = 50
+scattersize = 300
 
-mod = 1#if zoomed in or not!!
+mod = 0 #if zoomed in or not!!
 
-save = 0
-filename = ''
+save = 1
+filename = 'slope test2'
 
-min_scale = 0.999
-max_scale = 1.001
+min_scale = 0.9
+max_scale = 1.1
 
 if mod:
     fig,axes = plt.subplots(4,3,figsize=(20,15))
@@ -234,8 +233,8 @@ if mod:
     
     start = 0
     end = len(times)
-    start=0
-    end = 15
+    start=2
+    end = 5
     
     axes[1,1].scatter(times[start:end],extvector[:,0][start:end],color='r',s=scattersize)
     axes[1,1].set_ylim((np.min(extvector[:,0][start:end])*min_scale,np.max(extvector[:,0][start:end])*max_scale))
@@ -252,8 +251,8 @@ if mod:
 
     start = 0
     end = len(times)
-    start=75
-    end = 90
+    start=3
+    end = 5
     
     axes[1,2].scatter(times[start:end],extvector[:,0][start:end],color='r',s=scattersize)
     axes[1,2].set_ylim((np.min(extvector[:,0][start:end])*min_scale,np.max(extvector[:,0][start:end])*max_scale))
