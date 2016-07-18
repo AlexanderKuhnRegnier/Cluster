@@ -6,6 +6,7 @@ import matplotlib
 from copy import deepcopy as deepcop
 import os
 import cPickle as pickle
+import csv
 
 end_date=datetime(9999,1,1)
 EXTMODE_INITIATE = ["SFGMJ059","SFGMJ064","SFGMSEXT","SFGMM002"]
@@ -74,11 +75,29 @@ def eliminate_adjacent_identical(extmode_commanding):
     else:
         return []
         
-        
+def print_results(results):
+    '''
+    Prints out the contents of the results array in a more easily readable way
+    Converts the microsecond (us) time duration value into minutes for easier viewing
+    '''
+    for sc in range(4):
+        print "SC",sc+1
+        for i,row in zip(range(len(results)),results):
+            if row[2]==sc:
+                print format(i,'02d'),row[0].tolist().isoformat(),format(int(row[1]/60e6),'04d'),"mins",row[2],row[3]
+
+
 cmdlist = []
 datelist = []
 
+start_date = datetime(2015,8,6)
+end_date = datetime(2015,10,15)
 reprocess = 0
+
+simple_plot = 0
+overlay_plot = 0
+
+write_to_file = 1
 
 if reprocess:
     if 'datelist.pickle' in os.listdir(os.getcwd()):
@@ -99,8 +118,6 @@ if 'datelist.pickle' in os.listdir(os.getcwd()) and 'cmdlist.pickle' in os.listd
 else:
     print "starting new processing"
     #time   commmand    sc
-    start_date = datetime(2015,10,6)
-    end_date = datetime(2015,11,10)
     
     extmode_commanding_list=getcommands(start_date,end_date)
     print "got commmands"
@@ -122,10 +139,6 @@ else:
     #for a in extmode_commanding_list:
         #print a
     
-    plt.close('all')
-    
-    fig,axarr=plt.subplots(4,sharex=True)
-    print "Plotting"
     cmdlist = []
     datelist=[]
     for i in range(len(extmode_commanding_list)):
@@ -155,11 +168,25 @@ else:
         datelist.append(dates)
         #axarr[i].plot_date(tempdates,tempcmds, '-') #this plots triangle wave - modify data in next stage
         
+    picklefilename = 'cmdlist.pickle'
+    f=open(picklefilename,'w')
+    pickle.dump(cmdlist,f)
+    f.close()
+    picklefilename = 'datelist.pickle'
+    f=open(picklefilename,'w')
+    pickle.dump(datelist,f)
+    f.close()
+        
+if simple_plot:
+    plt.close('all')
+    
+    fig,axarr=plt.subplots(4,sharex=True)
+    print "Plotting"
+
     print "modifying data"
     for cs,ds in zip(cmdlist,datelist):
         if len(cs) != len(ds):
             raise Exception("Not of equal lenght!!")
-    
     
     c=0
     for cs,ds in zip(cmdlist,datelist):
@@ -194,14 +221,7 @@ else:
     for c in range(4):
         axarr[c].set_ylim(-0.2,1.2)
     
-    picklefilename = 'cmdlist.pickle'
-    f=open(picklefilename,'w')
-    pickle.dump(cmdlist,f)
-    f.close()
-    picklefilename = 'datelist.pickle'
-    f=open(picklefilename,'w')
-    pickle.dump(datelist,f)
-    f.close()
+
 
 '''
 cmdlist has corresponding datelist
@@ -224,20 +244,28 @@ for spacecraft in range(4):
         but we only care about the event immediately before the current spacecraft ext mode has 
         been initiated!
         '''
-        currentdate = dates[eventid]
         currentcommand = cmdlist[spacecraft][eventid]
         if currentcommand==1:   #if currently, ext mode is being initiaed, check if this was the case earlier for other sc
                                 #and in those cases, check how long
+            currentdate = dates[eventid]
+            if eventid<(len(dates)-1):
+                current_end_date = dates[eventid+1]
+                ext_mode_duration = (current_end_date-currentdate)/np.timedelta64(1,'us')
+            else:
+                current_end_date = -1 #end date is unknown!!
+                ext_mode_duration = -1 #duration is therefore also unknown!
             other_scs = otherspacecrafts(spacecraft)
             for othersc in other_scs:
                 #previous = np.datetime64(datetime(1,1,1))
                 if len(datelist[othersc]):          #if this datelist even has any entries!
                     other_dates = np.array(datelist[othersc])
+                    '''
                     print "Current, sc:",spacecraft
                     print currentdate,type(currentdate)                    
                     print "Other, sc:",othersc
                     print other_dates
                     print ""
+                    '''
                     timediffs = np.array((other_dates-currentdate)/np.timedelta64(1,'us'),dtype=np.int64) #time differences in minutes! -
                     '''
                     need to assert the following things at this stage:
@@ -267,13 +295,13 @@ for spacecraft in range(4):
                             similar to case2, look for next INITIATE command
                         
                     In all cases, need to make sure that preceeding/next command (depending on which is required)
-                    is present.
+                    is present. - is this always necessary though?
                     
                     we also need to check for TERMINATE commands that occur before the current time windows, with
                     no additional INITIATE commands to follow it.
                     '''
-                    print "timediffs"
-                    print timediffs
+                    #print "timediffs"
+                    #print timediffs
                     
                     other_commands = cmdlist[othersc]
                     if len(other_commands) != timediffs.shape[0]:
@@ -289,11 +317,152 @@ for spacecraft in range(4):
                     '''
                     last_index = length-1
                     for i in range(length):
+                        orig_length = len(results)
                         cmd = other_commands[i]
                         timediff = timediffs[i]
-                        if timediff<0 and cmd==0:   #TERMINATE command before current time
+                        if timediff<=0 and cmd==0:   #TERMINATE command before current time
                             if i == last_index:     #This was the last command issued
-                                results = np.vstack((results,[currentdate,timediff,spacecraft,othersc))
-                            elif timediffs[i+1] > 0:
-                                results = np.vstack((results,[currentdate,timediff+timediffs[i+1],spacecraft,othersc))
-                            
+                                results = np.vstack((results,[currentdate,ext_mode_duration,spacecraft,othersc]))
+                                '''
+                                row = results[-1]
+                                if 9<len(results)<21 and spacecraft==1:
+                                    print "1"
+                                    print row[0].tolist().isoformat(),format(int(row[1]/60e6),'04d'),row[2],row[3]
+                                '''
+                            elif timediffs[i+1]>0:#if next event is after the current even!
+                                if timediffs[i+1]<ext_mode_duration:
+                                    results = np.vstack((results,[currentdate,timediffs[i+1],spacecraft,othersc]))
+                                else:
+                                    results = np.vstack((results,[currentdate,ext_mode_duration,spacecraft,othersc]))
+
+                                '''
+                                row = results[-1]
+                                if 9<len(results)<21 and spacecraft==1:
+                                    print "2"
+                                    print row[0].tolist().isoformat(),format(int(row[1]/60e6),'04d'),row[2],row[3]
+                                '''
+                            elif timediffs[i+1]<=0:
+                                pass
+                            else:#should never happen                                
+                                raise Exception("Unknown Error")
+                        if timediff>0 and cmd==0:
+                            if timediff<ext_mode_duration:
+                                duration = ext_mode_duration-timediff
+                                new_start = currentdate+timediff*np.timedelta64(1,'us')
+                                results = np.vstack((results,[new_start,duration,spacecraft,othersc]))
+                                '''
+                                row = results[-1]
+                                if 9<len(results)<21 and spacecraft==1:
+                                    print "3"
+                                    print row[0].tolist().isoformat(),format(int(row[1]/60e6),'04d'),row[2],row[3]
+                                '''
+                        if timediff<=0 and cmd==1:
+                            pass
+                        if timediff>0 and cmd==1:
+                            if i==0:    #if this is the first command!
+                                #assume that there was no ext mode before this - is this valid without explicitly having the
+                                #TERMINATE command?
+                                if timediff>ext_mode_duration:
+                                    results = np.vstack((results,[currentdate,ext_mode_duration,spacecraft,othersc]))
+                                    '''
+                                    row = results[-1]
+                                    if 9<len(results)<21 and spacecraft==1:
+                                        print "4"
+                                        print row[0].tolist().isoformat(),format(int(row[1]/60e6),'04d'),row[2],row[3]
+                                    '''
+                                else:
+                                    results = np.vstack((results,[currentdate,timediff,spacecraft,othersc]))
+                                    '''
+                                    row = results[-1]
+                                    if 9<len(results)<21 and spacecraft==1:
+                                        print "5"
+                                        print row[0].tolist().isoformat(),format(int(row[1]/60e6),'04d'),row[2],row[3]
+                                    '''
+                        '''
+                        if spacecraft==1:
+                            if len(results)>orig_length:
+                                orig_length=len(results)
+                                if 9<len(results)<21:
+                                    row = results[-1]
+                                    print row[0].tolist().isoformat(),format(int(row[1]/60e6),'04d'),row[2],row[3]
+                        '''
+results = np.array(sorted(results,key=lambda x:x[0]))
+#print "Sorted Results (by date)"
+#for i,row in zip(range(len(results)),results):
+    #print i,row
+
+######
+'''
+for testing only
+'''
+'''
+results = results[9:21]
+print "reduced results"
+for sc in range(1,2):
+    print "SC",sc+1
+    for i,row in zip(range(len(results)),results):
+        if row[2]==sc:
+            print format(i,'02d'),row[0].tolist().isoformat(),format(int(row[1]/60e6),'04d'),"mins",row[2],row[3]
+'''
+######     
+        
+if overlay_plot:
+    plt.close('all')
+    
+    fig,axarr=plt.subplots(4,sharex=True)
+    print "Plotting Overlay with Relevant Time Periods"
+
+    print "modifying data"
+    for cs,ds in zip(cmdlist,datelist):
+        if len(cs) != len(ds):
+            raise Exception("Not of equal lenght!!")
+    
+    c=0
+    for cs,ds in zip(cmdlist,datelist):
+        #tempcs = deepcop(cs)
+        #tempds = deepcop(ds)
+        tempcs = []
+        tempds = []
+        #print cs
+        #print ds
+        if len(cs)>1:
+            for i in range(len(cs)-1):
+                command = cs[i]
+                next_command = cs[i+1]
+                date = ds[i]
+                next_date = ds[i+1]
+                tempcs.append(command)
+                tempcs.append(command)
+                tempds.append(date)
+                tempds.append(next_date)
+                
+                '''
+                print "current, then next"
+                print command,date
+                print next_command,next_date
+                '''
+        #print "output"
+        #print tempcs
+        #print tempds  
+        axarr[c].plot_date(tempds,tempcs, '-')
+        c+=1
+    for row in results:
+        start = row[0]
+        end = start+np.timedelta64(1,'us')*row[1]
+        axarr[row[2]].scatter(start,0.+(1-row[3]/3.),c='r',s=150)
+        axarr[row[2]].scatter(end,0.+(1-row[3]/3.),c='g',s=150)
+    for c in range(4):
+        axarr[c].set_ylim(-0.2,1.2)
+    figManager = plt.get_current_fig_manager()
+    figManager.window.showMaximized()
+
+print_results(results)
+
+directory = 'Y:/ExtModeDurations/'
+filename = directory+'extmode_durations.csv'
+if write_to_file:
+    with open(filename,'wb') as f:
+        writer = csv.writer(f,dialect='excel')
+        writer.writerow(['Start Time of Interval','Interval Duration (s)','Spacecraft in Ext Mode', 'Spacecraft not in Ext Mode'])
+        for row in results:
+            writer.writerow([row[0].tolist().strftime('%d/%m/%Y %H:%M:%S'),row[1]/1e6,row[2]+1,row[3]+1])
