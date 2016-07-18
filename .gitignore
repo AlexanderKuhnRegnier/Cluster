@@ -1,8 +1,13 @@
-testdata
+**/*.html*
 **/session
-**/*.html
 **/*.pyc
-**/*.pickle
+**/*.pickle*
+**/*.csv*
 **/*tmp*
-**/*.csv
+**/filenumber*
 filenumber
+**/*.png
+**/*.zip
+**/*.hex*
+**/*ExtProc*
+**/*EXT.GSE*
