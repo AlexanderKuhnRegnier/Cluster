@@ -33,6 +33,11 @@ class vectorlist:
         self.vectors = []
         self.ext=ext
         self.filename = ''
+    def isempty(self):
+        if len(self.vectors):
+            return True
+        else:
+            return False
     def mergelist(self,vlist):
         if isinstance(vlist,vectorlist):
             for v in vlist.vectors:
@@ -41,6 +46,9 @@ class vectorlist:
         else:
             raise Exception("Not a vector list")
     def prune(self,n=0,start_date=datetime(1,1,1),end_date=datetime(1,1,1),value=0,greater_than=True):
+        '''
+        Removes vectors from vectorlist which do not fit pruning criteria
+        '''
         print "Before:",len(self.vectors)
         td = end_date-start_date
         if td.days > 0 and td.seconds >= 0:
@@ -282,6 +290,7 @@ class vectorfiles:
         self.array = []
         self.std_dates = []
         self.stds = []
+        self.threshold_std = np.array([]).reshape(-1,2)
     def add_vectorlist(self,vlist,color='red',legend='data',plotwhich='mag'):
         if not isinstance(vlist, vectorlist):
             raise Exception('Object supplied must be a vector list')
@@ -345,6 +354,10 @@ class vectorfiles:
             for i in range(0,length,n):
                 self.std_dates.append(dates[i])
                 self.stds.append(np.std(data[i:i+n]))
+    def select_stds(self,threshold=0.1):
+        for d,std in zip(self.std_dates,self.stds):
+            if std<threshold:
+                self.threshold_std = np.vstack((self.threshold_std,np.array([d,std])))
 
 def process(vfiles,sc,start_date,end_date,input):
     global prune_start,prune_end,prune_n,prune_value,prune_greater_than
@@ -353,7 +366,7 @@ def process(vfiles,sc,start_date,end_date,input):
     legends = [entry[3] for entry in input]
     plotwhichs=[entry[4] for entry in input] 
     if start_date==end_date or end_date=='':
-        dates = start_date
+        dates = [start_date]
     else:
         dates = [start_date+timedelta(days=1)*i for i in range(abs(end_date-start_date).days)]
     for datev in dates:
@@ -463,91 +476,174 @@ vfiles = vectorfiles()
 refdirahk114 = "Y:/reference/"
 refdir = "Z:/data/reference/" 
 caadir = 'Z:/caa/ic_archive/'
-#refdirahk114 = refdir
-sc = 3
 
-'''
-#large pickle file!!
-start_date = datetime(2010,1,1)
-end_date = datetime(2014,8,10)
-'''
-plt.close('all')
-
-start_date = datetime(2016,1,1)
-end_date  = datetime(2016,1,10)
-'''
-input = [directory,extmode 0 or 1 (off or on), colour, legend, whichdata ('mag','x','y','z')]
-'''
-input = [
-         #[caadir,0,'r','caa','mag'],
-         #[refdir,0,'g','def','y'],
-         [refdir,1,'b','def','mag']
-]
-################
-'''
-pruning of output - fine date selection & point count reduction
-'''
-#prune_start = datetime(2015,1,1)
-#prune_end   = datetime(2015,5,1)
-#prune_n     = 20
-prune_greater_than = False
-prune_value = 40
-#################
-scatter_size = 50
-#################
-
-rm_outliers = 0
-
-#plot(vfiles,sc,start_date,end_date,input)
-
-std_n = 50
-PLOT = 1
-
-reprocess = 1
-
-pickling = 0
-
-if prune_start != datetime(1,1,1):
-    dt_label_start = prune_start.isoformat()
-else:
-    dt_label_start = start_date.isoformat()
-if prune_start != datetime(1,1,1):
-    dt_label_end = prune_end.isoformat()
-else:
-    dt_label_end = end_date.isoformat()
-
-if pickling: 
-    descriptor_string = '_pruningvalue{0:03d}_pruningnumber{1:03d}'.format(prune_value,prune_n)
-    pickle_file = dt_label_start+'__'+dt_label_end+descriptor_string+'.pickle'
-    pickle_file = pickle_file.replace(':','')
-    if rm_outliers != 0 and rm_outliers != 1:
-        raise Exception("only use 0 or 1 please")
-    pickle_file += format(rm_outliers,'d')
-
-if reprocess:
-    process(vfiles,sc,start_date,end_date,input)
-    if pickling:
-        pickle.dump(vfiles,open(pickle_file,'wb'))
-
-if PLOT:
-    if pickling:
-        print "Reading from pickle file"
-        vfiles = pickle.load(open(pickle_file,'rb'))
-    plot(vfiles,sc,start_date,end_date,input,n=std_n)
+def analyse(sc=1,start_date=datetime(2016,1,1),end_date='',
+            prune_start=datetime(1,1,1),prune_end=datetime(1,1,1),prune_n=1,
+            prune_value = 0,input=[[refdir,1,'b','default','mag']],
+            scatter_size=50,prune_greater_than=False,
+            threshold=1.2,rm_outliers=0,std_n=50,PLOT=0,reprocess=1,
+            pickling=0):
+    '''
+    sc    = spacecraft (1,2,3,4)    
+    input = [[directory,extmode 0 or 1 (off or on), colour, legend (string), 
+             whichdata ('mag','x','y','z')],[],[],...]
+             available directories are: 
+                        refdirahk114 = 'Y:/reference/'
+                        refdir       = 'Z:/data/reference/' 
+                        caadir       = 'Z:/caa/ic_archive/'
+    start_date = time to start data analysis
+    end_date   = time to end data analysis. If not supplied, only data for the start
+                    date is analysed
+    prune_start,prune_end variables allow for finer control of processed data
+    after it has been collected
+    
+    all dates (ie. start_date, end_date, prune_start, prune_end) are expected
+    to be given as a python datetime.datetime object.
+    
+    prune_n = minimum number of vectors in a given day
+    prune_value = sets magnetic field value threshold (see below)
+    prune_greater_than = True or False. If set to True, all datapoints above 
+                        prune_value threshold are selected. If set to False,
+                        all values below the threshold are selected
+    scatter_size = an integer controlling the size of the scatter points plotted
+    PLOT = plots scatter graphs of different stages of the data processing
+    rm_outliers = 0 or 1, depending on if outlying values should be removed
+                for a smoother data set
+    reprocess = 0 or 1, if set to 1 takes in new data depending on the dates
+                selected.
+    pickling = 0 or 1. If pickling is set to 1 and reprocess is set to 1,
+                the program will write the collected data to a pickle file
+                which can then be reloaded for faster data analysis should
+                other parameters be changed afterwards. Thus, the second time 
+                around, reprocess should be set to 0, and pickling should
+                remain set at 1, so that the program loads the collected data
+                from the pickle file instead of looking for the raw file.
+                If data is pruned, this will be reflected in the pickle file
+                as well, so
+                
+    In general, if the default parameter is not changed, the corresponding
+    action will not be performed.
+    '''
+    #global prune_start,prune_end,prune_n,prune_value,prune_greater_than
+    #global vfiles, scatter_size,sc
+    #global refdirahk114,refdir,caadir
+    global vfiles
+    ###############################################################################
+    '''
+    #default arguments
+    prune_start=datetime(1,1,1)
+    prune_end=datetime(1,1,1)
+    prune_n=1
+    prune_value = 0
+    end_date = ''
+    '''
+    
+    #User Input Variables
+    #refdirahk114 = refdir
+    #sc = sc
+    
+    '''
+    #large pickle file!!
+    start_date = datetime(2010,1,1)
+    end_date = datetime(2014,8,10)
+    '''
+    #plt.close('all')
+    
+    #start_date = datetime(2016,1,2)
+    #end_date  = datetime(2016,1,3)
+    '''
+    input = [directory,extmode 0 or 1 (off or on), colour, legend, whichdata ('mag','x','y','z')]
+    '''
+    '''
+    input = [
+             #[caadir,0,'r','caa','mag'],
+             #[refdir,0,'g','def','y'],
+             [refdir,1,'b','def','mag']
+    ]
+    '''
+    ################
+    '''
+    pruning of output - fine date selection & point count reduction
+    '''
+    '''
+    #prune_start = datetime(2015,1,1)
+    #prune_end   = datetime(2015,5,1)
+    #prune_n     = 20
+    prune_greater_than = False
+    prune_value = 40
+    #################
+    scatter_size = 50
+    #################
+    
+    threshold = 1.2
+    
+    
+    rm_outliers = 0
+    
     #plot(vfiles,sc,start_date,end_date,input)
-
-if rm_outliers:
-    if pickle_file in os.listdir(os.getcwd()):
-        print "Already removed outliers!"
+    
+    std_n = 50
+    PLOT = 1
+    
+    reprocess = 1
+    
+    pickling = 0
+    '''
+    ###############################################################################
+    
+    if prune_start != datetime(1,1,1):
+        dt_label_start = prune_start.isoformat()
     else:
-        plot(vfiles,sc,start_date,end_date,input,n=std_n)
-        remove_outliers()
+        dt_label_start = start_date.isoformat()
+    if prune_start != datetime(1,1,1):
+        dt_label_end = prune_end.isoformat()
+    else:
+        if end_date != '':
+            dt_label_end = end_date.isoformat()
+        else:
+            dt_label_end=''
+    
+    if pickling: 
+        descriptor_string = '_pruningvalue{0:03d}_pruningnumber{1:03d}'.format(prune_value,prune_n)
+        pickle_file = dt_label_start+'__'+dt_label_end+descriptor_string+'.pickle'
+        pickle_file = pickle_file.replace(':','')
+        if rm_outliers != 0 and rm_outliers != 1:
+            raise Exception("only use 0 or 1 please")
+        pickle_file += format(rm_outliers,'d')
+    
+    if reprocess:
+        process(vfiles,sc,start_date,end_date,input)
         if pickling:
             pickle.dump(vfiles,open(pickle_file,'wb'))
-    plot(vfiles,sc,start_date,end_date,input,n=std_n)
-
-vfiles.calculate_stds(n=std_n)
-print len(vfiles.stds),len(vfiles.std_dates)
-plt.figure()
-plt.scatter(vfiles.std_dates,vfiles.stds)
-plt.show()
+    else:
+        if pickling:
+            print "Reading from pickle file"
+            vfiles = pickle.load(open(pickle_file,'rb'))
+    
+    if PLOT:
+        plot(vfiles,sc,start_date,end_date,input,n=std_n)
+        #plot(vfiles,sc,start_date,end_date,input)
+    
+    if rm_outliers:
+        if pickle_file in os.listdir(os.getcwd()):
+            print "Already removed outliers!"
+        else:
+            plot(vfiles,sc,start_date,end_date,input,n=std_n)
+            remove_outliers()
+            if pickling:
+                pickle.dump(vfiles,open(pickle_file,'wb'))
+        plot(vfiles,sc,start_date,end_date,input,n=std_n)
+    
+    vfiles.calculate_stds(n=std_n)
+    print len(vfiles.stds),len(vfiles.std_dates)
+    if PLOT:
+        plt.figure()
+        plt.scatter(vfiles.std_dates,vfiles.stds)
+        plt.show()
+    vfiles.select_stds(threshold=threshold)
+    if PLOT:
+        plt.figure()
+        print vfiles.threshold_std.shape
+        plt.scatter(vfiles.threshold_std[:,0].tolist(),vfiles.threshold_std[:,1].tolist(),s=100,c='r')
+        plt.show()
+    return vfiles.threshold_std
