@@ -589,3 +589,12 @@ out this data in order to obtain the dataset which describes
 the true intersection between the ext mode and non-ext mode
 data, given the standard deviation requirements given.
 '''
+#[x.pop(i) for i in sorted(indices_to_delete,reverse=True)] #returns deleted elements
+for event in data_list:
+    ext_mode_data = event[4][0]
+    ext_mode_starts = ext_mode_data[0]
+    ext_mode_ends = ext_mode_data[1]
+    non_ext_data = event[6][0]
+    non_ext_starts = non_ext_data[0]
+    non_ext_ends = non_ext_data[1]
+    

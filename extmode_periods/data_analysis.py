@@ -365,7 +365,7 @@ class vectorfiles:
             length = int((len(data)-len(data)%n))
             for i in range(0,length,n):
                 self.std_dates.append(dates[i])
-                self.std_end_dates.append(dates[i:i+n+1][-1])
+                self.std_end_dates.append(dates[i:i+n][-1]) #end date of interval - should this be [i:i+n+1]??
                 self.stds.append(np.std(data[i:i+n]))
                 nddata = np.array(data[i:i+n]).reshape(-1,1)
                 nddates = np.array([d.tolist() for d in dates[i:i+n]]).reshape(-1,1)
