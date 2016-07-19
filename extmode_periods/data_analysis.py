@@ -289,8 +289,17 @@ class vectorfiles:
     def __init__(self):
         self.array = []
         self.std_dates = []
+        self.std_end_dates = []
         self.stds = []
-        self.threshold_std = np.array([]).reshape(-1,2)
+        self.threshold_std = np.array([]).reshape(-1,4)
+        '''
+        4 columns in the threshold_std array
+        column 0:start date of interval
+        column 1:end date of interval
+        column 2:standard deviation over interval
+        column 3:raw data for the interval (as (n,2) array)
+        '''
+        self.std_data_raw =[]
     def add_vectorlist(self,vlist,color='red',legend='data',plotwhich='mag'):
         if not isinstance(vlist, vectorlist):
             raise Exception('Object supplied must be a vector list')
@@ -325,6 +334,7 @@ class vectorfiles:
         return dates
     def calculate_stds(self,n=10,scatter=True,log=False):
         global sc
+        print "STD samples:",n
         for count,entry in zip(range(len(self.array)),self.array):
             #print "entry ",entry
             vlist = entry[0]
@@ -353,12 +363,47 @@ class vectorfiles:
             length = int((len(data)-len(data)%n))
             for i in range(0,length,n):
                 self.std_dates.append(dates[i])
+                self.std_end_dates.append(dates[i:i+n+1][-1])
                 self.stds.append(np.std(data[i:i+n]))
+                nddata = np.array(data[i:i+n]).reshape(-1,1)
+                nddates = np.array([d.tolist() for d in dates[i:i+n]]).reshape(-1,1)
+                raw_data = np.concatenate((nddates,nddata),axis=1)
+                self.std_data_raw.append(raw_data)
     def select_stds(self,threshold=0.1):
-        for d,std in zip(self.std_dates,self.stds):
+        for d,end_d,std,raw_std_data in zip(self.std_dates,self.std_end_dates,
+                                            self.stds,self.std_data_raw):
             if std<threshold:
-                self.threshold_std = np.vstack((self.threshold_std,np.array([d,std])))
-
+                self.threshold_std = np.vstack((self.threshold_std,
+                                                np.array([d,
+                                                          end_d,
+                                                          std,
+                                                          raw_std_data])))
+    def merge_select_stds(self):
+        new_threshold_std = np.array([]).reshape(-1,4)
+        for i in range(self.threshold_std.shape[0]):
+            if new_threshold_std.shape[0] == 0:
+                new_threshold_std = np.vstack((new_threshold_std,
+                                               self.threshold_std[i]))
+            else:
+                previous_end_date = new_threshold_std[-1,1]
+                this_start_date = self.threshold_std[i,0]
+                if previous_end_date == this_start_date:
+                    new_threshold_std[-1,1]=self.threshold_std[i,1]
+                    new_threshold_std[-1,2]=np.mean((self.threshold_std[i,2],
+                                                    new_threshold_std[-1,2]))
+                    new_threshold_std[-1,3]=np.vstack((new_threshold_std[-1,3],
+                                                        self.threshold_std[i,3]))
+                else:
+                    new_threshold_std = np.vstack((new_threshold_std,
+                                                   self.threshold_std[i]))
+                    if i==self.threshold_std.shape[0]-1:
+                        if self.threshold_std[-1][1] not in new_threshold_std[-1]:
+                            #print self.threshold_std[-1]
+                            #print new_threshold_std[-1]
+                            new_threshold_std = np.vstack((new_threshold_std,
+                                                           self.threshold_std[-1]))
+        return new_threshold_std
+            
 def process(vfiles,sc,start_date,end_date,input):
     global prune_start,prune_end,prune_n,prune_value,prune_greater_than
     dirs = [[entry[0],entry[1]] for entry in input]
@@ -481,8 +526,8 @@ def analyse(sc=1,start_date=datetime(2016,1,1),end_date='',
             prune_start=datetime(1,1,1),prune_end=datetime(1,1,1),prune_n=1,
             prune_value = 0,input=[[refdir,1,'b','default','mag']],
             scatter_size=50,prune_greater_than=False,
-            threshold=1.2,rm_outliers=0,std_n=50,PLOT=0,reprocess=1,
-            pickling=0):
+            std_threshold=1.2,rm_outliers=0,std_n=50,PLOT=0,reprocess=1,
+            pickling=0,scatter=True):
     '''
     sc    = spacecraft (1,2,3,4)    
     input = [[directory,extmode 0 or 1 (off or on), colour, legend (string), 
@@ -507,6 +552,7 @@ def analyse(sc=1,start_date=datetime(2016,1,1),end_date='',
                         all values below the threshold are selected
     scatter_size = an integer controlling the size of the scatter points plotted
     PLOT = plots scatter graphs of different stages of the data processing
+    scatter = True or False - plot scatter or line plot
     rm_outliers = 0 or 1, depending on if outlying values should be removed
                 for a smoother data set
     reprocess = 0 or 1, if set to 1 takes in new data depending on the dates
@@ -575,7 +621,7 @@ def analyse(sc=1,start_date=datetime(2016,1,1),end_date='',
     scatter_size = 50
     #################
     
-    threshold = 1.2
+    std_threshold = 1.2
     
     
     rm_outliers = 0
@@ -621,29 +667,38 @@ def analyse(sc=1,start_date=datetime(2016,1,1),end_date='',
             vfiles = pickle.load(open(pickle_file,'rb'))
     
     if PLOT:
-        plot(vfiles,sc,start_date,end_date,input,n=std_n)
+        plot(vfiles,sc,start_date,end_date,input,n=std_n,scatter=scatter)
         #plot(vfiles,sc,start_date,end_date,input)
     
     if rm_outliers:
         if pickle_file in os.listdir(os.getcwd()):
             print "Already removed outliers!"
         else:
-            plot(vfiles,sc,start_date,end_date,input,n=std_n)
+            plot(vfiles,sc,start_date,end_date,input,n=std_n,scatter=scatter)
             remove_outliers()
             if pickling:
                 pickle.dump(vfiles,open(pickle_file,'wb'))
         plot(vfiles,sc,start_date,end_date,input,n=std_n)
     
     vfiles.calculate_stds(n=std_n)
-    print len(vfiles.stds),len(vfiles.std_dates)
+    
+    #print len(vfiles.stds),len(vfiles.std_dates)
     if PLOT:
         plt.figure()
         plt.scatter(vfiles.std_dates,vfiles.stds)
         plt.show()
-    vfiles.select_stds(threshold=threshold)
+        
+    vfiles.select_stds(threshold=std_threshold)
+    
     if PLOT:
         plt.figure()
         print vfiles.threshold_std.shape
-        plt.scatter(vfiles.threshold_std[:,0].tolist(),vfiles.threshold_std[:,1].tolist(),s=100,c='r')
+        plt.scatter(vfiles.threshold_std[:,0].tolist(),
+                    vfiles.threshold_std[:,2].tolist(),s=scatter_size,c='r')
         plt.show()
-    return vfiles.threshold_std
+    new = vfiles.merge_select_stds()
+    #return vfiles.threshold_std,new
+    return new
+
+#input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
+#output = analyse(input=input,end_date=datetime(2016,1,4),std_n=10,PLOT=1,std_threshold=0.25)
