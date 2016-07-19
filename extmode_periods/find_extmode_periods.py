@@ -7,6 +7,9 @@ from copy import deepcopy as deepcop
 import os
 import cPickle as pickle
 import csv
+import data_analysis
+from data_analysis import refdir,refdirahk114,caadir
+import calendar
 
 end_date=datetime(9999,1,1)
 EXTMODE_INITIATE = ["SFGMJ059","SFGMJ064","SFGMSEXT","SFGMM002"]
@@ -32,11 +35,13 @@ def getcommands(start_date,end_date):
                         #print command
                         if command[1:] in EXTMODE_INITIATE:
                             command_execution_time = data[0]
+                            #print "time",command_execution_time
                             extmode_commanding = np.vstack((
                             extmode_commanding,
                             [command_execution_time,'INITIATE',sc]))
                         elif command[1:] in EXTMODE_TERMINATE:
                             command_execution_time = data[0]
+                            #print "time",command_execution_time
                             extmode_commanding = np.vstack((
                             extmode_commanding,
                             [command_execution_time,'TERMINATE',sc]))                   
@@ -86,18 +91,44 @@ def print_results(results):
             if row[2]==sc:
                 print format(i,'02d'),row[0].tolist().isoformat(),format(int(row[1]/60e6),'04d'),"mins",row[2],row[3]
 
+def calculate_end_times(results):
+    results_end_date = np.array([]).reshape(-1,4)
+    for i in range(len(results)):
+        results_end_date = np.vstack((results_end_date,
+                                np.array([
+                                results[i,0],
+                                results[i,0]+results[i,1]*np.timedelta64(1,'us'),
+                                results[i,2],
+                                results[i,3]])))
+    return results_end_date
+
+def find_min_max_dates(results_end_date):
+    print "SC has possible values 0,1,2,3!!!"
+    min_date = datetime(9999,1,1)
+    max_date = datetime(1,1,1)
+    for row in results_end_date:
+        start_date = row[0].tolist()
+        end_date = row[1].tolist()
+        if start_date<min_date:
+            min_date = start_date
+        if end_date>max_date:
+            max_date=end_date
+    if min_date == datetime(9999,1,1) or max_date == datetime(1,1,1):
+        print "No events found!"
+        return False,False
+    return min_date.date(),max_date.date()
 
 cmdlist = []
 datelist = []
 
 start_date = datetime(2015,8,6)
-end_date = datetime(2015,10,15)
+end_date = datetime(2015,10,10)
 reprocess = 0
 
 simple_plot = 0
-overlay_plot = 0
+overlay_plot = 1
 
-write_to_file = 1
+write_to_file = 0
 
 if reprocess:
     if 'datelist.pickle' in os.listdir(os.getcwd()):
@@ -148,7 +179,10 @@ else:
         tempcmds=[]
         tempdates=[]
         for date in dates:
+            #print "appending",date
             tempdates.append(np.datetime64(date))
+            #print "appended",tempdates[-1]
+            #print tempdates[-1].tolist()
         for cmd in cmds:
             if cmd=='INITIATE':
                 tempcmds.append(1)
@@ -389,7 +423,7 @@ for spacecraft in range(4):
 results = np.array(sorted(results,key=lambda x:x[0]))
 #print "Sorted Results (by date)"
 #for i,row in zip(range(len(results)),results):
-    #print i,row
+#    print i,row
 
 ######
 '''
@@ -407,6 +441,12 @@ for sc in range(1,2):
 ######     
         
 if overlay_plot:
+    '''
+    Note that the conversion between the np.datetime64 object and the 
+    python datetime.datetime object that seems to be necessary in order
+    to plot the data also introduces a timeshift into the data,
+    probably due to time-zone conversion or something similar.
+    '''
     plt.close('all')
     
     fig,axarr=plt.subplots(4,sharex=True)
@@ -456,8 +496,13 @@ if overlay_plot:
     figManager = plt.get_current_fig_manager()
     figManager.window.showMaximized()
 
-print_results(results)
+#print_results(results)
 
+results_end_date = calculate_end_times(results)
+for rowend, row in zip(results_end_date,results):
+    print rowend
+    print row
+    print ""
 directory = 'Y:/ExtModeDurations/'
 filename = directory+'extmode_durations.csv'
 if write_to_file:
@@ -466,3 +511,81 @@ if write_to_file:
         writer.writerow(['Start Time of Interval','Interval Duration (s)','Spacecraft in Ext Mode', 'Spacecraft not in Ext Mode'])
         for row in results:
             writer.writerow([row[0].tolist().strftime('%d/%m/%Y %H:%M:%S'),row[1]/1e6,row[2]+1,row[3]+1])
+            
+'''
+Now, the time periods where ext mode for one spacecraft and non-ext mode for
+any other spacecraft overlap.
+The data_analysis module will now be used to generate a list of periods of
+time, where data (either in ext or not in ext mode) with a standard deviation
+below a certain threshold for a certain sample size is available, for 
+field values up to a certain specified value. This list will then be searched
+for matches with the overlaps determined previously
+'''
+'''
+analyse every 'event' that is recorded, ie. every time that one sc is in ext
+mode but at least 1 other sc is not
+want to record:
+        0+start time of this event
+        1+end time of event
+        2+duration of event in seconds
+        (data: - only concerns data that meets the standard deviation target 
+                set beforehand)
+        3+sc in ext mode        
+        4+analysis output for ext mode sc
+        
+        5+sc not in ext mode
+        6+analysis output for non-ext mode sc
+7 'columns' - number of 'rows' depending on the number of events
+'''
+data_list = []
+PLOT = 1
+reprocess = 1
+std_threshold=1000.
+std_n = 40
+prune_value = 2000
+prune_greater_than = False
+for row in results_end_date:
+    start_date,end_date=row[0].tolist().date(),row[1].tolist().date()
+    spacecrafts=[row[2],row[3]]
+    ext_modes = [1,0]
+    for spacecraft,ext_mode in zip(spacecrafts,ext_modes):
+        print ""
+        print "SC:",spacecraft,"EXT MODE:",ext_mode
+        if ext_mode:
+            legend = 'ext mode'
+            c = 'r'
+        else:
+            legend = 'non ext mode'
+            c = 'b'
+        print start_date,end_date
+        input = [[refdir,ext_mode,c,legend,'mag']]
+        prune_start = row[0].tolist()
+        prune_end = row[1].tolist()
+        output=data_analysis.analyse(
+                              spacecraft=spacecraft+1,
+                              input=input,start_date=start_date,
+                              end_date=end_date,
+                              prune_value=prune_value,
+                              prune_greater_than=prune_greater_than,
+                              prune_start=prune_start,
+                              prune_end=prune_end,
+                              PLOT=PLOT,reprocess=reprocess,
+                              std_threshold=std_threshold,
+                              std_n=std_n)
+        if ext_mode:
+            data_list.append([row[0].tolist(),
+                              row[1].tolist(),
+                              (row[1]-row[0])/np.timedelta64(1,'s'),
+                              spacecraft,
+                              output])
+        else:
+            data_list[-1].extend([spacecraft,output])
+print "Finished compliling data list",len(data_list)
+
+'''
+Now just need to sift through all the entries in column 4 and 6 of
+data_list, in order to find intervals that match up, and then filter
+out this data in order to obtain the dataset which describes
+the true intersection between the ext mode and non-ext mode
+data, given the standard deviation requirements given.
+'''

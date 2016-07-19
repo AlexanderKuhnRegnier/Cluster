@@ -207,60 +207,61 @@ class vectorlist:
             #checks could be done here
             #for now, just assume everything will be ok
             dates = vlist.returndatetimes()
-            if plotwhich=='mag':
-                data = vlist.returnmagnitudes()
-            elif plotwhich=='x':
-                data = vlist.returnx()
-            elif plotwhich=='y':
-                data=vlist.returny()
-            elif plotwhich=='z':
-                data=vlist.returnz()
-            else:
-                data=vlist.returnmagnitudes()
-            '''
-            print "data excerpt"
-            for i in range(5):
-                print dates[i],data[i],self.filename
-            '''
-            label = legend+' ('+plotwhich+')'
-            if scatter:
-                if [label,colour] in legend_colour_list:
-                    ax[0].scatter(dates,data,c=colour,
-                         s=scatter_size)
+            if len(dates):
+                if plotwhich=='mag':
+                    data = vlist.returnmagnitudes()
+                elif plotwhich=='x':
+                    data = vlist.returnx()
+                elif plotwhich=='y':
+                    data=vlist.returny()
+                elif plotwhich=='z':
+                    data=vlist.returnz()
                 else:
-                    ax[0].scatter(dates,data,c=colour,label=label,
-                         s=scatter_size)
-                    legend_colour_list.append([label,colour])
-            else:
-                ax[0].plot(dates,data,c=colour,label=legend)
-
-            ######################
-            '''
-            standard deviation calculation below
-            '''
-            ######################
-            std_dates=[]
-            stds = []
-            length = int((len(data)-len(data)%n))
-            for i in range(0,length,n):
-                std_dates.append(dates[i])
-                stds.append(np.std(data[i:i+n]))
-            label = legend+' ('+plotwhich+')'+'std'
-            if scatter:
-                if [label,colour] in legend_colour_list_std:
-                    ax[1].scatter(std_dates,stds,c=colour,
-                         s=scatter_size)
+                    data=vlist.returnmagnitudes()
+                '''
+                print "data excerpt"
+                for i in range(5):
+                    print dates[i],data[i],self.filename
+                '''
+                label = legend+' ('+plotwhich+')'
+                if scatter:
+                    if [label,colour] in legend_colour_list:
+                        ax[0].scatter(dates,data,c=colour,
+                             s=scatter_size)
+                    else:
+                        ax[0].scatter(dates,data,c=colour,label=label,
+                             s=scatter_size)
+                        legend_colour_list.append([label,colour])
                 else:
-                    ax[1].scatter(std_dates,stds,c=colour,label=label,
-                         s=scatter_size)
-                    legend_colour_list_std.append([label,colour])
-            else:
-                ax[1].plot(std_dates,stds,c=colour,label=legend)            
-            if min(dates)<min_date:
-                min_date = min(dates)
-            if max(dates)>max_date:
-                max_date = max(dates)
-        
+                    ax[0].plot(dates,data,c=colour,label=legend)
+    
+                ######################
+                '''
+                standard deviation calculation below
+                '''
+                ######################
+                std_dates=[]
+                stds = []
+                length = int((len(data)-len(data)%n))
+                for i in range(0,length,n):
+                    std_dates.append(dates[i])
+                    stds.append(np.std(data[i:i+n]))
+                label = legend+' ('+plotwhich+')'+'std'
+                if scatter:
+                    if [label,colour] in legend_colour_list_std:
+                        ax[1].scatter(std_dates,stds,c=colour,
+                             s=scatter_size)
+                    else:
+                        ax[1].scatter(std_dates,stds,c=colour,label=label,
+                             s=scatter_size)
+                        legend_colour_list_std.append([label,colour])
+                else:
+                    ax[1].plot(std_dates,stds,c=colour,label=legend)            
+                if min(dates)<min_date:
+                    min_date = min(dates)
+                if max(dates)>max_date:
+                    max_date = max(dates)
+            
         ax[0].set_xlim((min_date.astype(object)-timedelta(hours=2),max_date.astype(object)+timedelta(hours=2)))
         legend = ax[0].legend()
         legend = ax[1].legend()
@@ -334,6 +335,7 @@ class vectorfiles:
         return dates
     def calculate_stds(self,n=10,scatter=True,log=False):
         global sc
+        print "Spacecraft:",sc
         print "STD samples:",n
         for count,entry in zip(range(len(self.array)),self.array):
             #print "entry ",entry
@@ -396,16 +398,11 @@ class vectorfiles:
                 else:
                     new_threshold_std = np.vstack((new_threshold_std,
                                                    self.threshold_std[i]))
-                    if i==self.threshold_std.shape[0]-1:
-                        if self.threshold_std[-1][1] not in new_threshold_std[-1]:
-                            #print self.threshold_std[-1]
-                            #print new_threshold_std[-1]
-                            new_threshold_std = np.vstack((new_threshold_std,
-                                                           self.threshold_std[-1]))
+
         return new_threshold_std
             
-def process(vfiles,sc,start_date,end_date,input):
-    global prune_start,prune_end,prune_n,prune_value,prune_greater_than
+def process(vfiles,sc,start_date,end_date,input,prune_start,prune_end,prune_n,prune_value,prune_greater_than):
+    #global prune_start,prune_end,prune_n,prune_value,prune_greater_than
     dirs = [[entry[0],entry[1]] for entry in input]
     colours = [entry[2] for entry in input]
     legends = [entry[3] for entry in input]
@@ -413,7 +410,7 @@ def process(vfiles,sc,start_date,end_date,input):
     if start_date==end_date or end_date=='':
         dates = [start_date]
     else:
-        dates = [start_date+timedelta(days=1)*i for i in range(abs(end_date-start_date).days)]
+        dates = [start_date+timedelta(days=1)*i for i in range(abs(end_date-start_date).days+1)]
     for datev in dates:
         print ""
         print datev.isoformat()
@@ -521,15 +518,16 @@ vfiles = vectorfiles()
 refdirahk114 = "Y:/reference/"
 refdir = "Z:/data/reference/" 
 caadir = 'Z:/caa/ic_archive/'
-
-def analyse(sc=1,start_date=datetime(2016,1,1),end_date='',
+sc=0
+scatter_size = 10
+def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
             prune_start=datetime(1,1,1),prune_end=datetime(1,1,1),prune_n=1,
             prune_value = 0,input=[[refdir,1,'b','default','mag']],
-            scatter_size=50,prune_greater_than=False,
+            scatter_s=50,prune_greater_than=False,
             std_threshold=1.2,rm_outliers=0,std_n=50,PLOT=0,reprocess=1,
             pickling=0,scatter=True):
     '''
-    sc    = spacecraft (1,2,3,4)    
+    spacecraft    = spacecraft (1,2,3,4)    
     input = [[directory,extmode 0 or 1 (off or on), colour, legend (string), 
              whichdata ('mag','x','y','z')],[],[],...]
              available directories are: 
@@ -550,7 +548,7 @@ def analyse(sc=1,start_date=datetime(2016,1,1),end_date='',
     prune_greater_than = True or False. If set to True, all datapoints above 
                         prune_value threshold are selected. If set to False,
                         all values below the threshold are selected
-    scatter_size = an integer controlling the size of the scatter points plotted
+    scatter_s = an integer controlling the size of the scatter points plotted
     PLOT = plots scatter graphs of different stages of the data processing
     scatter = True or False - plot scatter or line plot
     rm_outliers = 0 or 1, depending on if outlying values should be removed
@@ -569,11 +567,20 @@ def analyse(sc=1,start_date=datetime(2016,1,1),end_date='',
                 
     In general, if the default parameter is not changed, the corresponding
     action will not be performed.
+    #########################################################################
+    Output:
+    4 column numpy array
+    column 0:start date of interval
+    column 1:end date of interval
+    column 2:standard deviation over interval
+    column 3:raw data for the interval (as (n,2) array)
     '''
     #global prune_start,prune_end,prune_n,prune_value,prune_greater_than
-    #global vfiles, scatter_size,sc
     #global refdirahk114,refdir,caadir
-    global vfiles
+    global vfiles,sc,scatter_size
+    vfiles=vectorfiles()
+    sc=spacecraft
+    scatter_size = scatter_s
     ###############################################################################
     '''
     #default arguments
@@ -658,7 +665,7 @@ def analyse(sc=1,start_date=datetime(2016,1,1),end_date='',
         pickle_file += format(rm_outliers,'d')
     
     if reprocess:
-        process(vfiles,sc,start_date,end_date,input)
+        process(vfiles,sc,start_date,end_date,input,prune_start,prune_end,prune_n,prune_value,prune_greater_than)
         if pickling:
             pickle.dump(vfiles,open(pickle_file,'wb'))
     else:
@@ -683,14 +690,14 @@ def analyse(sc=1,start_date=datetime(2016,1,1),end_date='',
     vfiles.calculate_stds(n=std_n)
     
     #print len(vfiles.stds),len(vfiles.std_dates)
-    if PLOT:
+    if PLOT==2:
         plt.figure()
         plt.scatter(vfiles.std_dates,vfiles.stds)
         plt.show()
         
     vfiles.select_stds(threshold=std_threshold)
     
-    if PLOT:
+    if PLOT==2:
         plt.figure()
         print vfiles.threshold_std.shape
         plt.scatter(vfiles.threshold_std[:,0].tolist(),
@@ -699,6 +706,13 @@ def analyse(sc=1,start_date=datetime(2016,1,1),end_date='',
     new = vfiles.merge_select_stds()
     #return vfiles.threshold_std,new
     return new
+'''
+input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
+output = analyse(spacecraft=4,input=input,start_date=datetime(2015,10,1),
+                 end_date=datetime(2015,10,1),std_n=10,
+                 PLOT=1,std_threshold=0.015,
+                 prune_start=datetime(2015, 10, 1, 1, 26, 54),
+                 prune_end=datetime(2015, 10, 1, 12, 52))
 
-#input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
-#output = analyse(input=input,end_date=datetime(2016,1,4),std_n=10,PLOT=1,std_threshold=0.25)
+print output[:,2], min(output[:,2])
+'''
