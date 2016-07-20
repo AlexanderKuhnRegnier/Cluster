@@ -122,8 +122,8 @@ cmdlist = []
 datelist = []
 
 start_date = datetime(2015,1,6)
-end_date = datetime(2015,4,10)
-reprocess = 0
+end_date = datetime(2015,1,10)
+reprocess = 1
 
 simple_plot = 0
 overlay_plot = 1
@@ -267,6 +267,25 @@ will contain start time[0], duration[1] and spacecraft[2] which is in ext mode w
 at least another spacecraft is not in ext mode
 as well as the other spacecraft that is not in ext mode[3]
 '''
+'''
+preprocess datelist and cmdlist so that for intervals where no commands are present,
+we assume that the spacecraft is NOT in extended mode.
+This will be done by adding an initiate command to the last date in all
+datelist entries
+'''
+emtpy = []
+existing_dates = []
+for i in range(4):
+    ds = datelist[i]
+    cs = cmdlist[i]
+    if not len(ds) and not len(cs): #if both lists are empty!!
+        emtpy.append(i)
+    else:
+        existing_dates.extend(ds)
+min_date = max(existing_dates)
+for i in emtpy:
+    datelist[i].append(min_date)
+    cmdlist[i].append(1)
 
 spacecrafts = [0,1,2,3]
 otherspacecrafts = lambda x: spacecrafts[:x]+spacecrafts[x+1:]
