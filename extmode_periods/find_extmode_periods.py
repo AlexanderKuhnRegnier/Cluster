@@ -122,28 +122,25 @@ cmdlist = []
 datelist = []
 
 start_date = datetime(2015,1,6)
-end_date = datetime(2015,1,10)
-reprocess = 1
+end_date = datetime(2015,1,20)
 
 simple_plot = 0
 overlay_plot = 1
 
 write_to_file = 0
 
-if reprocess:
-    if 'datelist.pickle' in os.listdir(os.getcwd()):
-        os.remove('datelist.pickle')
-    if 'cmdlist.pickle' in os.listdir(os.getcwd()):
-        os.remove('cmdlist.pickle')        
+pickledir='Y:/extmode_data_pickles/'
+picklefile = 'extmode_data_'+start_date.strftime('%Y%M%d')+'_'+ \
+             end_date.strftime('%Y%M%d')+'.pickle'
 
-if 'datelist.pickle' in os.listdir(os.getcwd()) and 'cmdlist.pickle' in os.listdir(os.getcwd()):
+    
+if picklefile in os.listdir(pickledir):
     print "Loading previously processed results"
-    f = open('datelist.pickle','r')
-    datelist = pickle.load(f)
+    f = open(pickledir+picklefile,'r')
+    pickle_data = pickle.load(f)
     f.close()
-    f = open('cmdlist.pickle','r')
-    cmdlist = pickle.load(f)
-    f.close()
+    datelist = pickle_data[0]
+    cmdlist = pickle_data[1]
     print "   Datelist lengths",len(datelist[0]),len(datelist[1]),len(datelist[2]),len(datelist[3])
     print "Commandlist lengths",len(cmdlist[0]),len(cmdlist[1]),len(cmdlist[2]),len(cmdlist[3])
 else:
@@ -202,13 +199,8 @@ else:
         datelist.append(dates)
         #axarr[i].plot_date(tempdates,tempcmds, '-') #this plots triangle wave - modify data in next stage
         
-    picklefilename = 'cmdlist.pickle'
-    f=open(picklefilename,'w')
-    pickle.dump(cmdlist,f)
-    f.close()
-    picklefilename = 'datelist.pickle'
-    f=open(picklefilename,'w')
-    pickle.dump(datelist,f)
+    f=open(pickledir+picklefile,'w')
+    pickle.dump([datelist,cmdlist],f)
     f.close()
         
 if simple_plot:
