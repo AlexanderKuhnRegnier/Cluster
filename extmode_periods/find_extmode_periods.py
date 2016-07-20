@@ -121,8 +121,8 @@ def find_min_max_dates(results_end_date):
 cmdlist = []
 datelist = []
 
-start_date = datetime(2015,8,6)
-end_date = datetime(2015,10,10)
+start_date = datetime(2015,1,6)
+end_date = datetime(2015,4,10)
 reprocess = 0
 
 simple_plot = 0
@@ -538,11 +538,11 @@ want to record:
 7 'columns' - number of 'rows' depending on the number of events
 '''
 data_list = []
-PLOT = 1
+PLOT = 0
 reprocess = 1
-std_threshold=1000.
+std_threshold=100
 std_n = 40
-prune_value = 2000
+prune_value = 2500
 prune_greater_than = False
 for row in results_end_date:
     start_date,end_date=row[0].tolist().date(),row[1].tolist().date()
@@ -561,6 +561,7 @@ for row in results_end_date:
         input = [[refdir,ext_mode,c,legend,'mag']]
         prune_start = row[0].tolist()
         prune_end = row[1].tolist()
+        print "Pruning input dates:",prune_start,prune_end
         output=data_analysis.analyse(
                               spacecraft=spacecraft+1,
                               input=input,start_date=start_date,
@@ -581,20 +582,125 @@ for row in results_end_date:
         else:
             data_list[-1].extend([spacecraft,output])
 print "Finished compliling data list",len(data_list)
-
 '''
 Now just need to sift through all the entries in column 4 and 6 of
 data_list, in order to find intervals that match up, and then filter
 out this data in order to obtain the dataset which describes
 the true intersection between the ext mode and non-ext mode
 data, given the standard deviation requirements given.
-'''
-#[x.pop(i) for i in sorted(indices_to_delete,reverse=True)] #returns deleted elements
-for event in data_list:
-    ext_mode_data = event[4][0]
-    ext_mode_starts = ext_mode_data[0]
-    ext_mode_ends = ext_mode_data[1]
-    non_ext_data = event[6][0]
-    non_ext_starts = non_ext_data[0]
-    non_ext_ends = non_ext_data[1]
+
+To store this data, rebuild an array similar to data_list,only keeping the data 
+that exists concurrently in both data sets (ext and non ext)
+
+All 7 columns will persist +1 additional, with the following differences:
+    times will refer to the overlap of data, not the entire event
+    spacecraft numbers will obviously stay constant
+    the 'analysis output' will now contain the standard deviation of
+    the data which exists concurrently in both data sets, as well as this raw 
+    data itself (stored in a (n,2) numpy array containing dates and magnetic 
+    field values. )
     
+    The standard deviation in the aforementioned entires will be recalculated 
+    for the isolated 'overlap' data.
+    Also, the average of both ext mode and non ext mode 
+    standard deviations will be included in a new column,
+    after the duration column! - to assess the quality of the overlapping data
+    
+-> 8 columns in total:
+    0:start time of data overlap
+    1:end time of data overlap
+    2:duration of overlap (in seconds)
+    3:average standard deviation of data in overlap
+    4:sc in ext mode    
+    5:std+raw data ext mode
+    6:sc not in ext mode
+    7:std+raw data non ext mode
+8 columns, number of 'rows' depends on the number of overlapping time periods
+'''
+overlap_data = []
+for event in data_list:
+    print ""
+    print "Event",event[0],event[1],event[2],event[3],event[5]
+    ext_mode_data_list = event[4]
+    non_ext_data_list = event[6]
+    print ext_mode_data_list.shape
+    print non_ext_data_list.shape
+    sc_ext = event[3]
+    sc_nonext = event[5]
+    for ext_mode_data in ext_mode_data_list:
+        ext_mode_start = ext_mode_data[0]
+        ext_mode_end = ext_mode_data[1]
+        print "ext mode"
+        print ext_mode_start,ext_mode_end
+        for non_ext_data in non_ext_data_list:
+            overlap_ext_mode_data = np.array([])
+            overlap_non_ext_data = np.array([])
+            common_start = 0
+            common_end = 0
+            print "non ext mode"
+            non_ext_start = non_ext_data[0]
+            non_ext_end = non_ext_data[1]
+            print non_ext_start,non_ext_end
+            if non_ext_start>ext_mode_end:
+                print "Exiting loop"
+                break
+            if (ext_mode_start<=non_ext_start<ext_mode_end or
+                ext_mode_start<=non_ext_end<ext_mode_end   or
+                non_ext_start<=ext_mode_start<non_ext_end  or
+                non_ext_start<=ext_mode_end<non_ext_end):
+                    if non_ext_start<=ext_mode_start:
+                        common_start = ext_mode_start
+                    else:
+                        common_start = non_ext_start
+                    if non_ext_end>=ext_mode_end:
+                        common_end = ext_mode_end
+                    else:
+                        common_end = non_ext_end
+                    overlap_duration = (common_end-common_start)\
+                                        /np.timedelta64(1,'s')
+                    raw_ext_mode_data = ext_mode_data[3]
+                    delete_list = []
+                    for i in range(raw_ext_mode_data.shape[0]):
+                        vector_date = np.datetime64(raw_ext_mode_data[i,0])
+                        if vector_date<common_start or vector_date>common_end:
+                            delete_list.append(i)
+                    overlap_ext_mode_data = np.delete(raw_ext_mode_data,
+                                                      delete_list,axis=0)
+                    ext_mode_std = np.std(overlap_ext_mode_data[:,1])
+                    raw_ext_overlap_entry = [ext_mode_std,overlap_ext_mode_data]
+                    raw_non_ext_data = non_ext_data[3]                    
+                    delete_list = []
+                    for i in range(raw_non_ext_data.shape[0]):
+                        vector_date = np.datetime64(raw_non_ext_data[i,0])
+                        if vector_date<common_start or vector_date>common_end:
+                            delete_list.append(i)
+                    overlap_non_ext_data = np.delete(raw_non_ext_data,
+                                                      delete_list,axis=0)    
+                    non_ext_std = np.std(overlap_non_ext_data[:,1])
+                    raw_non_ext_overlap_entry = [non_ext_std,overlap_non_ext_data]
+                    avg_std = np.mean([non_ext_std,ext_mode_std])
+            
+                    overlap_data.append([
+                    common_start,
+                    common_end,
+                    overlap_duration,
+                    avg_std,
+                    sc_ext,
+                    raw_ext_overlap_entry,
+                    sc_nonext,
+                    raw_non_ext_overlap_entry])
+
+print "number of overlaps found", len(overlap_data)
+print "Plotting overlaps"
+
+fig,ax = plt.subplots()
+for overlap in overlap_data:
+    raw_ext_data = overlap[5][1]
+    raw_non_ext_data = overlap[7][1]
+    ax.plot_date(raw_ext_data[:,0],raw_ext_data[:,1])
+    ax.plot_date(raw_non_ext_data[:,0],raw_non_ext_data[:,1])
+ax.autoscale_view()
+figManager = plt.get_current_fig_manager()
+figManager.window.showMaximized()
+plt.gcf().autofmt_xdate()
+plt.show()

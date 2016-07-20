@@ -35,9 +35,9 @@ class vectorlist:
         self.filename = ''
     def isempty(self):
         if len(self.vectors):
-            return True
-        else:
             return False
+        else:
+            return True
     def mergelist(self,vlist):
         if isinstance(vlist,vectorlist):
             for v in vlist.vectors:
@@ -97,10 +97,12 @@ class vectorlist:
                 for line in f:
                     try:
                         v = vector()
-                        v.assigndatetime(np.datetime64(line[0:24]))
-                        x_mag = float(line[24:33])
-                        y_mag = float(line[33:42])
-                        z_mag = float(line[42:51])
+                        line=line.split(' ')
+                        line = [char for char in line if char != '']
+                        v.assigndatetime(np.datetime64(line[0]))
+                        x_mag = float(line[1])
+                        y_mag = float(line[2])
+                        z_mag = float(line[3])
                         v.assignvalue(np.array([x_mag,y_mag,z_mag]))
                         v.calcmagnitude()
                         self.add_vector_entry(v)                 
@@ -365,12 +367,14 @@ class vectorfiles:
             length = int((len(data)-len(data)%n))
             for i in range(0,length,n):
                 self.std_dates.append(dates[i])
-                self.std_end_dates.append(dates[i:i+n][-1]) #end date of interval - should this be [i:i+n+1]??
+                self.std_end_dates.append(dates[i:i+n+1][-1]) #end date of interval - should this be [i:i+n+1] - yes, since the 
+                                                                #algorithm relies on identical start/end times
                 self.stds.append(np.std(data[i:i+n]))
                 nddata = np.array(data[i:i+n]).reshape(-1,1)
                 nddates = np.array([d.tolist() for d in dates[i:i+n]]).reshape(-1,1)
                 raw_data = np.concatenate((nddates,nddata),axis=1)
                 self.std_data_raw.append(raw_data)
+                
     def select_stds(self,threshold=0.1):
         for d,end_d,std,raw_std_data in zip(self.std_dates,self.std_end_dates,
                                             self.stds,self.std_data_raw):
@@ -432,13 +436,13 @@ def process(vfiles,sc,start_date,end_date,input,prune_start,prune_end,prune_n,pr
                 #vlist.print_values(0)
     print "Prune Start"
     if prune_start != datetime(1,1,1) and prune_end != datetime(1,1,1):
-        print "Pruning Dates"
+        print "Pruning Dates:",prune_start,prune_end
         vfiles.prune(start_date=prune_start,end_date=prune_end)
     if prune_n > 1:
-        print "Pruning Points"
+        print "Pruning Points",prune_n
         vfiles.prune(n=prune_n)
     if prune_value > 0:
-        print "Pruning Values"
+        print "Pruning Values",prune_value
         vfiles.prune(value=prune_value,greater_than=prune_greater_than)
 
 def plot(vfiles,sc,start_date,end_date,input,std=True,scatter=True,n=10):
@@ -706,13 +710,13 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
     new = vfiles.merge_select_stds()
     #return vfiles.threshold_std,new
     return new
-'''
+
+plt.close('all')
 input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
 output = analyse(spacecraft=4,input=input,start_date=datetime(2015,10,1),
                  end_date=datetime(2015,10,1),std_n=10,
-                 PLOT=1,std_threshold=0.015,
-                 prune_start=datetime(2015, 10, 1, 1, 26, 54),
-                 prune_end=datetime(2015, 10, 1, 12, 52))
+                 PLOT=2,std_threshold=1.5
+                 )
 
 print output[:,2], min(output[:,2])
-'''
+print output.shape
