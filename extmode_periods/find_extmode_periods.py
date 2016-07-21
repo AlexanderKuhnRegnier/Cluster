@@ -118,7 +118,16 @@ def find_min_max_dates(results_end_date):
         return False,False
     return min_date.date(),max_date.date()
 
-def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0):
+def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0,
+                      analysis_plot=0,reprocess=1,std_threshold=0,std_n=10,
+                      prune_value=0,prune_greater_than=False):
+    PLOT = analysis_plot
+    #reprocess = 1
+    #std_threshold=100
+    #std_n = 40
+    #prune_value = 2500
+    #prune_greater_than = False
+    
     cmdlist = []
     datelist = []
     pickledir='Y:/extmode_data_pickles/'
@@ -492,12 +501,7 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0):
     7 'columns' - number of 'rows' depending on the number of events
     '''
     data_list = []
-    PLOT = 0
-    reprocess = 1
-    std_threshold=100
-    std_n = 40
-    prune_value = 2500
-    prune_greater_than = False
+
     for row in results_end_date:
         start_date,end_date=row[0].tolist().date(),row[1].tolist().date()
         spacecrafts=[row[2],row[3]]
@@ -647,20 +651,30 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0):
     return overlap_data
 
 def plot_overlap_data(overlap_data):
+    '''
+    20/07
+    doesn't work properly, only some of the data seems to show up
+    is this intentional, or is there something wrong with it?
+    '''
     print "Plotting overlaps"
-    fig,ax = plt.subplots()
+    fig,axarr = plt.subplots(4,1,sharex=True)
     for overlap in overlap_data:
         raw_ext_data = overlap[5][1]
         raw_non_ext_data = overlap[7][1]
-        ax.plot_date(raw_ext_data[:,0],raw_ext_data[:,1])
-        ax.plot_date(raw_non_ext_data[:,0],raw_non_ext_data[:,1])
-    ax.autoscale_view()
+        ext_mode_sc = overlap[4]
+        non_ext_sc = overlap[6]
+        
+        axarr[ext_mode_sc].plot_date(raw_ext_data[:,0],raw_ext_data[:,1],
+                                     fmt='-',tz='UTC',c='r')
+        axarr[non_ext_sc].plot_date(raw_non_ext_data[:,0],raw_non_ext_data[:,1],
+                                    fmt='-',tz='UTC',c='g')
     figManager = plt.get_current_fig_manager()
     figManager.window.showMaximized()
     plt.gcf().autofmt_xdate()
     plt.show()
     return fig
-    
+
+
 start_date = datetime(2015,1,6)
 end_date = datetime(2015,1,20)
 

@@ -1,12 +1,13 @@
 import numpy as np
 from numpy import linalg as LA
-from datetime import date,time,datetime,timedelta
+from datetime import datetime,timedelta
 import os
 from getfile import getfile
 import gzip
 import matplotlib.pyplot as plt
 import cPickle as pickle
 import csv
+import time
 
 prune_start=datetime(1,1,1)
 prune_end=datetime(1,1,1)
@@ -129,7 +130,8 @@ class vectorlist:
         f,ax = plt.subplots(1,1)
         min_date = np.datetime64(datetime(9999,1,1))
         max_date = np.datetime64(datetime(1,1,1))
-        legend_colour_list = []
+        legend_colour_list_scatter = []
+        legend_colour_list_line = []
         for count,entry in zip(range(len(array)),array):
             #print "entry ",entry
             vlist = entry[0]
@@ -159,15 +161,40 @@ class vectorlist:
             '''
             label = legend+' ('+plotwhich+')'
             if scatter:
-                if [label,colour] in legend_colour_list:
+                if [label,colour] in legend_colour_list_scatter:
                     ax.scatter(dates,data,c=colour,
                          s=scatter_size)
                 else:
                     ax.scatter(dates,data,c=colour,label=label,
                          s=scatter_size)
-                    legend_colour_list.append([label,colour])
-            else:
-                ax.plot(dates,data,c=colour,label=legend)
+                    legend_colour_list_scatter.append([label,colour])
+            else: #ie. if line plot is selected
+                dates_list=[]
+                data_list=[]
+                '''
+                preprocess data so that for time gaps, a line isn't being drawn
+                -so split the data up into chunks when this happens!
+                '''
+                total_entries=0
+                for i in range(len(dates)-1):
+                    dates2 = dates[i:i+2]
+                    diff = (dates2[-1]-dates2[0])/np.timedelta64(1,'s')
+                    if diff>100:#split data at this point!
+                        dates_list.append(dates[total_entries:i+1])
+                        data_list.append(data[total_entries:i+1])
+                        total_entries+=len(dates_list[-1])
+                if total_entries != len(dates):
+                    dates_list.append(dates[total_entries:])
+                    data_list.append(data[total_entries:])
+                    if len(dates_list[-1])!=len(data_list[-1]):
+                        print "Error, last plotted lists not of equal length!!"
+                    total_entries+=len(dates_list[-1])
+                for ds,da in zip(dates_list,data_list):
+                    if [label,colour] in legend_colour_list_line:
+                        ax.plot(ds,da,c=colour)
+                    else:
+                        ax.plot(ds,da,c=colour,label=legend)
+                        legend_colour_list_line.append([label,colour]) 
             print "plotted the following",len(dates),len(data)
             print "From:",min(dates).astype(object)
             print "  To:",max(dates).astype(object)
@@ -187,16 +214,18 @@ class vectorlist:
         figManager.window.showMaximized()
         plt.gcf().autofmt_xdate()
         plt.show()
-    def plotstds(self,array,n=10,scatter=True,log=False):
+    def plotstds(self,array,n=10,scatter=True,log=False,
+                 threshold_std_dates=np.array([]),
+                 threshold_std_data=np.array([])):
         global scatter_size,sc
         #labels = [','.join([entry[2],entry[3]]) for entry in array]
         #labels = '-'.join(set(labels))
         #array = [vlist,color,legend,plotwhich]
         f,ax = plt.subplots(2,1,sharex=True)
-        min_date = np.datetime64(datetime(9999,1,1))
-        max_date = np.datetime64(datetime(1,1,1))
-        legend_colour_list = []
-        legend_colour_list_std = []
+        legend_colour_list_scatter = []
+        legend_colour_list_line = []
+        legend_colour_list_std_scatter = []
+        legend_colour_list_std_line = []
         for count,entry in zip(range(len(array)),array):
             #print "entry ",entry
             vlist = entry[0]
@@ -227,16 +256,38 @@ class vectorlist:
                 '''
                 label = legend+' ('+plotwhich+')'
                 if scatter:
-                    if [label,colour] in legend_colour_list:
-                        ax[0].scatter(dates,data,c=colour,
-                             s=scatter_size)
+                    if [label,colour] in legend_colour_list_scatter:
+                        ax[0].plot_date(dates,data,c=colour)
                     else:
-                        ax[0].scatter(dates,data,c=colour,label=label,
-                             s=scatter_size)
-                        legend_colour_list.append([label,colour])
-                else:
-                    ax[0].plot(dates,data,c=colour,label=legend)
-    
+                        ax[0].plot_date(dates,data,c=colour,label=label)
+                        legend_colour_list_scatter.append([label,colour])
+                else: #ie. if line plot is selected
+                    dates_list=[]
+                    data_list=[]
+                    '''
+                    preprocess data so that for time gaps, a line isn't being drawn
+                    -so split the data up into chunks when this happens!
+                    '''
+                    total_entries=0
+                    for i in range(len(dates)-1):
+                        dates2 = dates[i:i+2]
+                        diff = (dates2[-1]-dates2[0])/np.timedelta64(1,'s')
+                        if diff>100:#split data at this point!
+                            dates_list.append(dates[total_entries:i+1])
+                            data_list.append(data[total_entries:i+1])
+                            total_entries+=len(dates_list[-1])
+                    if total_entries != len(dates):
+                        dates_list.append(dates[total_entries:])
+                        data_list.append(data[total_entries:])
+                        if len(dates_list[-1])!=len(data_list[-1]):
+                            print "Error, last plotted lists not of equal length!!"
+                        total_entries+=len(dates_list[-1])
+                    for ds,da in zip(dates_list,data_list):
+                        if [label,colour] in legend_colour_list_line:
+                            ax[0].plot_date(ds,da,c=colour,fmt='-')
+                        else:
+                            ax[0].plot_date(ds,da,c=colour,label=legend,fmt='-')
+                            legend_colour_list_line.append([label,colour]) 
                 ######################
                 '''
                 standard deviation calculation below
@@ -250,26 +301,76 @@ class vectorlist:
                     stds.append(np.std(data[i:i+n]))
                 label = legend+' ('+plotwhich+')'+'std'
                 if scatter:
-                    if [label,colour] in legend_colour_list_std:
-                        ax[1].scatter(std_dates,stds,c=colour,
-                             s=scatter_size)
+                    if [label,colour] in legend_colour_list_std_scatter:
+                        ax[1].plot_date(std_dates,stds,c=colour)
+                        ax[1].plot_date(threshold_std_dates,
+                                      threshold_std_data,
+                                      c='g')
                     else:
-                        ax[1].scatter(std_dates,stds,c=colour,label=label,
-                             s=scatter_size)
-                        legend_colour_list_std.append([label,colour])
+                        ax[1].plot_date(std_dates,stds,c=colour,label=label)
+                        ax[1].plot_date(threshold_std_dates,
+                                      threshold_std_data,c='g')
+                        legend_colour_list_std_scatter.append([label,colour])
                 else:
-                    ax[1].plot(std_dates,stds,c=colour,label=legend)            
-                if min(dates)<min_date:
-                    min_date = min(dates)
-                if max(dates)>max_date:
-                    max_date = max(dates)
-            
-        ax[0].set_xlim((min_date.astype(object)-timedelta(hours=2),max_date.astype(object)+timedelta(hours=2)))
+                    std_dates_list=[]
+                    stds_list=[]
+                    '''
+                    preprocess data so that for time gaps, a line isn't being drawn
+                    -so split the data up into chunks when this happens!
+                    '''
+                    total_entries=0
+                    for i in range(len(std_dates)-1):
+                        dates2 = std_dates[i:i+2]
+                        diff = (dates2[-1]-dates2[0])/np.timedelta64(1,'s')
+                        if diff>(10*int(n)):#split data at this point!
+                            std_dates_list.append(std_dates[total_entries:i+1])
+                            stds_list.append(stds[total_entries:i+1])
+                            total_entries+=len(std_dates_list[-1])
+                    if total_entries != len(std_dates):
+                        std_dates_list.append(std_dates[total_entries:])
+                        stds_list.append(stds[total_entries:])
+                        if len(std_dates_list[-1])!=len(stds_list[-1]):
+                            print "Error, last plotted lists not of equal length!!"
+                        total_entries+=len(std_dates_list[-1])
+                    for ds_std,da_std in zip(std_dates_list,stds_list):
+                        if [label,colour] in legend_colour_list_std_line:
+                            ax[1].plot_date(ds_std,da_std,c='r',fmt='-.')
+                        else:
+                            ax[1].plot_date(ds_std,da_std,c='r',label=legend,fmt='-.')
+                            legend_colour_list_std_line.append([label,colour]) 
+                    std_dates_list=[]
+                    stds_list=[]
+                    '''
+                    this time for the threshold data!!
+                    preprocess data so that for time gaps, a line isn't being drawn
+                    -so split the data up into chunks when this happens!
+                    '''
+                    total_entries=0
+                    for i in range(len(threshold_std_dates)-1):
+                        dates2 = threshold_std_dates[i:i+2]
+                        diff = (dates2[-1]-dates2[0])/np.timedelta64(1,'s')
+                        if diff>(10*int(n)):#split data at this point!
+                            std_dates_list.append(threshold_std_dates[total_entries:i+1])
+                            stds_list.append(threshold_std_data[total_entries:i+1])
+                            total_entries+=len(std_dates_list[-1])
+                    if total_entries != len(threshold_std_dates):
+                        std_dates_list.append(threshold_std_dates[total_entries:])
+                        stds_list.append(threshold_std_data[total_entries:])
+                        if len(std_dates_list[-1])!=len(stds_list[-1]):
+                            print "Error, last plotted lists not of equal length!!"
+                        total_entries+=len(std_dates_list[-1])
+                    for ds_std,da_std in zip(std_dates_list,stds_list):
+                        if [label,colour] in legend_colour_list_std_line:
+                            ax[1].plot_date(ds_std,da_std,c='g',fmt='-')
+                        else:
+                            ax[1].plot_date(ds_std,da_std,c='g',label=legend,fmt='-')
+                            legend_colour_list_std_line.append([label,colour]) 
         legend = ax[0].legend()
         legend = ax[1].legend()
         ax[0].set_xlabel('Time')
         ax[0].set_ylabel('nT')
         ax[1].set_ylabel('nT')
+        
         if log:
             ax[0].set_yscale('log')
             #ax[1].set_yscale('log')
@@ -311,7 +412,9 @@ class vectorfiles:
     def plotfiles(self,scatter=False,log=True,std=False,n=10):
         s = vectorlist()
         if std:
-            s.plotstds(self.array,scatter=scatter,log=log,n=n)
+            s.plotstds(self.array,scatter=scatter,log=log,n=n,
+                       threshold_std_dates = self.threshold_std[:,0],
+                       threshold_std_data = self.threshold_std[:,2])
         else:
             s.plotlists(self.array,scatter=scatter,log=log)
     def printfiles(self):
@@ -375,7 +478,12 @@ class vectorfiles:
                 raw_data = np.concatenate((nddates,nddata),axis=1)
                 self.std_data_raw.append(raw_data)
                 
-    def select_stds(self,threshold=0.1):
+    def select_stds(self,threshold):
+        if threshold==0:
+            if len(self.stds):
+                threshold=max(self.stds)*10.
+            else:
+                threshold = 1e10
         for d,end_d,std,raw_std_data in zip(self.std_dates,self.std_end_dates,
                                             self.stds,self.std_data_raw):
             if std<threshold:
@@ -455,14 +563,7 @@ def plot(vfiles,sc,start_date,end_date,input,std=True,scatter=True,n=10):
         log=False
     else:
         log=True
-    '''
-    if prune_start != datetime(1,1,1) and prune_end != datetime(1,1,1):
-        print "Pruning Dates"
-        vfiles.prune(start_date=prune_start,end_date=prune_end)
-    if prune_n > 1:
-        print "Pruning Points"
-        vfiles.prune(n=prune_n)
-    '''
+
     vfiles.plotfiles(scatter=scatter,log=log,std=std,n=n)
 
 def plot_timeseries():
@@ -525,7 +626,7 @@ caadir = 'Z:/caa/ic_archive/'
 sc=0
 scatter_size = 10
 def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
-            prune_start=datetime(1,1,1),prune_end=datetime(1,1,1),prune_n=1,
+            prune_start=datetime(1,1,1),prune_end=datetime(1,1,1),prune_n=0,
             prune_value = 0,input=[[refdir,1,'b','default','mag']],
             scatter_s=50,prune_greater_than=False,
             std_threshold=1.2,rm_outliers=0,std_n=50,PLOT=0,reprocess=1,
@@ -590,7 +691,7 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
     #default arguments
     prune_start=datetime(1,1,1)
     prune_end=datetime(1,1,1)
-    prune_n=1
+    prune_n=0
     prune_value = 0
     end_date = ''
     '''
@@ -677,10 +778,6 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
             print "Reading from pickle file"
             vfiles = pickle.load(open(pickle_file,'rb'))
     
-    if PLOT:
-        plot(vfiles,sc,start_date,end_date,input,n=std_n,scatter=scatter)
-        #plot(vfiles,sc,start_date,end_date,input)
-    
     if rm_outliers:
         if pickle_file in os.listdir(os.getcwd()):
             print "Already removed outliers!"
@@ -692,31 +789,22 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
         plot(vfiles,sc,start_date,end_date,input,n=std_n)
     
     vfiles.calculate_stds(n=std_n)
-    
-    #print len(vfiles.stds),len(vfiles.std_dates)
-    if PLOT==2:
-        plt.figure()
-        plt.scatter(vfiles.std_dates,vfiles.stds)
-        plt.show()
-        
     vfiles.select_stds(threshold=std_threshold)
     
-    if PLOT==2:
-        plt.figure()
-        print vfiles.threshold_std.shape
-        plt.scatter(vfiles.threshold_std[:,0].tolist(),
-                    vfiles.threshold_std[:,2].tolist(),s=scatter_size,c='r')
-        plt.show()
+    if PLOT:
+        plot(vfiles,sc,start_date,end_date,input,n=std_n,scatter=scatter)
+        #plot(vfiles,sc,start_date,end_date,input)
     new = vfiles.merge_select_stds()
     #return vfiles.threshold_std,new
     return new
 
+#starttime = time.clock()
 plt.close('all')
 input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
-output = analyse(spacecraft=4,input=input,start_date=datetime(2015,10,1),
-                 end_date=datetime(2015,10,1),std_n=10,
-                 PLOT=2,std_threshold=1.5
+output = analyse(spacecraft=3,input=input,start_date=datetime(2014,2,1),
+                 end_date=datetime(2014,2,10),std_n=10,
+                 PLOT=True, scatter=False
                  )
-
-print output[:,2], min(output[:,2])
-print output.shape
+#print "Duration:",time.clock()-starttime
+#print output[:,2], min(output[:,2])
+#print output.shape
