@@ -132,7 +132,7 @@ class vectorlist:
         max_date = np.datetime64(datetime(1,1,1))
         legend_colour_list_scatter = []
         legend_colour_list_line = []
-        for count,entry in zip(range(len(array)),array):
+        for count,entry in enumerate(array):
             #print "entry ",entry
             vlist = entry[0]
             colour = entry[1]
@@ -156,7 +156,7 @@ class vectorlist:
                 data=vlist.returnmagnitudes()
             '''
             print "data excerpt"
-            for i in range(5):
+            for i in xrange(5):
                 print dates[i],data[i],self.filename
             '''
             label = legend+' ('+plotwhich+')'
@@ -176,7 +176,7 @@ class vectorlist:
                 -so split the data up into chunks when this happens!
                 '''
                 total_entries=0
-                for i in range(len(dates)-1):
+                for i in xrange(len(dates)-1):
                     dates2 = dates[i:i+2]
                     diff = (dates2[-1]-dates2[0])/np.timedelta64(1,'s')
                     if diff>100:#split data at this point!
@@ -226,7 +226,7 @@ class vectorlist:
         legend_colour_list_line = []
         legend_colour_list_std_scatter = []
         legend_colour_list_std_line = []
-        for count,entry in zip(range(len(array)),array):
+        for count,entry in enumerate(array):
             #print "entry ",entry
             vlist = entry[0]
             colour = entry[1]
@@ -251,7 +251,7 @@ class vectorlist:
                     data=vlist.returnmagnitudes()
                 '''
                 print "data excerpt"
-                for i in range(5):
+                for i in xrange(5):
                     print dates[i],data[i],self.filename
                 '''
                 label = legend+' ('+plotwhich+')'
@@ -269,7 +269,7 @@ class vectorlist:
                     -so split the data up into chunks when this happens!
                     '''
                     total_entries=0
-                    for i in range(len(dates)-1):
+                    for i in xrange(len(dates)-1):
                         dates2 = dates[i:i+2]
                         diff = (dates2[-1]-dates2[0])/np.timedelta64(1,'s')
                         if diff>100:#split data at this point!
@@ -296,7 +296,7 @@ class vectorlist:
                 std_dates=[]
                 stds = []
                 length = int((len(data)-len(data)%n))
-                for i in range(0,length,n):
+                for i in xrange(0,length,n):
                     std_dates.append(dates[i])
                     stds.append(np.std(data[i:i+n]))
                 label = legend+' ('+plotwhich+')'+'std'
@@ -319,7 +319,7 @@ class vectorlist:
                     -so split the data up into chunks when this happens!
                     '''
                     total_entries=0
-                    for i in range(len(std_dates)-1):
+                    for i in xrange(len(std_dates)-1):
                         dates2 = std_dates[i:i+2]
                         diff = (dates2[-1]-dates2[0])/np.timedelta64(1,'s')
                         if diff>(10*int(n)):#split data at this point!
@@ -346,7 +346,7 @@ class vectorlist:
                     -so split the data up into chunks when this happens!
                     '''
                     total_entries=0
-                    for i in range(len(threshold_std_dates)-1):
+                    for i in xrange(len(threshold_std_dates)-1):
                         dates2 = threshold_std_dates[i:i+2]
                         diff = (dates2[-1]-dates2[0])/np.timedelta64(1,'s')
                         if diff>(10*int(n)):#split data at this point!
@@ -395,7 +395,7 @@ class vectorfiles:
         self.std_dates = []
         self.std_end_dates = []
         self.stds = []
-        self.threshold_std = np.array([]).reshape(-1,4)
+        self.threshold_std = []
         '''
         4 columns in the threshold_std array
         column 0:start date of interval
@@ -413,8 +413,10 @@ class vectorfiles:
         s = vectorlist()
         if std:
             s.plotstds(self.array,scatter=scatter,log=log,n=n,
-                       threshold_std_dates = self.threshold_std[:,0],
-                       threshold_std_data = self.threshold_std[:,2])
+                       threshold_std_dates = [self.threshold_std[i][0] for \
+                                       i in xrange(len(self.threshold_std))],
+                       threshold_std_data = [self.threshold_std[i][2] for  \
+                                       i in xrange(len(self.threshold_std))])
         else:
             s.plotlists(self.array,scatter=scatter,log=log)
     def printfiles(self):
@@ -442,7 +444,7 @@ class vectorfiles:
         global sc
         print "Spacecraft:",sc
         print "STD samples:",n
-        for count,entry in zip(range(len(self.array)),self.array):
+        for count,entry in enumerate(self.array):
             #print "entry ",entry
             vlist = entry[0]
             if len(entry)==4:
@@ -468,49 +470,47 @@ class vectorfiles:
             '''
             ######################
             length = int((len(data)-len(data)%n))
-            for i in range(0,length,n):
+            for i in xrange(0,length,n):
                 self.std_dates.append(dates[i])
                 self.std_end_dates.append(dates[i:i+n+1][-1]) #end date of interval - should this be [i:i+n+1] - yes, since the 
                                                                 #algorithm relies on identical start/end times
                 self.stds.append(np.std(data[i:i+n]))
-                nddata = np.array(data[i:i+n]).reshape(-1,1)
-                nddates = np.array([d.tolist() for d in dates[i:i+n]]).reshape(-1,1)
-                raw_data = np.concatenate((nddates,nddata),axis=1)
+                nddata = data[i:i+n]
+                nddates = dates[i:i+n]
+                raw_data = [nddates,nddata]
                 self.std_data_raw.append(raw_data)
-                
-    def select_stds(self,threshold):
-        if threshold==0:
-            if len(self.stds):
-                threshold=max(self.stds)*10.
-            else:
-                threshold = 1e10
-        for d,end_d,std,raw_std_data in zip(self.std_dates,self.std_end_dates,
-                                            self.stds,self.std_data_raw):
-            if std<threshold:
-                self.threshold_std = np.vstack((self.threshold_std,
-                                                np.array([d,
-                                                          end_d,
-                                                          std,
-                                                          raw_std_data])))
-    def merge_select_stds(self):
-        new_threshold_std = np.array([]).reshape(-1,4)
-        for i in range(self.threshold_std.shape[0]):
-            if new_threshold_std.shape[0] == 0:
-                new_threshold_std = np.vstack((new_threshold_std,
-                                               self.threshold_std[i]))
-            else:
-                previous_end_date = new_threshold_std[-1,1]
-                this_start_date = self.threshold_std[i,0]
-                if previous_end_date == this_start_date:
-                    new_threshold_std[-1,1]=self.threshold_std[i,1]
-                    new_threshold_std[-1,2]=np.mean((self.threshold_std[i,2],
-                                                    new_threshold_std[-1,2]))
-                    new_threshold_std[-1,3]=np.vstack((new_threshold_std[-1,3],
-                                                        self.threshold_std[i,3]))
-                else:
-                    new_threshold_std = np.vstack((new_threshold_std,
-                                                   self.threshold_std[i]))
 
+    def select_stds(self,threshold):
+        if threshold==0:    #then don't filter anything out
+            for d,end_d,std,raw_std_data in zip(self.std_dates,self.std_end_dates,
+                                                self.stds,self.std_data_raw):
+                self.threshold_std.append([d,end_d,std,list(raw_std_data)])
+        else:        
+            for d,end_d,std,raw_std_data in zip(self.std_dates,self.std_end_dates,
+                                                self.stds,self.std_data_raw):
+                if std<threshold:
+                    self.threshold_std.append([d,end_d,std,list(raw_std_data)])
+            
+    def merge_select_stds(self):
+        new_threshold_std = []
+        new_threshold_std.append([self.threshold_std[0][0],
+                                  self.threshold_std[0][1],
+                                  self.threshold_std[0][2],
+                                  list(self.threshold_std[0][3])])
+        for i in xrange(1,len(self.threshold_std)):    
+            previous_end_date = new_threshold_std[-1][1]
+            this_start_date = self.threshold_std[i][0]
+            if previous_end_date == this_start_date:
+                new_threshold_std[-1][1]=self.threshold_std[i][1]
+                new_threshold_std[-1][2]=np.mean((self.threshold_std[i][2],
+                                                new_threshold_std[-1][2]))
+                new_threshold_std[-1][3][0].append(list(self.threshold_std[i][3][0]))
+                new_threshold_std[-1][3][1].append(list(self.threshold_std[i][3][1]))
+            else:
+                new_threshold_std.append([self.threshold_std[i][0],
+                                          self.threshold_std[i][1],
+                                          self.threshold_std[i][2],
+                                          list(self.threshold_std[i][3])])
         return new_threshold_std
             
 def process(vfiles,sc,start_date,end_date,input,prune_start,prune_end,prune_n,prune_value,prune_greater_than):
@@ -522,7 +522,7 @@ def process(vfiles,sc,start_date,end_date,input,prune_start,prune_end,prune_n,pr
     if start_date==end_date or end_date=='':
         dates = [start_date]
     else:
-        dates = [start_date+timedelta(days=1)*i for i in range(abs(end_date-start_date).days+1)]
+        dates = [start_date+timedelta(days=1)*i for i in xrange(abs(end_date-start_date).days+1)]
     for datev in dates:
         print ""
         print datev.isoformat()
@@ -605,7 +605,7 @@ def remove_outliers():
         vlist = entry[0]
         mags = vlist.returnmagnitudes()
         
-        for i in range(5,len(mags)-10,1):
+        for i in xrange(5,len(mags)-10,1):
             mags[i]
             if abs(mags[i]-mags[i-1]) > 100 and abs(mags[i]-mags[i+1])>100:
                     mags[i] = np.mean(mags[i-5:i]+mags[i+1:i+10])
@@ -629,8 +629,8 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
             prune_start=datetime(1,1,1),prune_end=datetime(1,1,1),prune_n=0,
             prune_value = 0,input=[[refdir,1,'b','default','mag']],
             scatter_s=50,prune_greater_than=False,
-            std_threshold=1.2,rm_outliers=0,std_n=50,PLOT=0,reprocess=1,
-            pickling=0,scatter=True):
+            std_threshold=0,rm_outliers=0,std_n=50,PLOT=0,reprocess=1,
+            pickling=0,scatter=False):
     '''
     spacecraft    = spacecraft (1,2,3,4)    
     input = [[directory,extmode 0 or 1 (off or on), colour, legend (string), 
@@ -674,7 +674,7 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
     action will not be performed.
     #########################################################################
     Output:
-    4 column numpy array
+    4 'column' list ---
     column 0:start date of interval
     column 1:end date of interval
     column 2:standard deviation over interval
@@ -803,7 +803,7 @@ plt.close('all')
 input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
 output = analyse(spacecraft=3,input=input,start_date=datetime(2014,2,1),
                  end_date=datetime(2014,2,10),std_n=10,
-                 PLOT=True, scatter=False
+                 PLOT=False, scatter=False,std_threshold=2
                  )
 #print "Duration:",time.clock()-starttime
 #print output[:,2], min(output[:,2])
