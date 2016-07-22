@@ -1,5 +1,5 @@
 import numpy as np
-from numpy import linalg as LA
+#from numpy import linalg as LA
 from datetime import datetime,timedelta
 import os
 from getfile import getfile
@@ -15,26 +15,9 @@ prune_end=datetime(1,1,1)
 prune_n=1
 prune_value = 0
 end_date = ''
-
-
-
-class vector:
-    def __init__(self):
-        self.v = 0
-        self.datetime = 0
-        self.magnitude = 0
-    def assigndatetime(self,dt):
-        self.datetime=dt        
-    def assignvalue(self,v):
-        self.v = v
-    def assignmagnitude(self,mag):
-        self.magnitude = mag
-    def calcmagnitude(self):
-        self.magnitude = LA.norm(self.v)
     
 class vectorlist:
     def __init__(self,ext=False):
-        self.vectors = []
         self.ext=ext
         self.filename = ''
     def isempty(self):
@@ -42,7 +25,6 @@ class vectorlist:
             return False
         else:
             return True
-
     def prune(self,n=0,start_date=datetime(1,1,1),end_date=datetime(1,1,1),value=0,greater_than=True):
         '''
         Removes vectors from vectorlist which do not fit pruning criteria
@@ -65,60 +47,65 @@ class vectorlist:
             else:
                 self.vectors=[v for v in self.vectors if v.magnitude<value]
             print "After value pruning:",len(self.vectors)
-    def add_vector_entry(self,v):
-        if isinstance(v,vector):
-            self.vectors.append(v)
-        else:
-            raise Exception("This is not a vector")
-    def read_file(self,filename,limit=-1):
+
+    def read_file(self,filename):
+        data_dict = {'datetime':[],'x':[],'y':[],'z':[]}
         if '.cef.gz' in filename and '/caa/ic_archive/' in filename: #this is caa file, needs to be read differently!
             self.filename=filename
+            data_dict['mag']=[]
             #gzip.open(filename) #defaults to 'rb' and 9
             with gzip.open(self.filename, 'rb') as f:
                 for line in f:
                     if 'DATA_UNTIL = EOF' in line:
-                        co=0
                         for line in f:
-                            co+=1
-                            if co==limit:
-                                break
-                            line = line.split(',')
-                            v = vector()                            
+                            line = line.split(',')   
+                            '''
                             v.assigndatetime(np.datetime64(line[0]))
                             v.assignvalue(np.array(line[2:5],dtype=np.float64))
                             v.assignmagnitude(float(line[5]))
-                            self.add_vector_entry(v)
+                            '''
+                            data_dict['datetime'].append(np.datetime64(line[0]))
+                            x_mag = float(line[2])
+                            y_mag = float(line[3])
+                            z_mag = float(line[4])
+                            mag = float(line[5])
+                            data_dict['x'].append(x_mag)
+                            data_dict['y'].append(y_mag)
+                            data_dict['z'].append(z_mag)
+                            data_dict['mag'].append(mag)
+            self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z','mag'])
         else:  
             self.filename = filename
-            counter = 0
             with open(filename) as f:
                 for line in f:
                     try:
-                        v = vector()
                         line=line.split(' ')
                         line = [char for char in line if char != '']
-                        v.assigndatetime(np.datetime64(line[0]))
+                        data_dict['datetime'].append(np.datetime64(line[0]))
                         x_mag = float(line[1])
                         y_mag = float(line[2])
                         z_mag = float(line[3])
-                        v.assignvalue(np.array([x_mag,y_mag,z_mag]))
-                        v.calcmagnitude()
-                        self.add_vector_entry(v)                 
+                        data_dict['x'].append(x_mag)
+                        data_dict['y'].append(y_mag)
+                        data_dict['z'].append(z_mag)
                     except ValueError:
                         print "Something wrong with line"
-                    counter+=1
-                    if counter==limit:
-                        break
+            self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z'])
+            if not self.vectors.empty:
+                mag = np.linalg.norm(self.vectors.ix[:,1:],axis=1)
+                self.vectors['mag'] = mag
+            else:
+                self.vectors['mag']=[]
     def returndatetimes(self):
-        return [vector.datetime for vector in self.vectors]
+        return np.asarray(self.vectors['datetime'])
     def returnmagnitudes(self):
-        return [vector.magnitude for vector in self.vectors]
+        return np.asarray(self.vectors['mag'])
     def returnx(self):
-        return [vector.v[0] for vector in self.vectors]
+        return np.asarray(self.vectors['x'])
     def returny(self):
-        return [vector.v[1] for vector in self.vectors]
+        return np.asarray(self.vectors['y'])
     def returnz(self):
-        return [vector.v[2] for vector in self.vectors]
+        return np.asarray(self.vectors['z'])
     def plotlists(self,array,scatter=True,log=False):
         global scatter_size
         #labels = [','.join([entry[2],entry[3]]) for entry in array]
@@ -378,13 +365,8 @@ class vectorlist:
         plt.gcf().autofmt_xdate()
         plt.show()
     def print_values(self,limit):
-        counter = 0
         print "filename:",self.filename
-        for vector in self.vectors:
-            if counter == limit:
-                break            
-            counter+=1
-            print vector.datetime, vector.v, vector.magnitude
+        print self.vectors.ix[:limit]
             
 class vectorfiles:
     def __init__(self):
@@ -472,11 +454,10 @@ class vectorfiles:
                 self.std_end_dates.append(dates[i:i+n+1][-1]) #end date of interval - should this be [i:i+n+1] - yes, since the 
                                                                 #algorithm relies on identical start/end times
                 self.stds.append(np.std(data[i:i+n]))
-                nddata = data[i:i+n]
-                nddates = dates[i:i+n]
+                nddata = list(data[i:i+n])
+                nddates = list(dates[i:i+n])
                 raw_data = [nddates,nddata]
-                self.std_data_raw.append(raw_data)
-
+                self.std_data_raw.append(list(raw_data))
     def select_stds(self,threshold):
         if threshold==0:    #then don't filter anything out
             for d,end_d,std,raw_std_data in zip(self.std_dates,self.std_end_dates,
@@ -486,14 +467,14 @@ class vectorfiles:
             for d,end_d,std,raw_std_data in zip(self.std_dates,self.std_end_dates,
                                                 self.stds,self.std_data_raw):
                 if std<threshold:
-                    self.threshold_std.append([d,end_d,std,list(raw_std_data)])
-            
+                    self.threshold_std.append([d,end_d,std,list(raw_std_data)])        
     def merge_select_stds(self):
         new_threshold_std = []
         new_threshold_std.append([self.threshold_std[0][0],
                                   self.threshold_std[0][1],
                                   self.threshold_std[0][2],
-                                  list(self.threshold_std[0][3])])
+                                  [list(self.threshold_std[0][3][0]),
+                                   list(self.threshold_std[0][3][1])]])
         for i in xrange(1,len(self.threshold_std)):    
             previous_end_date = new_threshold_std[-1][1]
             this_start_date = self.threshold_std[i][0]
@@ -501,15 +482,15 @@ class vectorfiles:
                 new_threshold_std[-1][1]=self.threshold_std[i][1]
                 new_threshold_std[-1][2]=np.mean((self.threshold_std[i][2],
                                                 new_threshold_std[-1][2]))
-                new_threshold_std[-1][3][0].append(list(self.threshold_std[i][3][0]))
-                new_threshold_std[-1][3][1].append(list(self.threshold_std[i][3][1]))
+                new_threshold_std[-1][3][0].extend(self.threshold_std[i][3][0])
+                new_threshold_std[-1][3][1].extend(self.threshold_std[i][3][1])
             else:
                 new_threshold_std.append([self.threshold_std[i][0],
                                           self.threshold_std[i][1],
                                           self.threshold_std[i][2],
-                                          list(self.threshold_std[i][3])])
+                                          [list(self.threshold_std[0][3][0]),
+                                           list(self.threshold_std[0][3][1])]])  
         return new_threshold_std
-            
 def process(vfiles,sc,start_date,end_date,input,prune_start,prune_end,prune_n,prune_value,prune_greater_than):
     #global prune_start,prune_end,prune_n,prune_value,prune_greater_than
     dirs = [[entry[0],entry[1]] for entry in input]
