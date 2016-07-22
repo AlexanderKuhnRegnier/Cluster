@@ -6,14 +6,17 @@ from getfile import getfile
 import gzip
 import matplotlib.pyplot as plt
 import cPickle as pickle
-import csv
-import time
+import pandas as pd
+#import csv
+#import time
 
 prune_start=datetime(1,1,1)
 prune_end=datetime(1,1,1)
 prune_n=1
 prune_value = 0
 end_date = ''
+
+
 
 class vector:
     def __init__(self):
@@ -39,13 +42,7 @@ class vectorlist:
             return False
         else:
             return True
-    def mergelist(self,vlist):
-        if isinstance(vlist,vectorlist):
-            for v in vlist.vectors:
-                self.add_vector_entry(v)
-                print "Done merging list into current list"
-        else:
-            raise Exception("Not a vector list")
+
     def prune(self,n=0,start_date=datetime(1,1,1),end_date=datetime(1,1,1),value=0,greater_than=True):
         '''
         Removes vectors from vectorlist which do not fit pruning criteria
@@ -286,7 +283,7 @@ class vectorlist:
                         if [label,colour] in legend_colour_list_line:
                             ax[0].plot_date(ds,da,c=colour,fmt='-')
                         else:
-                            ax[0].plot_date(ds,da,c=colour,label=legend,fmt='-')
+                            ax[0].plot_date(ds,da,c=colour,label=label,fmt='-')
                             legend_colour_list_line.append([label,colour]) 
                 ######################
                 '''
@@ -299,7 +296,7 @@ class vectorlist:
                 for i in xrange(0,length,n):
                     std_dates.append(dates[i])
                     stds.append(np.std(data[i:i+n]))
-                label = legend+' ('+plotwhich+')'+'std'
+                label = legend+' ('+plotwhich+')'+' std'
                 if scatter:
                     if [label,colour] in legend_colour_list_std_scatter:
                         ax[1].plot_date(std_dates,stds,c=colour)
@@ -336,7 +333,7 @@ class vectorlist:
                         if [label,colour] in legend_colour_list_std_line:
                             ax[1].plot_date(ds_std,da_std,c='r',fmt='-.')
                         else:
-                            ax[1].plot_date(ds_std,da_std,c='r',label=legend,fmt='-.')
+                            ax[1].plot_date(ds_std,da_std,c='r',label=label,fmt='-.')
                             legend_colour_list_std_line.append([label,colour]) 
                     std_dates_list=[]
                     stds_list=[]
@@ -526,16 +523,13 @@ def process(vfiles,sc,start_date,end_date,input,prune_start,prune_end,prune_n,pr
     for datev in dates:
         print ""
         print datev.isoformat()
-        Year = str(datev.year)
+        Year = datev.year
         #year = Year[2:4]
-        month = '{0:02d}'.format(datev.month)
-        day = '{0:02d}'.format(datev.day)
+        month = datev.month
+        day = datev.day
 
         for [dir,ext],colour,legend,plotwhich in zip(dirs,colours,legends,plotwhichs):
-            directory = dir+Year+'/'+month+'/'
-            print "Getting file:",sc,Year,month,day,directory,ext
-            file = getfile(sc,Year,month,day,directory,ext=ext)
-
+            file = getfile(sc,Year,month,day,dir,ext=ext)
             if file:
                 print "filefound:",file
                 vlist = vectorlist()
@@ -625,6 +619,8 @@ refdir = "Z:/data/reference/"
 caadir = 'Z:/caa/ic_archive/'
 sc=0
 scatter_size = 10
+
+
 def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
             prune_start=datetime(1,1,1),prune_end=datetime(1,1,1),prune_n=0,
             prune_value = 0,input=[[refdir,1,'b','default','mag']],
@@ -798,13 +794,14 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
     #return vfiles.threshold_std,new
     return new
 
-#starttime = time.clock()
+
 plt.close('all')
+
 input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
 output = analyse(spacecraft=3,input=input,start_date=datetime(2014,2,1),
                  end_date=datetime(2014,2,10),std_n=10,
                  PLOT=False, scatter=False,std_threshold=2
                  )
-#print "Duration:",time.clock()-starttime
+
 #print output[:,2], min(output[:,2])
 #print output.shape
