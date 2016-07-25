@@ -29,8 +29,8 @@ class vectorlist:
         '''
         Removes vectors from vectorlist which do not fit pruning criteria
         '''
-        raise Exception("Needs to be reimplemented for pandas dataframes!")
         print "Before:",len(self.vectors)
+        '''
         td = end_date-start_date
         if td.days > 0 and td.seconds >= 0:
             self.vectors=[v for v in self.vectors if v.datetime > start_date
@@ -39,14 +39,20 @@ class vectorlist:
             self.vectors=[v for v in self.vectors if v.datetime > start_date
                             if v.datetime < end_date]
         #decrease density of vectors
+        '''
+        if start_date != datetime(1,1,1) and end_date != datetime(1,1,1):
+            self.vectors=self.vectors[start_date:end_date]
         if n > 0:
-            self.vectors=[v for (i,v) in enumerate(self.vectors) if not i%n] 
+            #self.vectors=[v for (i,v) in enumerate(self.vectors) if not i%n] 
+            self.vectors=self.vectors[::n]
         print "After:",len(self.vectors)
         if value > 0:
             if greater_than:
-                self.vectors=[v for v in self.vectors if v.magnitude>value]
+                #self.vectors=[v for v in self.vectors if v.magnitude>value]
+                self.vectors=self.vectors[self.vectors['mag']>value]
             else:
-                self.vectors=[v for v in self.vectors if v.magnitude<value]
+                #self.vectors=[v for v in self.vectors if v.magnitude<value]
+                self.vectors=self.vectors[self.vectors['mag']<value]
             print "After value pruning:",len(self.vectors)
 
     def read_file(self,filename):
@@ -472,38 +478,39 @@ class vectorfiles:
         for count,entry in enumerate(self.array):
             #print "entry ",entry
             vlist = entry[0]
-            if len(entry)==4:
-                plotwhich= entry[3]
-            else:
-                plotwhich = ''
-            #checks could be done here
-            #for now, just assume everything will be ok
-            dates = vlist.returndatetimes()
-            if plotwhich=='mag':
-                data = vlist.returnmagnitudes()
-            elif plotwhich=='x':
-                data = vlist.returnx()
-            elif plotwhich=='y':
-                data=vlist.returny()
-            elif plotwhich=='z':
-                data=vlist.returnz()
-            else:
-                data=vlist.returnmagnitudes()
-            ######################
-            '''
-            standard deviation calculation below
-            '''
-            ######################
-            length = int((len(data)-len(data)%n))
-            for i in xrange(0,length,n):
-                self.std_dates.append(dates[i])
-                self.std_end_dates.append(dates[i:i+n+1][-1]) #end date of interval - should this be [i:i+n+1] - yes, since the 
-                                                                #algorithm relies on identical start/end times
-                self.stds.append(np.std(data[i:i+n]))
-                nddata = list(data[i:i+n])
-                nddates = list(dates[i:i+n])
-                raw_data = [nddates,nddata]
-                self.std_data_raw.append(list(raw_data))
+            if not vlist.vectors.empty:
+                if len(entry)==4:
+                    plotwhich= entry[3]
+                else:
+                    plotwhich = ''
+                #checks could be done here
+                #for now, just assume everything will be ok
+                dates = vlist.returndatetimes()
+                if plotwhich=='mag':
+                    data = vlist.returnmagnitudes()
+                elif plotwhich=='x':
+                    data = vlist.returnx()
+                elif plotwhich=='y':
+                    data=vlist.returny()
+                elif plotwhich=='z':
+                    data=vlist.returnz()
+                else:
+                    data=vlist.returnmagnitudes()
+                ######################
+                '''
+                standard deviation calculation below
+                '''
+                ######################
+                length = int((len(data)-len(data)%n))
+                for i in xrange(0,length,n):
+                    self.std_dates.append(dates[i])
+                    self.std_end_dates.append(dates[i:i+n+1][-1]) #end date of interval - should this be [i:i+n+1] - yes, since the 
+                                                                    #algorithm relies on identical start/end times
+                    self.stds.append(np.std(data[i:i+n]))
+                    nddata = list(data[i:i+n])
+                    nddates = list(dates[i:i+n])
+                    raw_data = [nddates,nddata]
+                    self.std_data_raw.append(list(raw_data))
     def select_stds(self,threshold):
         if threshold==0:    #then don't filter anything out
             for d,end_d,std,raw_std_data in zip(self.std_dates,self.std_end_dates,
@@ -823,12 +830,20 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
 
 
 plt.close('all')
-
+'''
 input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
 output = analyse(spacecraft=3,input=input,start_date=datetime(2014,2,1),
                  end_date=datetime(2014,2,10),std_n=10,
                  PLOT=False, scatter=False,std_threshold=2
                  )
+'''
 
+input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
+output = analyse(spacecraft=1,input=input,start_date=datetime(2014,2,1),
+                 end_date=datetime(2014,2,4),std_n=10,
+                 PLOT=True, scatter=False,std_threshold=2,
+                 prune_start=datetime(2014,2,1,2,0,0),
+                 prune_end=datetime(2014,2,1,4,0,0)
+                 )
 #print output[:,2], min(output[:,2])
 #print output.shape
