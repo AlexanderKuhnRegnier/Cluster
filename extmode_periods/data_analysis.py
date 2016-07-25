@@ -40,20 +40,21 @@ class vectorlist:
                             if v.datetime < end_date]
         #decrease density of vectors
         '''
-        if start_date != datetime(1,1,1) and end_date != datetime(1,1,1):
-            self.vectors=self.vectors[start_date:end_date]
-        if n > 0:
-            #self.vectors=[v for (i,v) in enumerate(self.vectors) if not i%n] 
-            self.vectors=self.vectors[::n]
-        print "After:",len(self.vectors)
-        if value > 0:
-            if greater_than:
-                #self.vectors=[v for v in self.vectors if v.magnitude>value]
-                self.vectors=self.vectors[self.vectors['mag']>value]
-            else:
-                #self.vectors=[v for v in self.vectors if v.magnitude<value]
-                self.vectors=self.vectors[self.vectors['mag']<value]
-            print "After value pruning:",len(self.vectors)
+        if not self.vectors.empty:
+            if start_date != datetime(1,1,1) and end_date != datetime(1,1,1):
+                self.vectors=self.vectors[start_date:end_date]
+            if n > 0:
+                #self.vectors=[v for (i,v) in enumerate(self.vectors) if not i%n] 
+                self.vectors=self.vectors[::n]
+            print "After:",len(self.vectors)
+            if value > 0:
+                if greater_than:
+                    #self.vectors=[v for v in self.vectors if v.magnitude>value]
+                    self.vectors=self.vectors[self.vectors['mag']>value]
+                else:
+                    #self.vectors=[v for v in self.vectors if v.magnitude<value]
+                    self.vectors=self.vectors[self.vectors['mag']<value]
+                print "After value pruning:",len(self.vectors)
 
     def read_file(self,filename):
         data_dict = {'datetime':[],'x':[],'y':[],'z':[]}
@@ -523,26 +524,29 @@ class vectorfiles:
                     self.threshold_std.append([d,end_d,std,list(raw_std_data)])        
     def merge_select_stds(self):
         new_threshold_std = []
-        new_threshold_std.append([self.threshold_std[0][0],
-                                  self.threshold_std[0][1],
-                                  self.threshold_std[0][2],
-                                  [list(self.threshold_std[0][3][0]),
-                                   list(self.threshold_std[0][3][1])]])
-        for i in xrange(1,len(self.threshold_std)):    
-            previous_end_date = new_threshold_std[-1][1]
-            this_start_date = self.threshold_std[i][0]
-            if previous_end_date == this_start_date:
-                new_threshold_std[-1][1]=self.threshold_std[i][1]
-                new_threshold_std[-1][2]=np.mean((self.threshold_std[i][2],
-                                                new_threshold_std[-1][2]))
-                new_threshold_std[-1][3][0].extend(self.threshold_std[i][3][0])
-                new_threshold_std[-1][3][1].extend(self.threshold_std[i][3][1])
-            else:
-                new_threshold_std.append([self.threshold_std[i][0],
-                                          self.threshold_std[i][1],
-                                          self.threshold_std[i][2],
-                                          [list(self.threshold_std[0][3][0]),
-                                           list(self.threshold_std[0][3][1])]])  
+        if self.threshold_std:
+            new_threshold_std.append([self.threshold_std[0][0],
+                                      self.threshold_std[0][1],
+                                      self.threshold_std[0][2],
+                                      [list(self.threshold_std[0][3][0]),
+                                       list(self.threshold_std[0][3][1])]])
+            for i in xrange(1,len(self.threshold_std)):    
+                previous_end_date = new_threshold_std[-1][1]
+                this_start_date = self.threshold_std[i][0]
+                if previous_end_date == this_start_date:
+                    new_threshold_std[-1][1]=self.threshold_std[i][1]
+                    new_threshold_std[-1][2]=np.mean((self.threshold_std[i][2],
+                                                    new_threshold_std[-1][2]))
+                    new_threshold_std[-1][3][0].extend(self.threshold_std[i][3][0])
+                    new_threshold_std[-1][3][1].extend(self.threshold_std[i][3][1])
+                else:
+                    new_threshold_std.append([self.threshold_std[i][0],
+                                              self.threshold_std[i][1],
+                                              self.threshold_std[i][2],
+                                              [list(self.threshold_std[0][3][0]),
+                                               list(self.threshold_std[0][3][1])]]) 
+        for i in xrange(len(new_threshold_std)):
+            new_threshold_std[i][3]=np.asarray(new_threshold_std[i][3]).transpose()
         return new_threshold_std
 def process(vfiles,sc,start_date,end_date,input,prune_start,prune_end,prune_n,prune_value,prune_greater_than):
     #global prune_start,prune_end,prune_n,prune_value,prune_greater_than
@@ -828,22 +832,22 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
     #return vfiles.threshold_std,new
     return new
 
-
-plt.close('all')
 '''
+input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
+output = analyse(spacecraft=3,input=input,start_date=datetime(2015,1,6),
+                 end_date=datetime(2015,1,20),std_n=10,
+                 PLOT=True, scatter=False,std_threshold=0
+                 )
+'''
+#print output[:,2], min(output[:,2])
+#print output.shape
+
+'''
+#was used for benchmarking
+plt.close('all')
 input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
 output = analyse(spacecraft=3,input=input,start_date=datetime(2014,2,1),
                  end_date=datetime(2014,2,10),std_n=10,
                  PLOT=False, scatter=False,std_threshold=2
                  )
 '''
-
-input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
-output = analyse(spacecraft=1,input=input,start_date=datetime(2014,2,1),
-                 end_date=datetime(2014,2,4),std_n=10,
-                 PLOT=True, scatter=False,std_threshold=2,
-                 prune_start=datetime(2014,2,1,2,0,0),
-                 prune_end=datetime(2014,2,1,4,0,0)
-                 )
-#print output[:,2], min(output[:,2])
-#print output.shape

@@ -10,6 +10,7 @@ import csv
 import data_analysis
 from data_analysis import refdir,refdirahk114,caadir
 import calendar
+import pandas as pd
 
 end_date=datetime(9999,1,1)
 EXTMODE_INITIATE = ["SFGMJ059","SFGMJ064","SFGMSEXT","SFGMM002"]
@@ -24,12 +25,19 @@ def getcommands(start_date,end_date):
         #print extmode_commanding
         scch_files = getscchfiles(sc,start_date,end_date)
         #print scch_files
+        
+        prev_short_line = ''        
+        
         for file in scch_files:
             #print file
             with open(file,mode='rb') as f:
                 for line in f:
                     if len(line)>15:
-                        data = line[15:]
+                        offset=0
+                        if '\n' in prev_short_line:
+                            offset=len(prev_short_line)
+                        prev_short_line=''
+                        data = line[15-offset:]
                         data = data.split(' ')
                         command = data[3]
                         #print command
@@ -44,7 +52,9 @@ def getcommands(start_date,end_date):
                             #print "time",command_execution_time
                             extmode_commanding = np.vstack((
                             extmode_commanding,
-                            [command_execution_time,'TERMINATE',sc]))                   
+                            [command_execution_time,'TERMINATE',sc]))
+                    else:
+                        prev_short_line = line
         #print "commanding"
         #print extmode_commanding
         extmode_commanding_list.append(extmode_commanding)
@@ -131,8 +141,8 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0,
     cmdlist = []
     datelist = []
     pickledir='Y:/extmode_data_pickles/'
-    picklefile = 'extmode_data_'+start_date.strftime('%Y%M%d')+'_'+ \
-                 end_date.strftime('%Y%M%d')+'.pickle'
+    picklefile = 'extmode_data_'+start_date.strftime('%Y%m%d')+'_'+ \
+                 end_date.strftime('%Y%m%d')+'.pickle'
     if picklefile in os.listdir(pickledir):
         print "Loading previously processed results"
         f = open(pickledir+picklefile,'r')
@@ -175,7 +185,15 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0,
             tempdates=[]
             for date in dates:
                 #print "appending",date
-                tempdates.append(np.datetime64(date))
+                
+                #tempdates.append(np.datetime64(date))
+                try:
+                    tempdates.append(np.datetime64(date))
+                except ValueError:
+                    print "date",date
+                    print extmode_cmds
+                    raise
+                    
                 #print "appended",tempdates[-1]
                 #print tempdates[-1].tolist()
             for cmd in cmds:
@@ -410,7 +428,7 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0,
         to plot the data also introduces a timeshift into the data,
         probably due to time-zone conversion or something similar.
         '''
-        plt.close('all')
+        #plt.close('all')
         
         fig,axarr=plt.subplots(4,sharex=True)
         print "Plotting Overlay with Relevant Time Periods"
@@ -508,7 +526,7 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0,
         ext_modes = [1,0]
         for spacecraft,ext_mode in zip(spacecrafts,ext_modes):
             print ""
-            print "SC:",spacecraft,"EXT MODE:",ext_mode
+            print "SC:",spacecraft,"(",spacecraft+1,")","EXT MODE:",ext_mode
             if ext_mode:
                 legend = 'ext mode'
                 c = 'r'
@@ -581,8 +599,8 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0,
         print "Event",event[0],event[1],event[2],event[3],event[5]
         ext_mode_data_list = event[4]
         non_ext_data_list = event[6]
-        print ext_mode_data_list.shape
-        print non_ext_data_list.shape
+        print len(ext_mode_data_list)
+        print len(non_ext_data_list)
         sc_ext = event[3]
         sc_nonext = event[5]
         for ext_mode_data in ext_mode_data_list:
@@ -648,41 +666,73 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0,
                         sc_nonext,
                         raw_non_ext_overlap_entry])
     print "number of overlaps found", len(overlap_data)
-    return overlap_data
+    return overlap_data,fig,axarr
 
-def plot_overlap_data(overlap_data):
+def plot_overlap_data(overlap_data,fig,axarr):
     '''
     20/07
     doesn't work properly, only some of the data seems to show up
     is this intentional, or is there something wrong with it?
+    -25/07
+    It seems that data gaps seem to happen irregularly, but nonetheless
+    more often than expected, so the observed data gaps are likely not 
+    an error in this software, but rather an issue with spacecraft commanding.    
     '''
     print "Plotting overlaps"
-    fig,axarr = plt.subplots(4,1,sharex=True)
+    #fig,axarr = plt.subplots(4,1,sharex=True)
+    data_max=0
+    for overlap in overlap_data:
+        if overlap[5][1][:,1].size:
+            raw_ext_data_max = np.max(overlap[5][1][:,1])
+        if overlap[7][1][:,1].size:
+            raw_non_ext_data_max = np.max(overlap[7][1][:,1])
+        if raw_ext_data_max>data_max:
+            data_max=raw_ext_data_max
+        if raw_non_ext_data_max>data_max:
+            data_max=raw_non_ext_data_max
+        
     for overlap in overlap_data:
         raw_ext_data = overlap[5][1]
         raw_non_ext_data = overlap[7][1]
         ext_mode_sc = overlap[4]
         non_ext_sc = overlap[6]
-        
-        axarr[ext_mode_sc].plot_date(raw_ext_data[:,0],raw_ext_data[:,1],
+        axarr[ext_mode_sc].plot_date(raw_ext_data[:,0],
+raw_ext_data[:,1]/data_max,
                                      fmt='-',tz='UTC',c='r')
-        axarr[non_ext_sc].plot_date(raw_non_ext_data[:,0],raw_non_ext_data[:,1],
+        axarr[non_ext_sc].plot_date(raw_non_ext_data[:,0],
+raw_non_ext_data[:,1]/data_max,
                                     fmt='-',tz='UTC',c='g')
+    '''
     figManager = plt.get_current_fig_manager()
     figManager.window.showMaximized()
     plt.gcf().autofmt_xdate()
     plt.show()
+    '''
     return fig
 
-
-start_date = datetime(2015,1,6)
-end_date = datetime(2015,1,20)
-
+plt.close('all')
+start_date = datetime(2014,9,1)
+end_date = datetime(2014,10,1)
 overlay_plot = 1
-
 write_to_file = 0
+std_threshold=1
+std_n=20
+prune_value=0
 
-overlap_data=find_overlap_data(start_date=start_date,end_date=end_date,
+overlap_data,fig,axarr=find_overlap_data(start_date=start_date,end_date=end_date,
                                overlay_plot=overlay_plot,
-                               write_to_file=write_to_file)
-fig = plot_overlap_data(overlap_data)
+                               write_to_file=write_to_file,prune_value=prune_value,
+                               std_threshold=std_threshold,
+                               std_n=std_n)
+fig = plot_overlap_data(overlap_data,fig,axarr)
+
+overlapresults={}
+overlapresults['duration']=[]
+overlapresults['std']=[]
+for entry in overlap_data:
+    overlapresults['duration'].append(entry[2])
+    overlapresults['std'].append(entry[3])
+    
+df = pd.DataFrame(overlapresults)
+#plt.figure()
+df.hist()
