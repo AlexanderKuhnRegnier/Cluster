@@ -29,6 +29,7 @@ class vectorlist:
         '''
         Removes vectors from vectorlist which do not fit pruning criteria
         '''
+        raise Exception("Needs to be reimplemented for pandas dataframes!")
         print "Before:",len(self.vectors)
         td = end_date-start_date
         if td.days > 0 and td.seconds >= 0:
@@ -59,11 +60,7 @@ class vectorlist:
                     if 'DATA_UNTIL = EOF' in line:
                         for line in f:
                             line = line.split(',')   
-                            '''
-                            v.assigndatetime(np.datetime64(line[0]))
-                            v.assignvalue(np.array(line[2:5],dtype=np.float64))
-                            v.assignmagnitude(float(line[5]))
-                            '''
+
                             data_dict['datetime'].append(np.datetime64(line[0]))
                             x_mag = float(line[2])
                             y_mag = float(line[3])
@@ -76,28 +73,77 @@ class vectorlist:
             self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z','mag'])
         else:  
             self.filename = filename
+            
             with open(filename) as f:
                 for line in f:
                     try:
                         line=line.split(' ')
                         line = [char for char in line if char != '']
-                        data_dict['datetime'].append(np.datetime64(line[0]))
                         x_mag = float(line[1])
                         y_mag = float(line[2])
                         z_mag = float(line[3])
                         data_dict['x'].append(x_mag)
                         data_dict['y'].append(y_mag)
                         data_dict['z'].append(z_mag)
+                        data_dict['datetime'].append(np.datetime64(line[0]))
                     except ValueError:
-                        print "Something wrong with line"
+                        if "60.000" in line[0]:
+                            print "Replacing 60.000 by 59.999"
+                            line[0]=line[0].replace('60.000','59.999')
+                            line[0]=np.datetime64(line[0])
+                            data_dict['datetime'].append(np.datetime64(line[0]))                  
+                        else:
+                            print "Unknown Error"
             self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z'])
+            self.vectors.set_index('datetime',drop=True,inplace=True)
+            
+            '''
+            self.vectors=pd.read_csv(filename,
+                                     header=None,
+                                     delim_whitespace=True,
+                                     index_col=0,
+                                     usecols=[0,1,2,3],
+                                     engine='c',
+                                     dtype={1:np.float64,2:np.float64,3:np.float64},
+                                     skip_blank_lines=True,
+                                     na_filter=False,
+                                     verbose=False,
+                                     infer_datetime_format=True,
+                                     compression=None,
+                                     parse_dates=True,
+                                     names=['datetime','x','y','z'])
+            '''
             if not self.vectors.empty:
-                mag = np.linalg.norm(self.vectors.ix[:,1:],axis=1)
+                mag = np.linalg.norm(self.vectors.ix[:,:],axis=1)
                 self.vectors['mag'] = mag
+                if type(self.vectors.index[0])==str:
+                    print "Time format error in file"
+                    self.vectors.reset_index(inplace=True)
+                    datetimes=self.vectors['datetime']
+                    mask = datetimes.str.contains(':60.000')
+                    indices_to_replace = self.vectors.ix[mask,'datetime'].index
+                    #print indices_to_replace
+                    for i in indices_to_replace:
+                        #print "i", i, self.vectors.loc[i,'datetime']
+                        date_string = self.vectors.loc[i,'datetime']
+                        date_string = date_string.replace(':60.000',':59.999')
+                        self.vectors.loc[i,'datetime'] = date_string
+                    #print "New entry"
+                    #print self.vectors.loc[indices_to_replace,'datetime']
+                    #print self.vectors.loc[18350:18355]
+                    self.vectors.set_index('datetime',drop=True,inplace=True)
+                    #print self.vectors
+                    self.vectors.index = pd.to_datetime(self.vectors.index)
+                    #print self.vectors
+                    #raise Exception
+
             else:
                 self.vectors['mag']=[]
     def returndatetimes(self):
+        '''
         return np.asarray(self.vectors['datetime'])
+        '''
+        return np.asarray(self.vectors.index)
     def returnmagnitudes(self):
         return np.asarray(self.vectors['mag'])
     def returnx(self):

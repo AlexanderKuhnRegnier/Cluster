@@ -1,7 +1,7 @@
 #from datetime import date,time,datetime,timedelta
 import os
 
-def getfile(sc,Year,month,day,directory, ext=False):
+def getfile(sc,Year,month,day,directory,ext=False):
     Year = str(Year)
     month = '{0:02d}'.format(month)
     day = '{0:02d}'.format(day)
@@ -26,7 +26,7 @@ def getextreffile(sc,Year,month,day,directory):
     year=Year[2:4]
     sc = str(sc)
     for version in ['K','B','A']:
-        filepath = directory+'C'+sc+'_'+year+month+day+'_'+version+'.EXT.GSE'
+        filepath = directory+'C'+sc+'_'+year+month+day+'_'+version+'.EXT.GSE'    
         if os.path.isfile(filepath):
             return filepath
     return 0
