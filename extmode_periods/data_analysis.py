@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 #from numpy import linalg as LA
 from datetime import datetime,timedelta
 import os
@@ -6,15 +7,86 @@ from getfile import getfile
 import gzip
 import matplotlib.pyplot as plt
 import cPickle as pickle
+#import pickle
 import pandas as pd
+import itertools
 #import csv
-#import time
-
+import time
+refdirahk114 = "Y:/reference/"
+refdir = "Z:/data/reference/" 
+caadir = 'Z:/caa/ic_archive/'
+dirs = [refdirahk114,refdir,caadir]
+dir_names=['refdirahk114','refdir','caadir']
 prune_start=datetime(1,1,1)
 prune_end=datetime(1,1,1)
 prune_n=1
 prune_value = 0
 end_date = ''
+    
+class vfile_store:
+    def __init__(self,start_date=datetime(1,1,1),
+                 end_date=datetime(1,1,1),
+                    prune_start=datetime(1,1,1),
+                    prune_end=datetime(1,1,1),
+                    prune_value=0,
+                    input=[],
+                    prune_greater_than=False,
+                    std_n=0):
+        self.contents=[start_date,end_date,prune_start,prune_end,
+                       prune_value,input,prune_greater_than,std_n]
+        self.vfiles=None
+    def add_vectorfiles(self,vfiles):
+        if not isinstance(vfiles,vectorfiles):
+            raise Exception("Not a vectorfiles instance")
+        self.vfiles=vfiles
+    def get_vfiles(self):
+        return self.vfiles
+    def get_contents(self):
+        return self.contents
+    def is_equal(self,vectorfile_store):
+        if not isinstance(vectorfile_store,vfile_store):
+            raise Exception("Not a vfile_store instance")
+        return vectorfile_store.get_contents()==self.contents
+    '''
+    def load_vfiles(self):
+        picklef = self.make_pickle_filename()
+        if os.path.isfile(picklef):
+            with open(picklef,'rb') as f:
+                vf = pickle.load(f)
+            return vf
+        else:
+            return False
+    def store_vfiles_pickle(self,vfiles):
+        if not isinstance(vfiles,vectorfiles):
+            raise Exception("Not a vectorfiles instance")
+        picklef = self.make_pickle_filename()
+        f = open(picklef,'wb')
+        pickle.dump(vfiles,f)
+        f.close()
+        return f.closed
+    def make_pickle_filename(self):
+        str1 = self.contents[0].strftime('%Y%m%dT%H%M%S')
+        if self.contents[1]=='':
+            str2 = '_1_day_'
+        else:
+            str2 = self.contents[1].strftime('%Y%m%dT%H%M%S')        
+        if self.contents[2]==datetime(1,1,1):
+            str3 = 'no_prune_start'
+        else:
+            str3 = self.contents[2].strftime('%Y%m%dT%H%M%S')
+        if self.contents[3]==datetime(1,1,1):
+            str4 = 'no_prune_end'
+        else:
+            str4 = self.contents[3].strftime('%Y%m%dT%H%M%S')
+        str5 = format(self.contents[4],'04d')
+        str6 = '-'.join(map(str,list(itertools.chain(*self.contents[5]))))
+        for dir,dir_name in zip(dirs,dir_names):
+            if dir in str6:
+                str6 = str6.replace(dir,dir_name)
+        str7 = str(self.contents[6])
+        str8 = format(self.contents[7],'04d')
+        return pickledir+'__'.join([str1,str2,str3,str4,str5,str6,str7,str8]) 
+    '''
     
 class vectorlist:
     def __init__(self,ext=False):
@@ -427,7 +499,6 @@ class vectorfiles:
         self.std_dates = []
         self.std_end_dates = []
         self.stds = []
-        self.threshold_std = []
         '''
         4 columns in the threshold_std array
         column 0:start date of interval
@@ -513,6 +584,7 @@ class vectorfiles:
                     raw_data = [nddates,nddata]
                     self.std_data_raw.append(list(raw_data))
     def select_stds(self,threshold):
+        self.threshold_std = []
         if threshold==0:    #then don't filter anything out
             for d,end_d,std,raw_std_data in zip(self.std_dates,self.std_end_dates,
                                                 self.stds,self.std_data_raw):
@@ -652,9 +724,7 @@ def remove_outliers():
            
 #filename = "Y:/reference/2015/12/C1_151231_B.EXT.GSE"
 vfiles = vectorfiles()
-refdirahk114 = "Y:/reference/"
-refdir = "Z:/data/reference/" 
-caadir = 'Z:/caa/ic_archive/'
+
 sc=0
 scatter_size = 10
 
@@ -664,7 +734,7 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
             prune_value = 0,input=[[refdir,1,'b','default','mag']],
             scatter_s=50,prune_greater_than=False,
             std_threshold=0,rm_outliers=0,std_n=50,PLOT=0,reprocess=1,
-            pickling=0,scatter=False):
+            scatter=False,vectorfile_storage=vfile_store()):
     '''
     spacecraft    = spacecraft (1,2,3,4)    
     input = [[directory,extmode 0 or 1 (off or on), colour, legend (string), 
@@ -717,9 +787,11 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
     #global prune_start,prune_end,prune_n,prune_value,prune_greater_than
     #global refdirahk114,refdir,caadir
     global vfiles,sc,scatter_size
-    vfiles=vectorfiles()
     sc=spacecraft
     scatter_size = scatter_s
+    
+    vfiles_store = vfile_store(start_date,end_date,prune_start,prune_end,prune_value,
+                               input,prune_greater_than,std_n)
     ###############################################################################
     '''
     #default arguments
@@ -729,11 +801,9 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
     prune_value = 0
     end_date = ''
     '''
-    
     #User Input Variables
     #refdirahk114 = refdir
     #sc = sc
-    
     '''
     #large pickle file!!
     start_date = datetime(2010,1,1)
@@ -768,8 +838,7 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
     #################
     
     std_threshold = 1.2
-    
-    
+
     rm_outliers = 0
     
     #plot(vfiles,sc,start_date,end_date,input)
@@ -782,56 +851,30 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
     pickling = 0
     '''
     ###############################################################################
-    
-    if prune_start != datetime(1,1,1):
-        dt_label_start = prune_start.isoformat()
-    else:
-        dt_label_start = start_date.isoformat()
-    if prune_start != datetime(1,1,1):
-        dt_label_end = prune_end.isoformat()
-    else:
-        if end_date != '':
-            dt_label_end = end_date.isoformat()
-        else:
-            dt_label_end=''
-    
-    if pickling: 
-        descriptor_string = '_pruningvalue{0:03d}_pruningnumber{1:03d}'.format(prune_value,prune_n)
-        pickle_file = dt_label_start+'__'+dt_label_end+descriptor_string+'.pickle'
-        pickle_file = pickle_file.replace(':','')
-        if rm_outliers != 0 and rm_outliers != 1:
-            raise Exception("only use 0 or 1 please")
-        pickle_file += format(rm_outliers,'d')
-    
-    if reprocess:
+    if not vfiles_store.is_equal(vectorfile_storage):
+        print "No previous vfiles"
+        vfiles=vectorfiles()
         process(vfiles,sc,start_date,end_date,input,prune_start,prune_end,prune_n,prune_value,prune_greater_than)
-        if pickling:
-            pickle.dump(vfiles,open(pickle_file,'wb'))
-    else:
-        if pickling:
-            print "Reading from pickle file"
-            vfiles = pickle.load(open(pickle_file,'rb'))
-    
-    if rm_outliers:
-        if pickle_file in os.listdir(os.getcwd()):
-            print "Already removed outliers!"
-        else:
+        if rm_outliers:
             plot(vfiles,sc,start_date,end_date,input,n=std_n,scatter=scatter)
             remove_outliers()
-            if pickling:
-                pickle.dump(vfiles,open(pickle_file,'wb'))
-        plot(vfiles,sc,start_date,end_date,input,n=std_n)
-    
-    vfiles.calculate_stds(n=std_n)
+            plot(vfiles,sc,start_date,end_date,input,n=std_n)
+            
+        vfiles.calculate_stds(n=std_n) 
+        print "Storing vfiles",len(vfiles.array)        
+        vfiles_store.add_vectorfiles(vfiles)
+    else:
+        vfiles_store=vectorfile_storage
+        vfiles=vectorfile_storage.get_vfiles()
+        print "Using previous vfiles",len(vfiles.array)
     vfiles.select_stds(threshold=std_threshold)
-    
     if PLOT:
         plot(vfiles,sc,start_date,end_date,input,n=std_n,scatter=scatter)
         #plot(vfiles,sc,start_date,end_date,input)
     new = vfiles.merge_select_stds()
     #return vfiles.threshold_std,new
-    return new
-
+    return new,vfiles_store
+        
 '''
 input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
 output = analyse(spacecraft=3,input=input,start_date=datetime(2015,1,6),
@@ -839,15 +882,34 @@ output = analyse(spacecraft=3,input=input,start_date=datetime(2015,1,6),
                  PLOT=True, scatter=False,std_threshold=0
                  )
 '''
+'''
 #print output[:,2], min(output[:,2])
 #print output.shape
-
-'''
+start = time.clock()
 #was used for benchmarking
 plt.close('all')
 input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
-output = analyse(spacecraft=3,input=input,start_date=datetime(2014,2,1),
+output,vfiles_store = analyse(spacecraft=3,input=input,start_date=datetime(2014,2,1),
                  end_date=datetime(2014,2,10),std_n=10,
                  PLOT=False, scatter=False,std_threshold=2
                  )
+print "Duration1:", time.clock()-start
+
+start = time.clock()
+output2,vfiles_store = analyse(spacecraft=3,input=input,start_date=datetime(2014,2,1),
+                 end_date=datetime(2014,2,10),std_n=10,
+                 PLOT=False, scatter=False,std_threshold=1.5,
+                 vectorfile_storage=vfiles_store
+                 )
+
+print "Duration2:", time.clock()-start
+
+start = time.clock()
+output3,vfiles_store = analyse(spacecraft=3,input=input,start_date=datetime(2014,2,1),
+                 end_date=datetime(2014,2,10),std_n=100,
+                 PLOT=False, scatter=False,std_threshold=0.01,
+                 vectorfile_storage=vfiles_store
+                 )
+
+print "Duration3:", time.clock()-start
 '''
