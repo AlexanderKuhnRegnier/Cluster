@@ -44,6 +44,11 @@ class vfile_store:
     def get_contents(self):
         return self.contents
     def is_equal(self,vectorfile_store):
+        
+        ##########
+        return False
+        
+        
         if not isinstance(vectorfile_store,vfile_store):
             raise Exception("Not a vfile_store instance")
         return vectorfile_store.get_contents()==self.contents
@@ -861,7 +866,8 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
             plot(vfiles,sc,start_date,end_date,input,n=std_n)
             
         vfiles.calculate_stds(n=std_n) 
-        print "Storing vfiles",len(vfiles.array)        
+        print "Storing vfiles",len(vfiles.array)  
+        print ""
         vfiles_store.add_vectorfiles(vfiles)
     else:
         vfiles_store=vectorfile_storage
@@ -912,4 +918,13 @@ output3,vfiles_store = analyse(spacecraft=3,input=input,start_date=datetime(2014
                  )
 
 print "Duration3:", time.clock()-start
+'''
+'''
+#was used for benchmarking
+plt.close('all')
+input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
+output,vfiles_store = analyse(spacecraft=3,input=input,start_date=datetime(2014,2,1),
+                 end_date=datetime(2014,2,10),std_n=10,
+                 PLOT=False, scatter=False,std_threshold=2
+                 )
 '''

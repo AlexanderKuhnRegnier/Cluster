@@ -8,12 +8,12 @@ import os
 import cPickle as pickle
 import csv
 import data_analysis
-from data_analysis import refdir,refdirahk114,caadir
+from data_analysis import refdir,refdirahk114,caadir,vfile_store
 #import calendar
 import pandas as pd
 from numba import jit,double
 
-plt.style.use('seaborn-darkgrid')
+#plt.style.use('seaborn-darkgrid')
 end_date=datetime(9999,1,1)
 EXTMODE_INITIATE = ["SFGMJ059","SFGMJ064","SFGMSEXT","SFGMM002"]
 EXTMODE_TERMINATE = ["SFGMJ065","SFGMJ050"]
@@ -510,7 +510,7 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0):
                 writer.writerow([row[0].tolist().strftime('%d/%m/%Y %H:%M:%S'),row[1]/1e6,row[2]+1,row[3]+1])
     return results_end_date,fig,axarr          
 def determine_overlaps(results_end_date,
-                      analysis_plot=0,reprocess=1,std_threshold=0,std_n=10,
+                      analysis_plot=0,reprocess=1,std_threshold_list=[1.],std_n=10,
                       prune_value=0,prune_greater_than=False,
                       raw_data_output=True):
     '''
@@ -545,40 +545,49 @@ def determine_overlaps(results_end_date,
         start_date,end_date=row[0].tolist().date(),row[1].tolist().date()
         spacecrafts=[row[2],row[3]]
         ext_modes = [1,0]
-        for spacecraft,ext_mode in zip(spacecrafts,ext_modes):
-            print ""
-            print "SC:",spacecraft,"(",spacecraft+1,")","EXT MODE:",ext_mode
-            if ext_mode:
-                legend = 'ext mode'
-                c = 'r'
-            else:
-                legend = 'non ext mode'
-                c = 'b'
-            print start_date,end_date
-            input = [[refdir,ext_mode,c,legend,'mag']]
-            prune_start = row[0].tolist()
-            prune_end = row[1].tolist()
-            print "Pruning input dates:",prune_start,prune_end
-            output=data_analysis.analyse(
-                                  spacecraft=spacecraft+1,
-                                  input=input,start_date=start_date,
-                                  end_date=end_date,
-                                  prune_value=prune_value,
-                                  prune_greater_than=prune_greater_than,
-                                  prune_start=prune_start,
-                                  prune_end=prune_end,
-                                  PLOT=PLOT,reprocess=reprocess,
-                                  std_threshold=std_threshold,
-                                  std_n=std_n)
-            if ext_mode:
-                data_list.append([row[0].tolist(),
-                                  row[1].tolist(),
-                                  (row[1]-row[0])/np.timedelta64(1,'s'),
-                                  spacecraft,
-                                  output])
-            else:
-                data_list[-1].extend([spacecraft,output])
-    print "Finished compliling data list",len(data_list)
+        ext_vfile_store = vfile_store()
+        non_ext_vfile_store = vfile_store()
+        for std_threshold in std_threshold_list:
+            for spacecraft,ext_mode in zip(spacecrafts,ext_modes):
+                #print ""
+                print "SC:",spacecraft,"(",spacecraft+1,")","EXT MODE:",ext_mode
+                if ext_mode:
+                    previous_vfiles = ext_vfile_store
+                    legend = 'ext mode'
+                    c = 'r'
+                else:
+                    previous_vfiles = non_ext_vfile_store
+                    legend = 'non ext mode'
+                    c = 'b'
+                #print start_date,end_date
+                input = [[refdir,ext_mode,c,legend,'mag']]
+                prune_start = row[0].tolist()
+                prune_end = row[1].tolist()
+                #print "Pruning input dates:",prune_start,prune_end
+                output,vfiles_store=data_analysis.analyse(
+                                      spacecraft=spacecraft+1,
+                                      input=input,start_date=start_date,
+                                      end_date=end_date,
+                                      prune_value=prune_value,
+                                      prune_greater_than=prune_greater_than,
+                                      prune_start=prune_start,
+                                      prune_end=prune_end,
+                                      PLOT=PLOT,reprocess=reprocess,
+                                      std_threshold=std_threshold,
+                                      std_n=std_n,
+                                      vectorfile_storage=previous_vfiles)
+                if ext_mode:
+                    ext_vfile_store = vfiles_store
+                    data_list.append([row[0].tolist(),
+                                      row[1].tolist(),
+                                      (row[1]-row[0])/np.timedelta64(1,'s'),
+                                      spacecraft,
+                                      output])
+                else:
+                    non_ext_vfile_store = vfiles_store
+                    data_list[-1].extend([spacecraft,output])
+        
+    print "Finished compiling data list",len(data_list)
     '''
     Now just need to sift through all the entries in column 4 and 6 of
     data_list, in order to find intervals that match up, and then filter
@@ -609,7 +618,7 @@ def determine_overlaps(results_end_date,
         2:duration of overlap (in seconds)
         3:average standard deviation of data in overlap
         4:sc in ext mode    
-        5:std+raw data ext mode (list of )
+        5:std+raw data ext mode (list of)
         6:sc not in ext mode
         7:std+raw data non ext mode
     8 columns, number of 'rows' depends on the number of overlapping time periods
@@ -621,15 +630,15 @@ def determine_overlaps(results_end_date,
         2:duration of overlap (in seconds)
         3:list of combined field statistics - [max,min,mean,std]
         4:sc in ext mode    
-        5:std+raw data ext mode
+        5:raw data ext mode
         6:sc not in ext mode
-        7:std+raw data non ext mode
+        7:raw data non ext mode
     8 columns, number of 'rows' depends on the number of overlapping time periods
     '''
     overlap_data = []
     for event in data_list:
-        print ""
-        print "Event",event[0],event[1],event[2],event[3],event[5]
+        #print ""
+        #print "Event",event[0],event[1],event[2],event[3],event[5]
         ext_mode_data_list = event[4]
         non_ext_data_list = event[6]
         #print len(ext_mode_data_list)
@@ -769,35 +778,37 @@ def plot_overlap_data(overlap_data,fig,axarr):
     '''
     return fig
 
-plt.close('all')
-start_date = datetime(2014,9,1)
-end_date = datetime(2014,9,10)
-overlay_plot = 1
-additional_plots = 1
-write_to_file = 0
-std_threshold=1
-std_n=20
-prune_value=0
-raw_data_output=True  #needs to be enabled for additional_plots to work!
-
-results_end_date,fig,axarr=find_overlap_data(start_date=start_date,end_date=end_date,
-                               overlay_plot=overlay_plot,
-                               write_to_file=write_to_file)
-overlap_data=determine_overlaps(results_end_date,analysis_plot=0,
-                                std_threshold=std_threshold,
-                                std_n=std_n,
-                                prune_value=prune_value,
-                                prune_greater_than=False,
-                                raw_data_output=raw_data_output)
-if additional_plots:
-    fig = plot_overlap_data(overlap_data,fig,axarr)
-    overlapresults={}
-    overlapresults['duration']=[]
-    overlapresults['std']=[]
-    for entry in overlap_data:
-        overlapresults['duration'].append(entry[2])
-        overlapresults['std'].append(entry[3][3])
-        
-    df = pd.DataFrame(overlapresults)
-    #plt.figure()
-    df.hist()
+#plt.close('all')
+def get_overlap_data(
+start_date = datetime(2014,9,1),
+end_date = datetime(2014,9,10),
+overlay_plot = 0,
+additional_plots = 0,
+write_to_file = 0,
+std_threshold_list=[1.],
+std_n=20,
+prune_value=10,
+raw_data_output=0  #needs to be enabled for additional_plots to work!
+):
+    results_end_date,fig,axarr=find_overlap_data(start_date=start_date,end_date=end_date,
+                                   overlay_plot=overlay_plot,
+                                   write_to_file=write_to_file)
+    overlap_data=determine_overlaps(results_end_date,analysis_plot=0,
+                                    std_threshold_list=std_threshold_list,
+                                    std_n=std_n,
+                                    prune_value=prune_value,
+                                    prune_greater_than=False,
+                                    raw_data_output=raw_data_output)
+    if additional_plots:
+        fig = plot_overlap_data(overlap_data,fig,axarr)
+        overlapresults={}
+        overlapresults['duration']=[]
+        overlapresults['std']=[]
+        for entry in overlap_data:
+            overlapresults['duration'].append(entry[2])
+            overlapresults['std'].append(entry[3][3])
+            
+        df = pd.DataFrame(overlapresults)
+        #plt.figure()
+        df.hist()
+    return overlap_data
