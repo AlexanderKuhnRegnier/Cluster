@@ -143,13 +143,9 @@ def find_min_max_dates(results_end_date):
         return False,False
     return min_date.date(),max_date.date()
 
-def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0,
-                      analysis_plot=0,reprocess=1,std_threshold=0,std_n=10,
-                      prune_value=0,prune_greater_than=False,
-                      raw_data_output=True):
+def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0):
     fig=None
     axarr=[]
-    PLOT = analysis_plot
     #reprocess = 1
     #std_threshold=100
     #std_n = 40
@@ -512,7 +508,11 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0,
             writer.writerow(['Start Time of Interval','Interval Duration (s)','Spacecraft in Ext Mode', 'Spacecraft not in Ext Mode'])
             for row in results:
                 writer.writerow([row[0].tolist().strftime('%d/%m/%Y %H:%M:%S'),row[1]/1e6,row[2]+1,row[3]+1])
-                
+    return results_end_date,fig,axarr          
+def determine_overlaps(results_end_date,
+                      analysis_plot=0,reprocess=1,std_threshold=0,std_n=10,
+                      prune_value=0,prune_greater_than=False,
+                      raw_data_output=True):
     '''
     Now, the time periods where ext mode for one spacecraft and non-ext mode for
     any other spacecraft overlap.
@@ -538,6 +538,7 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0,
             6+analysis output for non-ext mode sc
     7 'columns' - number of 'rows' depending on the number of events
     '''
+    PLOT = analysis_plot
     data_list = []
 
     for row in results_end_date:
@@ -723,7 +724,7 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0,
                                 sc_nonext,
                                 overlap_non_ext_data])
     print "number of overlaps found", len(overlap_data)
-    return overlap_data,fig,axarr
+    return overlap_data
 
 def plot_overlap_data(overlap_data,fig,axarr):
     '''
@@ -771,20 +772,23 @@ def plot_overlap_data(overlap_data,fig,axarr):
 plt.close('all')
 start_date = datetime(2014,9,1)
 end_date = datetime(2014,9,10)
-overlay_plot = 0
-additional_plots = 0
+overlay_plot = 1
+additional_plots = 1
 write_to_file = 0
 std_threshold=1
 std_n=20
 prune_value=0
-raw_data_output=False  #needs to be enabled for additional_plots to work!
+raw_data_output=True  #needs to be enabled for additional_plots to work!
 
-overlap_data,fig,axarr=find_overlap_data(start_date=start_date,end_date=end_date,
+results_end_date,fig,axarr=find_overlap_data(start_date=start_date,end_date=end_date,
                                overlay_plot=overlay_plot,
-                               write_to_file=write_to_file,prune_value=prune_value,
-                               std_threshold=std_threshold,
-                               std_n=std_n,
-                               raw_data_output=raw_data_output)
+                               write_to_file=write_to_file)
+overlap_data=determine_overlaps(results_end_date,analysis_plot=0,
+                                std_threshold=std_threshold,
+                                std_n=std_n,
+                                prune_value=prune_value,
+                                prune_greater_than=False,
+                                raw_data_output=raw_data_output)
 if additional_plots:
     fig = plot_overlap_data(overlap_data,fig,axarr)
     overlapresults={}
