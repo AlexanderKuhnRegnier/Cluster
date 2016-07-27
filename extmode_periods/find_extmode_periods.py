@@ -258,11 +258,25 @@ def find_overlap_data(start_date,end_date,overlay_plot=1,write_to_file=0):
             emtpy.append(i)
         else:
             existing_dates.extend(ds)
-    min_date = max(existing_dates)
+    '''
+    last_date is mostly used to tell the software that if no commanding is found,
+    it should assume that this spacecraft is NOT in extended mode, as is often 
+    the case for spacecraft 4 especially.
+    '''
+    if not len(existing_dates):
+        raise Exception("No ext mode command dates "+'-'.join([str(len(i)) for i in datelist])\
+        +'__'+'-'.join([str(len(i)) for i in cmdlist]))
+    last_date = max(existing_dates)
+    '''
     for i in emtpy:
-        datelist[i].append(min_date)
+        datelist[i].append(last_date)
         cmdlist[i].append(1)
-    
+    '''
+    #instead of above, generalise to all spacecraft,
+    #issue INITIATE command to all sc at last recorded date
+    for i in xrange(4):
+        datelist[i].append(last_date)
+        cmdlist[i].append(1)
     spacecrafts = [0,1,2,3]
     otherspacecrafts = lambda x: spacecrafts[:x]+spacecrafts[x+1:]
     for spacecraft in xrange(4):
