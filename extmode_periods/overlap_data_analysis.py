@@ -3,6 +3,8 @@ import argparse
 from find_extmode_periods import get_overlap_data
 import numpy as np
 import cPickle as pickle
+import csv
+import os
 pickledir = 'Y:/overlap_stats/'
 parser = argparse.ArgumentParser()
 parser.add_argument('-y', '--year',required=True,type=int)
@@ -32,6 +34,22 @@ overlap_data_dict={
 'start':[],
 'end':[],
 'duration':[]}
+
+filename = pickledir+'processed_periods.csv'
+write_header=False
+if not os.path.isfile(filename):
+    write_header = True
+with open(filename,'ab') as f:
+    writer = csv.writer(f,dialect='excel')
+    if write_header:
+        writer.writerow(['Start Date','End Date','prune value','std n','std step number','std start','std end'])
+    writer.writerow([start_date.strftime('%d/%m/%Y'),
+                     end_date.strftime('%d/%m/%Y'),
+                    str(args.prune_value),
+                    str(args.std_n),
+                    str(args.std_step_number),
+                    str(args.std_start),
+                    str(args.std_end)])
 
 overlap_data = get_overlap_data(
 start_date = start_date,
