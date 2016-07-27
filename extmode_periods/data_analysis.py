@@ -1,17 +1,17 @@
 import numpy as np
-import copy
+#import copy
 #from numpy import linalg as LA
 from datetime import datetime,timedelta
-import os
+#import os
 from getfile import getfile
 import gzip
 import matplotlib.pyplot as plt
-import cPickle as pickle
+#import cPickle as pickle
 #import pickle
 import pandas as pd
-import itertools
+#import itertools
 #import csv
-import time
+#import time
 refdirahk114 = "Y:/reference/"
 refdir = "Z:/data/reference/" 
 caadir = 'Z:/caa/ic_archive/'
@@ -44,11 +44,6 @@ class vfile_store:
     def get_contents(self):
         return self.contents
     def is_equal(self,vectorfile_store):
-        
-        ##########
-        return False
-        
-        
         if not isinstance(vectorfile_store,vfile_store):
             raise Exception("Not a vfile_store instance")
         return vectorfile_store.get_contents()==self.contents
