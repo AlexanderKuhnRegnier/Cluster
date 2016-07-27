@@ -6,6 +6,7 @@ from datetime import datetime,timedelta
 from getfile import getfile
 import gzip
 import matplotlib.pyplot as plt
+plt.style.use('seaborn-darkgrid')
 #import cPickle as pickle
 #import pickle
 import pandas as pd
@@ -326,6 +327,20 @@ class vectorlist:
     def plotstds(self,array,n=10,scatter=True,log=False,
                  threshold_std_dates=np.array([]),
                  threshold_std_data=np.array([])):
+        '''
+        sorting the threshold_std arrays by ascending time in order
+        to remove jumps in the plots
+        '''
+        threshold_std_dates=np.asarray([pd.Timestamp(i).to_datetime() for i in \
+                                            threshold_std_dates]).reshape(-1,1)
+        threshold_std_data=np.asarray(threshold_std_data).reshape(-1,1)  
+        if threshold_std_dates.size != threshold_std_data.size:
+            raise Exception("The std threshold data sizes do not match!")
+        threshold_data = np.concatenate((threshold_std_dates,threshold_std_data),
+                                        axis=1)
+        threshold_data = np.asarray(sorted(threshold_data,key=lambda x:x[0]))
+        threshold_std_dates = threshold_data[:,0]
+        threshold_std_data  = threshold_data[:,1]
         global scatter_size,sc
         #labels = [','.join([entry[2],entry[3]]) for entry in array]
         #labels = '-'.join(set(labels))
@@ -430,8 +445,11 @@ class vectorlist:
                     total_entries=0
                     for i in xrange(len(std_dates)-1):
                         dates2 = std_dates[i:i+2]
-                        diff = (dates2[-1]-dates2[0])/np.timedelta64(1,'s')
-                        if diff>(10*int(n)):#split data at this point!
+                        diff = (np.datetime64(dates2[-1])-np.datetime64(dates2[0])) \
+                                            /np.timedelta64(1,'s')
+                        if diff<0:
+                            raise Exception("Negative diff")
+                        if diff>(5*int(n)):#split data at this point!
                             std_dates_list.append(std_dates[total_entries:i+1])
                             stds_list.append(stds[total_entries:i+1])
                             total_entries+=len(std_dates_list[-1])
@@ -457,7 +475,8 @@ class vectorlist:
                     total_entries=0
                     for i in xrange(len(threshold_std_dates)-1):
                         dates2 = threshold_std_dates[i:i+2]
-                        diff = (dates2[-1]-dates2[0])/np.timedelta64(1,'s')
+                        diff = (np.datetime64(dates2[-1])-np.datetime64(dates2[0]))\
+                                                /np.timedelta64(1,'s')
                         if diff>(10*int(n)):#split data at this point!
                             std_dates_list.append(threshold_std_dates[total_entries:i+1])
                             stds_list.append(threshold_std_data[total_entries:i+1])
@@ -485,10 +504,10 @@ class vectorlist:
             #ax[1].set_yscale('log')
         ax[0].set_title('Data for Spacecraft '+str(sc))
         ax[1].set_title('Standard Deviations of above data, over '+str(n)+' samples')
+        plt.show()
         figManager = plt.get_current_fig_manager()
         figManager.window.showMaximized()
         plt.gcf().autofmt_xdate()
-        plt.show()
     def print_values(self,limit):
         print "filename:",self.filename
         print self.vectors.ix[:limit]
@@ -876,6 +895,29 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
     #return vfiles.threshold_std,new
     return new,vfiles_store
         
+def plot_both(sc,start_date,end_date,plotwhich='mag',return_output=False,std_threshold=0,std_n=10):
+    '''
+    sc can be an int or a list of ints [1,2,3,4]
+    '''
+    if plotwhich not in ['x','y','z','mag']:
+        raise Exception("Please select one of 'x','y','z' or 'mag'")
+    input=[[refdir,1,'r','ext mode default',plotwhich],[refdir,0,'b','default',plotwhich]]
+    if type(sc)==list:
+        for s in sc:
+            output = analyse(spacecraft=s,input=input,start_date=start_date,
+                     end_date=end_date,std_n=std_n,
+                     PLOT=True, scatter=False,std_threshold=std_threshold
+                     )       
+    elif type(sc)==int:
+        output = analyse(spacecraft=3,input=input,start_date=start_date,
+                 end_date=end_date,std_n=std_n,
+                 PLOT=True, scatter=False,std_threshold=std_threshold
+                 )
+    else:
+        raise Exception("sc(s) has to be int type")
+    if return_output:
+        return output
+
 '''
 input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
 output = analyse(spacecraft=3,input=input,start_date=datetime(2015,1,6),
