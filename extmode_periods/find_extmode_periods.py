@@ -792,6 +792,40 @@ def plot_overlap_data(overlap_data,fig,axarr):
     '''
     return fig
 
+def plotting_get_overlap_data(
+start_date = datetime(2014,9,1),
+end_date = datetime(2014,9,10),
+overlay_plot = 1,
+additional_plots = 1,
+write_to_file = 0,
+std_threshold_list=[0],
+std_n=20,
+prune_value=0,
+raw_data_output=1  #needs to be enabled for additional_plots to work!
+):
+    results_end_date,fig,axarr=find_overlap_data(start_date=start_date,end_date=end_date,
+                                   overlay_plot=overlay_plot,
+                                   write_to_file=write_to_file)
+    overlap_data=determine_overlaps(results_end_date,analysis_plot=0,
+                                    std_threshold_list=std_threshold_list,
+                                    std_n=std_n,
+                                    prune_value=prune_value,
+                                    prune_greater_than=False,
+                                    raw_data_output=raw_data_output)
+    if additional_plots:
+        fig = plot_overlap_data(overlap_data,fig,axarr)
+        overlapresults={}
+        overlapresults['duration']=[]
+        overlapresults['std']=[]
+        for entry in overlap_data:
+            overlapresults['duration'].append(entry[2])
+            overlapresults['std'].append(entry[3][3])
+            
+        df = pd.DataFrame(overlapresults)
+        #plt.figure()
+        df.hist()
+    return overlap_data
+
 #plt.close('all')
 def get_overlap_data(
 start_date = datetime(2014,9,1),
