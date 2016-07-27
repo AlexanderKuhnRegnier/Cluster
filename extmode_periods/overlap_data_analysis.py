@@ -63,7 +63,7 @@ start_date.strftime('%Y%m%dT%H%M%S')+\
 '__'+end_date.strftime('%Y%m%dT%H%M%S')+\
 '_std_n_'+format(args.std_n,'03d')+\
 '_prune_value_'+format(args.prune_value)+\
-'_std_threshold_list_'+'-'.join(map(str,std_threshold_list))+\
+'_std_threshold_params_'+'-'.join(map(str,[args.std_start,args.std_end,args.std_step_number]))+\
 '.pickle'
 picklef=pickledir+pickle_descriptor
 with open(picklef,'wb') as f:
