@@ -5,7 +5,7 @@ def getscchfile(sc,dt,dir):
     Year=str(dt.year)
     month=dt.month
     day=dt.day
-    file_dict = {}
+    #file_dict = {}
     if int(Year)>=2000:
         year = str(Year)[2:4]
     else:
@@ -15,6 +15,7 @@ def getscchfile(sc,dt,dir):
     sc = '{:1d}'.format(sc)
     directory = dir+Year+'/'+month+'/'
     #print year,month,day,sc
+    '''
     for file in os.listdir(directory):
         if "C"+sc in file and year+month+day in file and ".SCCH" in file:
             version = file[10]  
@@ -30,6 +31,12 @@ def getscchfile(sc,dt,dir):
         return file
     else:
         return 0
+    '''
+    for version in ['K','B','A']:
+        filepath = directory+'C'+sc+'_'+year+month+day+'_'+version+'.SCCH'    
+        if os.path.isfile(filepath):
+            return filepath
+    return 0        
         
 def getscchfiles(sc,start_date=datetime(9999,1,1),end_date=datetime(9999,1,1)):
     if end_date == datetime(9999,1,1):    
