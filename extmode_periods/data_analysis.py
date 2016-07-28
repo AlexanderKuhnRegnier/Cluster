@@ -1013,10 +1013,10 @@ def plot_xyz(series,save=False,dpi=300,image_type='.pdf'):
                     +" with Cluster "+str(scs[0])+" in normal mode"\
                     +" and Cluster "+str(scs[1])+" in extended mode"\
                     +"\nSummary Field Data for both Spacecraft Measurements" \
-                    +"\nstd: "+format(s['std'],'.3f')\
-                    +" mean: "+format(s['mean'],'.3f')\
-                    +" min: "+format(s['min'],'.3f')\
-                    +" max: "+format(s['max'],'.3f')
+                    +"\nstd: "+format(series['std'],'.3f')\
+                    +" mean: "+format(series['mean'],'.3f')\
+                    +" min: "+format(series['min'],'.3f')\
+                    +" max: "+format(series['max'],'.3f')
     plt.suptitle(title_string,fontsize=15)
 
 def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf'):
@@ -1064,10 +1064,10 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf'):
                     +" with Cluster "+str(scs[0])+" in normal mode"\
                     +" and Cluster "+str(scs[1])+" in extended mode"\
                     +"\nSummary Field Data for both Spacecraft Measurements" \
-                    +"\nstd: "+format(s['std'],'.3f')\
-                    +" mean: "+format(s['mean'],'.3f')\
-                    +" min: "+format(s['min'],'.3f')\
-                    +" max: "+format(s['max'],'.3f')
+                    +"\nstd: "+format(series['std'],'.3f')\
+                    +" mean: "+format(series['mean'],'.3f')\
+                    +" min: "+format(series['min'],'.3f')\
+                    +" max: "+format(series['max'],'.3f')
     plt.suptitle(title_string,fontsize=15)
 
 '''
