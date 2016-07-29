@@ -970,7 +970,7 @@ def plot_both(sc,start_date,end_date,plotwhich='mag',return_output=False,std_thr
     if return_output:
         return output
                
-def plot_xyz(series,save=False,dpi=300,image_type='.pdf'):
+def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True):
     plt.ioff()
     if not '.' in image_type:
         image_type='.'+image_type
@@ -982,8 +982,12 @@ def plot_xyz(series,save=False,dpi=300,image_type='.pdf'):
     plotwhichs=['x','y','z']
     start_date = series.start.normalize().to_datetime()
     end_date = series.end.normalize().to_datetime()
-    prune_start = series.start.to_datetime()
-    prune_end = series.end.to_datetime()
+    if not prune:
+        prune_start=datetime(1,1,1)
+        prune_end=datetime(1,1,1)
+    else:
+        prune_start = series.start.to_datetime()
+        prune_end = series.end.to_datetime()
     f,axarr = plt.subplots(3,1,sharex=True)
     axarr[2].set_xlabel('Time')
     scs=map(int,[series.non_ext_sc+1,series.ext_sc+1])
@@ -1008,6 +1012,9 @@ def plot_xyz(series,save=False,dpi=300,image_type='.pdf'):
                   '__'+prune_end.strftime("%Y%m%dT%H%M%S")+image_type
         f.savefig(pickledir+filename,dpi=dpi)
     plt.show()
+    if not prune:
+        prune_start=start_date
+        prune_end=end_date
     title_string = "From "+prune_start.strftime("%d %B %Y %H:%M:%S")\
                     +" to "+prune_end.strftime("%d %B %Y %H:%M:%S")\
                     +" with Cluster "+str(scs[0])+" in normal mode"\
@@ -1019,7 +1026,7 @@ def plot_xyz(series,save=False,dpi=300,image_type='.pdf'):
                     +" max: "+format(series['max'],'.3f')
     plt.suptitle(title_string,fontsize=15)
 
-def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf'):
+def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True):
     plt.ioff()
     if not '.' in image_type:
         image_type='.'+image_type
@@ -1031,8 +1038,12 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf'):
     plotwhichs=['x','y','z','mag']
     start_date = series.start.normalize().to_datetime()
     end_date = series.end.normalize().to_datetime()
-    prune_start = series.start.to_datetime()
-    prune_end = series.end.to_datetime()
+    if not prune:
+        prune_start=datetime(1,1,1)
+        prune_end=datetime(1,1,1)
+    else:
+        prune_start = series.start.to_datetime()
+        prune_end = series.end.to_datetime()
     f,axarr = plt.subplots(2,2,sharex=True)
     axarr[0][1].set_xlabel('Time')
     axarr[1][1].set_xlabel('Time')
@@ -1059,6 +1070,9 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf'):
                   '__'+prune_end.strftime("%Y%m%dT%H%M%S")+image_type
         f.savefig(pickledir+filename,dpi=dpi)
     plt.show()
+    if not prune:
+        prune_start=start_date
+        prune_end=end_date
     title_string = "From "+prune_start.strftime("%d %B %Y %H:%M:%S")\
                     +" to "+prune_end.strftime("%d %B %Y %H:%M:%S")\
                     +" with Cluster "+str(scs[0])+" in normal mode"\
