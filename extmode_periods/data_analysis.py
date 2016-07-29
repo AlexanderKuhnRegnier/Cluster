@@ -551,18 +551,13 @@ class vectorfiles:
             vlist = entry[0]
             vlist.prune(n=n,start_date=start_date,end_date=end_date,value=value,greater_than=greater_than)
         print "Done Pruning"
-    def returnall_magnitudes(self):
-        mags=[]
+    def return_vectors(self):
+        vectors = pd.DataFrame()
         for entry in self.array:
             vlist = entry[0]
-            mags.extend(vlist.returnmagnitudes())
-        return mags
-    def returnall_dates(self):
-        dates=[]
-        for entry in self.array:
-            vlist = entry[0]
-            dates.extend(vlist.returndatetimes())
-        return dates
+            vectors=pd.concat((vectors,vlist.vectors),axis=0)
+        return vectors
+
     def calculate_stds(self,n=10,scatter=True,log=False):
         global sc
         print "Spacecraft:",sc
@@ -1084,6 +1079,21 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True):
                     +" max: "+format(series['max'],'.3f')
     plt.suptitle(title_string,fontsize=15)
 
+def return_vectors(scs,start_date,end_date):
+    if type(scs) == int or type(scs) == float:
+        scs = [int(scs)]
+    start = pd.Timestamp(start_date).normalize().to_datetime()
+    end = pd.Timestamp(end_date).normalize().to_datetime()
+    prune_start=start_date
+    prune_end = end_date
+    input=[[refdir,0,'','',''],[refdir,1,'','','']]
+    vecs=pd.DataFrame()
+    for sc in scs:
+        vfiles=vectorfiles()
+        process(vfiles,sc,start,end,input,prune_start,prune_end)
+        vecs = pd.concat((vecs,vfiles.return_vectors()))
+    return vecs
+    
 '''
 input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
 output = analyse(spacecraft=3,input=input,start_date=datetime(2015,1,6),
