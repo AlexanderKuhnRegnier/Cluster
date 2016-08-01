@@ -33,7 +33,9 @@ overlap_data_dict={
 'non_ext_sc':[],
 'start':[],
 'end':[],
-'duration':[]}
+'duration':[],
+'std_threshold':[],
+'std_n':[]}
 
 overlap_data = get_overlap_data(
 start_date = start_date,
@@ -56,6 +58,8 @@ for row in overlap_data:
     overlap_data_dict['std'].append(row[3][3])
     overlap_data_dict['ext_sc'].append(row[4])
     overlap_data_dict['non_ext_sc'].append(row[6])
+    overlap_data_dict['std_threshold'].append(row[8])
+    overlap_data_dict['std_n'].append(row[9])
 
 pickle_descriptor= \
 'overlap_data_dict_'+\

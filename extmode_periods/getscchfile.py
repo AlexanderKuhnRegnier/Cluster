@@ -1,5 +1,5 @@
 import os
-from datetime import datetime,timedelta
+import datetime
 
 def getscchfile(sc,dt,dir):
     Year=str(dt.year)
@@ -38,11 +38,11 @@ def getscchfile(sc,dt,dir):
             return filepath
     return 0        
         
-def getscchfiles(sc,start_date=datetime(9999,1,1),end_date=datetime(9999,1,1)):
-    if end_date == datetime(9999,1,1):    
+def getscchfiles(sc,start_date=datetime.datetime(9999,1,1),end_date=datetime.datetime(9999,1,1)):
+    if end_date == datetime.datetime(9999,1,1):    
         dates = [start_date]
     elif (end_date-start_date).days>0:
-        dates = [start_date + timedelta(days=i) 
+        dates = [start_date + datetime.timedelta(days=i) 
                 for i in range(0,((end_date-start_date).days+1))]
     else:
         raise Exception("Enter valid dates")

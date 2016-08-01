@@ -550,7 +550,9 @@ def determine_overlaps(results_end_date,
             
             5+sc not in ext mode
             6+analysis output for non-ext mode sc
-    7 'columns' - number of 'rows' depending on the number of events
+            7+std_threshold
+            8+std_n
+    9 'columns' - number of 'rows' depending on the number of events
     '''
     PLOT = analysis_plot
     data_list = []
@@ -578,7 +580,7 @@ def determine_overlaps(results_end_date,
                 prune_start = row[0].tolist()
                 prune_end = row[1].tolist()
                 #print "Pruning input dates:",prune_start,prune_end
-                output,vfiles_store=data_analysis.analyse(
+                std_periods,vectors,vfiles_store=data_analysis.analyse(
                                       spacecraft=spacecraft+1,
                                       input=input,start_date=start_date,
                                       end_date=end_date,
@@ -596,10 +598,11 @@ def determine_overlaps(results_end_date,
                                       row[1].tolist(),
                                       (row[1]-row[0])/np.timedelta64(1,'s'),
                                       spacecraft,
-                                      output])
+                                      [std_periods,vectors]])
                 else:
                     non_ext_vfile_store = vfiles_store
-                    data_list[-1].extend([spacecraft,output])
+                    data_list[-1].extend([spacecraft,[std_periods,vectors],
+                                         std_threshold,std_n])
         
     print "Finished compiling data list",len(data_list)
     '''
@@ -647,31 +650,33 @@ def determine_overlaps(results_end_date,
         5:raw data ext mode
         6:sc not in ext mode
         7:raw data non ext mode
-    8 columns, number of 'rows' depends on the number of overlapping time periods
+        8:std_threshold
+        9:std_n
+    10 columns, number of 'rows' depends on the number of overlapping time periods
     '''
     overlap_data = []
     for event in data_list:
         #print ""
         #print "Event",event[0],event[1],event[2],event[3],event[5]
-        ext_mode_data_list = event[4]
-        non_ext_data_list = event[6]
+        ext_std_periods,ext_vectors = event[4]
+        non_ext_std_periods,non_ext_vectors = event[6]
+        std_threshold = event[7]
+        std_n = event[8]
         #print len(ext_mode_data_list)
         #print len(non_ext_data_list)
         sc_ext = event[3]
         sc_nonext = event[5]
-        for ext_mode_data in ext_mode_data_list:
-            ext_mode_start = ext_mode_data[0]
-            ext_mode_end = ext_mode_data[1]
-            #print "ext mode"
-            #print ext_mode_start,ext_mode_end
-            for non_ext_data in non_ext_data_list:
+        for ext_index,ext_row in ext_std_periods.iterrows():
+            ext_mode_start = ext_row['start']
+            ext_mode_end = ext_row['end']
+            for non_ext_index,non_ext_row in non_ext_std_periods.iterrows():
                 overlap_ext_mode_data = np.array([])
                 overlap_non_ext_data = np.array([])
                 common_start = 0
                 common_end = 0
                 #print "non ext mode"
-                non_ext_start = non_ext_data[0]
-                non_ext_end = non_ext_data[1]
+                non_ext_start = non_ext_row['start']
+                non_ext_end = non_ext_row['end']
                 #print non_ext_start,non_ext_end
                 if non_ext_start>ext_mode_end:
                     #print "Exiting loop"
@@ -689,27 +694,15 @@ def determine_overlaps(results_end_date,
                         else:
                             common_end = non_ext_end
                         overlap_duration = (common_end-common_start)\
-                                            /np.timedelta64(1,'s')
-                        raw_ext_mode_data = ext_mode_data[3]
-                        delete_list = []
-                        for i in xrange(raw_ext_mode_data.shape[0]):
-                            vector_date = np.datetime64(raw_ext_mode_data[i,0])
-                            if vector_date<common_start or vector_date>common_end:
-                                delete_list.append(i)
-                        overlap_ext_mode_data = np.delete(raw_ext_mode_data,
-                                                          delete_list,axis=0)
+                                            /np.timedelta64(1,'s')                 
+                        overlap_ext_mode_data = ext_vectors[common_start:
+                                                            common_end]
                         if overlap_ext_mode_data.size:
-                            raw_non_ext_data = non_ext_data[3]
-                            delete_list = []
-                            for i in xrange(raw_non_ext_data.shape[0]):
-                                vector_date = np.datetime64(raw_non_ext_data[i,0])
-                                if vector_date<common_start or vector_date>common_end:
-                                    delete_list.append(i)
-                            overlap_non_ext_data = np.delete(raw_non_ext_data,
-                                                              delete_list,axis=0) 
+                            overlap_non_ext_data = non_ext_vectors[common_start:
+                                                                   common_end]
                             if overlap_non_ext_data.size:
                                 '''
-                                #here, the raw data is still returned with std - no depreciated
+                                #here, the raw data is still returned with std - now depreciated
                                 #in favour of field stats list
                                 #ext_mode_std = np.std(overlap_ext_mode_data[:,1])
                                 #raw_ext_overlap_entry = [ext_mode_std,overlap_ext_mode_data]
@@ -726,13 +719,22 @@ def determine_overlaps(results_end_date,
                                 sc_nonext,
                                 raw_non_ext_overlap_entry])
                                 '''
-                                combined_field = np.append(overlap_non_ext_data[:,1],
-                                                             overlap_ext_mode_data[:,1])
-                                combined_field = combined_field.astype(np.float64)
-                                field_max = numba_max(combined_field)
-                                field_min = numba_min(combined_field)
-                                field_mean= numba_mean(combined_field)
-                                field_std = numba_std(combined_field)
+                                combined_field = pd.concat((overlap_non_ext_data,
+                                                             overlap_ext_mode_data),
+                                                             axis=0)
+
+                                field_max = numba_max((combined_field[
+                                                                'mag'].values))
+                                field_min = numba_min(np.ravel(combined_field[
+                                                                'mag'].values))
+                                field_mean= numba_mean(np.ravel(combined_field[
+                                                                'mag'].values))
+                                
+                                field_std_x = numba_std(combined_field['x'].values)
+                                field_std_y = numba_std(combined_field['y'].values)
+                                field_std_z = numba_std(combined_field['z'].values)
+                                field_std = np.max([field_std_x,field_std_y,
+                                                    field_std_z])
                                 field_stats = [field_max,field_min,field_mean,field_std]
                                 if not raw_data_output:
                                     overlap_ext_mode_data = []
@@ -745,7 +747,9 @@ def determine_overlaps(results_end_date,
                                 sc_ext,
                                 overlap_ext_mode_data,
                                 sc_nonext,
-                                overlap_non_ext_data])
+                                overlap_non_ext_data,
+                                std_threshold,
+                                std_n])
     print "number of overlaps found", len(overlap_data)
     return overlap_data
 
@@ -763,10 +767,10 @@ def plot_overlap_data(overlap_data,fig,axarr):
     #fig,axarr = plt.subplots(4,1,sharex=True)
     data_max=0
     for overlap in overlap_data:
-        if overlap[5][:,1].size:
-            raw_ext_data_max = np.max(overlap[5][:,1])
-        if overlap[7][:,1].size:
-            raw_non_ext_data_max = np.max(overlap[7][:,1])
+        if overlap[5]['mag'].size:
+            raw_ext_data_max = np.max(overlap[5]['mag'])
+        if overlap[7]['mag'].size:
+            raw_non_ext_data_max = np.max(overlap[7]['mag'])
         if raw_ext_data_max>data_max:
             data_max=raw_ext_data_max
         if raw_non_ext_data_max>data_max:
@@ -778,11 +782,11 @@ def plot_overlap_data(overlap_data,fig,axarr):
         if raw_ext_data.size and raw_non_ext_data.size:
             ext_mode_sc = overlap[4]
             non_ext_sc = overlap[6]
-            axarr[ext_mode_sc].plot_date(raw_ext_data[:,0],
-    raw_ext_data[:,1]/data_max,
+            axarr[ext_mode_sc].plot_date(raw_ext_data.index,
+                                        raw_ext_data['mag']/data_max,
                                          fmt='-',tz='UTC',c='r')
-            axarr[non_ext_sc].plot_date(raw_non_ext_data[:,0],
-    raw_non_ext_data[:,1]/data_max,
+            axarr[non_ext_sc].plot_date(raw_non_ext_data.index,
+                                    raw_non_ext_data['mag']/data_max,
                                         fmt='-',tz='UTC',c='g')
     '''
     figManager = plt.get_current_fig_manager()
@@ -803,6 +807,8 @@ std_n=20,
 prune_value=0,
 raw_data_output=1  #needs to be enabled for additional_plots to work!
 ):
+    if std_threshold_list[0]==0:
+        std_threshold_list=[1e10]
     results_end_date,fig,axarr=find_overlap_data(start_date=start_date,end_date=end_date,
                                    overlay_plot=overlay_plot,
                                    write_to_file=write_to_file)

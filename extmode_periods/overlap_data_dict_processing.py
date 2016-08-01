@@ -30,7 +30,9 @@ def read_overlap_data_dicts(remove=True):
     'non_ext_sc':[],
     'start':[],
     'end':[],
-    'duration':[]}
+    'duration':[],
+    'std_threshold':[],
+    'std_n':[]}
     overlap_data_dict=newdict(overlap_data_dict)
     read_files=[]
     for file in os.listdir(pickledir):
