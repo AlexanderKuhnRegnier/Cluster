@@ -1,2 +1,7 @@
 **/session
 **/*.pyc
+**/*.pickle*
+**/*.csv*
+**/*tmp*
+**/*filenumber*
+**/testdata

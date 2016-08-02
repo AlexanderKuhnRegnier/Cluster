@@ -314,11 +314,13 @@ function getcal($sc,$filepicked)
 	$use_default = FALSE;
 	if ($calfile=getcalfile($sc,$filepicked,CAACAL))
 	{
+		echo "Using CAA calibration!".PHP_EOL;
 		$use_caa = TRUE;
 		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!		
 	}
 	elseif ($calfile=getcalfile($sc,$filepicked,DAILYCAL))
 	{
+		echo "Using DAILY calibration!".PHP_EOL;
 		$use_daily = TRUE;
 		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!			
 	}
@@ -565,8 +567,8 @@ To Do - get orbit times - and from there, get the proper calibration filename in
 -> in file getcalfile.php!
 */
 
-echo "DEFAULT CAL".PHP_EOL;
-getcaldefault($sc,$filepicked);
+#getcaldefault($sc,$filepicked);
+getcal($sc,$filepicked);
 modifycal($sc);
 displaycal($sc);
 
