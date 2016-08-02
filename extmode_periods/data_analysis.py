@@ -14,12 +14,13 @@ import pandas as pd
 #import itertools
 #import csv
 #import time
-VERBOSE=False
+VERBOSE=True
+PLOT_VERBOSE=False
 
 pickledir = 'Y:/overlap_stats/'
 imagedir=pickledir+'images/'
-refdirahk114 = "Y:/reference/"
-refdir = "Z:/data/reference/" 
+refdirahk114 = 'Y:/reference/'
+refdir = 'Z:/data/reference/'
 caadir = 'Z:/caa/ic_archive/'
 dirs = [refdirahk114,refdir,caadir]
 dir_names=['refdirahk114','refdir','caadir']
@@ -159,9 +160,9 @@ class vectorlist:
                             data_dict['z'].append(z_mag)
                             data_dict['mag'].append(mag)
             self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z','mag'])
+            self.vectors.set_index('datetime',drop=True,inplace=True)
         else:  
             self.filename = filename
-            
             with open(filename) as f:
                 for line in f:
                     try:
@@ -184,7 +185,6 @@ class vectorlist:
                             print "Unknown Error"
             self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z'])
             self.vectors.set_index('datetime',drop=True,inplace=True)
-            
             '''
             self.vectors=pd.read_csv(filename,
                                      header=None,
@@ -338,22 +338,7 @@ class vectorlist:
         if VERBOSE:
             print "plotting stds"
             print "threshold:",threshold
-        '''
-        sorting the threshold_std arrays by ascending time in order
-        to remove jumps in the plots
-        '''
-        '''
-        threshold_std_dates=np.asarray([pd.Timestamp(i).to_datetime() for i in \
-                                            threshold_std_dates]).reshape(-1,1)
-        threshold_std_data=np.asarray(threshold_std_data).reshape(-1,1)  
-        if threshold_std_dates.size != threshold_std_data.size:
-            raise Exception("The std threshold data sizes do not match!")
-        threshold_data = np.concatenate((threshold_std_dates,threshold_std_data),
-                                        axis=1)
-        threshold_data = np.asarray(sorted(threshold_data,key=lambda x:x[0]))
-        threshold_std_dates = threshold_data[:,0]
-        threshold_std_data  = threshold_data[:,1]
-        '''
+
         std_plot_lists = []
         std_frame = vfiles.stds.dropna()
         mask = std_frame['data']<threshold
@@ -370,14 +355,17 @@ class vectorlist:
             above_threshold['delta']=above_threshold['diffs']/pd.Timedelta(1,'s')
             interval_mask = above_threshold['delta']>5
             break_times = above_threshold[interval_mask].index
-            mask = above_threshold.index<break_times[0]
-            std_plot_list_above = [above_threshold[mask][['data']]]
-            for i in xrange(break_times.shape[0]-1):
-                mask = (above_threshold.index<break_times[i+1]) \
-                        & (above_threshold.index>=break_times[i])
-                std_plot_list_above.append(above_threshold[mask][['data']])        
+            std_plot_list_above = []
+            for i in xrange(break_times.shape[0]):
+                mask = above_threshold.index<break_times[i]
+                std_plot_list_above.append(above_threshold[mask][['data']]) 
+                mask2=above_threshold.index >= break_times[i]
+                above_threshold = above_threshold[mask2]
+            std_plot_list_above.append(above_threshold[['data']])
+            #[[]] since 'data'
+            #label needs to be retained for plotting
             std_plot_lists.append([std_plot_list_above,'r'])
-        
+    
         if not below_threshold.empty:
             if VERBOSE:
                 print "Below threshold not empty"
@@ -389,12 +377,13 @@ class vectorlist:
             below_threshold['delta']=below_threshold['diffs']/pd.Timedelta(1,'s')
             interval_mask = below_threshold['delta']>5
             break_times = below_threshold[interval_mask].index
-            mask = below_threshold.index<break_times[0]
-            std_plot_list_below = [below_threshold[mask][['data']]]
-            for i in xrange(break_times.shape[0]-1):
-                mask = (below_threshold.index<break_times[i+1]) \
-                        & (below_threshold.index>=break_times[i])
-                std_plot_list_below.append(below_threshold[mask][['data']])      
+            std_plot_list_below = []
+            for i in xrange(break_times.shape[0]):
+                mask = below_threshold.index<break_times[i]
+                std_plot_list_below.append(below_threshold[mask][['data']]) 
+                mask2 = below_threshold.index>=break_times[i]
+                below_threshold = below_threshold[mask2]
+            std_plot_list_below.append(below_threshold[['data']])
             std_plot_lists.append([std_plot_list_below,'g'])
 
         #labels = [','.join([entry[2],entry[3]]) for entry in array]
@@ -411,7 +400,7 @@ class vectorlist:
             for frame in frame_list:
                 ds_std = frame.index.values
                 da_std = frame['data'].values
-                if VERBOSE:
+                if PLOT_VERBOSE:
                     print "plotting"
                     print ds_std
                 if std_label in legend_list_std_line:
@@ -877,7 +866,8 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
         if VERBOSE:
             print "No previous vfiles"
         vfiles=vectorfiles()
-        process(vfiles,sc,start_date,end_date,input,prune_start,prune_end,prune_n,prune_value,prune_greater_than)
+        process(vfiles,sc,start_date,end_date,input,prune_start,prune_end,
+                prune_n,prune_value,prune_greater_than)
         if rm_outliers:
             plot(vfiles,sc,start_date,end_date,input,n=std_n,scatter=scatter)
             remove_outliers()
@@ -953,7 +943,10 @@ def plot_axis(array,ax):
     legend = ax.legend(loc='best') 
         
 def plot_both(scs,start_date,end_date,plotwhich='mag',return_output=False,
-              std_threshold=0,std_n=10,prune=True,prune_value=0):
+              std_threshold=0,std_n=10,prune=True,prune_value=0,source='default'):
+    
+    plt.close('all')    
+    
     if type(scs) == int or type(scs) == float:
         scs = [int(scs)]
     '''
@@ -969,7 +962,12 @@ def plot_both(scs,start_date,end_date,plotwhich='mag',return_output=False,
         prune_end = end_date
     if plotwhich not in ['x','y','z','mag']:
         raise Exception("Please select one of 'x','y','z' or 'mag'")
-    input=[[refdir,1,'r','ext mode default',plotwhich],[refdir,0,'b','default',plotwhich]]
+    if source=='default':
+        input=[[refdir,1,'r','ext mode default',plotwhich],[refdir,0,'b','default',plotwhich]]
+    elif source=='caa':
+        input=[[refdirahk114,1,'r','ext mode caa',plotwhich],[caadir,0,'b','caa',plotwhich]]        
+    else:
+        raise Exception("Select either 'default' or 'caa' as source")
     for s in scs:
         output = analyse(spacecraft=s,input=input,start_date=start,
                  end_date=end,std_n=std_n,
@@ -1129,7 +1127,15 @@ def return_vectors_from_vfiles(vfiles,start,end):
         vfile.prune(start_date=start,end_date=end)
         vecs = pd.concat((vecs,vfile.return_vectors()),axis=0)
     return vecs
-    
+ 
+ 
+input=[[caadir,0,'r','caa','mag']]
+output = analyse(spacecraft=3,input=input,start_date=datetime(2016,1,1),
+                 end_date=datetime(2016,1,4),std_n=10,
+                 PLOT=True, scatter=False,std_threshold=1.,
+                 prune_value = 0
+                 )
+
 '''
 input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
 output = analyse(spacecraft=3,input=input,start_date=datetime(2015,1,8),
