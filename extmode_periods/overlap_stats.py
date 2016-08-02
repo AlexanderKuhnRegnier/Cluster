@@ -7,12 +7,43 @@ import matplotlib.pyplot as plt
 plt.style.use('seaborn-darkgrid')
 plt.close('all')
 import data_analysis as da
+import PyPDF2 as pdf
+
+pickledir = 'Y:/overlap_stats/'
+imagedir=pickledir+'images/'
+data_file = 'overlap_stats.pickle'
+
+def append_pdf(input,output):
+    [output.addPage(input.getPage(page_num)) for page_num in 
+                            range(input.numPages)]
+
+def save_filtered(filtered_frame,filetypes=['.pdf'],dpi=330,prune=True):
+    '''
+    Take a dataframe that has been filtered using certain criteria,
+    and saves figures depicting the time intervals and spacecraft 
+    specified in the dataframe.
+    Options to change the saved filetype(s) and the dpi.
+    '''
+    for image_type in filetypes:
+        for index,row in filtered_frame.iterrows():
+            da.plot_mag_xyz(row,save=True,dpi=dpi,image_type=image_type,
+                            show=False,prune=prune)
+            da.plot_xyz(row,save=True,dpi=dpi,image_type=image_type,
+                            show=False,prune=prune)
+        if image_type=='.pdf':
+            merger = pdf.PdfFileMerger()
+            for f in os.listdir(imagedir):
+                if '.pdf' in f:
+                    merger.append((file(imagedir+f,'rb')))
+            if prune:
+                merger.write(imagedir+'overlap_periods.pdf')
+            else:
+                merger.write(imagedir+'overlap_periods_not_pruned.pdf')                
 
 '''
 #overlap_data.groupby(overlap_data['start'].dt.normalize())
 '''
-pickledir = 'Y:/overlap_stats/'
-data_file = 'overlap_stats.pickle'
+
 if os.path.isfile(pickledir+data_file):
     with open(pickledir+data_file,'rb') as f:
         overlap_data = pickle.load(f)
@@ -32,7 +63,7 @@ new_overlap_data = pd.DataFrame(overlap_data_dict,columns=['start','end',
                                                        'std_n'])
 overlap_data = pd.concat((overlap_data,new_overlap_data),axis=0)
 print "Size before dropping duplicates:",overlap_data.size,overlap_data.shape
-overlap_data.drop_duplicates(inplace=True)
+overlap_data.drop_duplicates(['start','end'],inplace=True)
 overlap_data.reset_index(drop=True,inplace=True)
 print "Size after dropping duplicates:",overlap_data.size,overlap_data.shape
 with open(pickledir+data_file,'wb') as f:
@@ -61,16 +92,20 @@ print "\nAll overlaps longer than {0:.1f} hours".format(min_time)
 print overlap_data[overlap_data['duration (h)']>min_time]
 '''
 
-
 print "\nAll overlaps sorted by time in descending order"
 print overlap_data.sort_values(by='duration (h)',ascending=False)
-
 
 print "\nNumber of overlaps wrt ext_sc"
 print overlap_data.groupby('ext_sc').size()
 
 print "\nNumber of overlaps wrt non_ext_sc"
 print overlap_data.groupby('non_ext_sc').size()
+
+print "\nNumber of overlaps by year"
+print overlap_data.groupby(overlap_data['start'].dt.year).size()
+
+print "\nNumber of overlaps by month"
+print overlap_data.groupby(overlap_data['start'].dt.month).size()
 
 '''
 upper_percentile=0.98
@@ -104,7 +139,7 @@ ax=overlap_data.plot(kind='hexbin',x='duration (h)',y='std',gridsize=100)
 #fig = ax.get_figure()
 #fig.savefig(pickledir+'hexbin.png',dpi=300)
 
-
+'''
 print "\nHexbin plot of duration (h) vs standard deviation (nT) log bins"
 ax=overlap_data.plot(kind='hexbin',x='duration (h)',y='std',gridsize=100,bins='log',
                          title='Hexbin, log bins')
@@ -112,15 +147,15 @@ fig = ax.get_figure()
 cb = fig.get_axes()[1]
 cb.set_ylabel('log10(N)')
 plt.show()
-
+'''
 
 '''
 print "\nScatter plot of duration (h) vs standard deviation (nT)"
 ax=overlap_data.plot(kind='scatter',x='duration (h)',y='std')
 '''
 
-
-limit = 2  #hours
+'''
+limit = 0.2  #hours
 print "\nHexbin plot of duration (h) vs standard deviation (nT) log bins"\
              "(durations over {0:.1f} hours)".format(limit)
 filtered = overlap_data[overlap_data['duration (h)']>2]
@@ -131,50 +166,32 @@ if not filtered.empty:
     cb = fig.get_axes()[1]
     cb.set_ylabel('log10(N)')
     plt.show()
-
-
-'''
-Testing
-Comparing the stats with stats obtained by directly calculating 
-the relevant statistics on the time periods
 '''
 
 '''
-def vector_mags_from_series(series):
-    #print "size",series.size
-    #print series
-    start_date=series['start']
-    end_date=series['end']
-    scs=[int(series.ext_sc)+1,int(series.non_ext_sc)+1]
-    return da.return_vectors(scs,start_date,end_date)['mag']
+width = 0.01
+min_hour = 0
+max_hour = 13
+hour_mins = np.arange(min_hour,max_hour,width)
+hour_maxs = hour_mins[1:]
+hour_mins = hour_mins[:-1]
+min_std = []
+for mini,maxi in zip(hour_mins,hour_maxs):
+    filtered = overlap_data[overlap_data['duration (h)']>=mini]
+    filtered = filtered[filtered['duration (h)']<maxi]
+    min_std.append(filtered['std'].min())
+fig,ax=plt.subplots(figsize=(20,12))
+rects1 = ax.bar(hour_mins,min_std,width,label='Minimum STD')
+plt.show()
+ax.legend()
+ax.set_xlabel('Duration (hours)',fontsize=14)
+ax.set_ylabel('std (nT)',fontsize=14)
+plt.suptitle('Minimum standard deviation for different duration intervals',
+             fontsize=16)
+'''
 
-def mag_std(series):
-    mags=vector_mags_from_series(series)
-    return np.std(mags)
-
-stds = overlap_data.apply(mag_std,axis=1)
-
-std_comparison = pd.concat((overlap_data[['start','end','std']],stds),axis=1)
-std_comparison = std_comparison.rename(columns={0:'new_std'})
-print std_comparison
-
-def mag_max(series):
-    mags=vector_mags_from_series(series)
-    return np.max(mags)
-    
-maxs=overlap_data.apply(mag_max,axis=1)
-
-max_comparison = pd.concat((overlap_data[['start','end','max']],maxs),axis=1)
-max_comparison = max_comparison.rename(columns={0:'new_max'})
-print max_comparison
-
-def mag_mean(series):
-    mags=vector_mags_from_series(series)
-    return np.mean(mags)
-    
-means=overlap_data.apply(mag_mean,axis=1)
-
-mean_comparison = pd.concat((overlap_data[['start','end','mean']],means),axis=1)
-mean_comparison = mean_comparison.rename(columns={0:'new_mean'})
-print mean_comparison
+'''            
+filtered = overlap_data.sort_values('duration (h)',ascending=False).iloc[:40].\
+            sort_values('std').iloc[:2]
+save_filtered(filtered)
 '''
