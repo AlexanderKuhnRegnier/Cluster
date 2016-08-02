@@ -17,6 +17,7 @@ import pandas as pd
 VERBOSE=False
 
 pickledir = 'Y:/overlap_stats/'
+imagedir=pickledir+'images/'
 refdirahk114 = "Y:/reference/"
 refdir = "Z:/data/reference/" 
 caadir = 'Z:/caa/ic_archive/'
@@ -920,7 +921,9 @@ def plot_axis(array,ax):
             data=vlist.returnz()
         else:
             raise Exception("I need to know what to plot")
-        label = legend+' ('+plotwhich+')'+' mean: '+format(np.mean(data),'.3e')
+        #label = legend+' ('+plotwhich+')'+' mean: '+format(np.mean(data),'.3e')
+        ax.set_title(plotwhich,fontsize=16)
+        label = legend+' mean: '+format(np.mean(data),'.3e')
         dates_list=[]
         data_list=[]
         '''
@@ -996,7 +999,7 @@ def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True):
     else:
         prune_start = series.start.to_datetime()
         prune_end = series.end.to_datetime()
-    f,axarr = plt.subplots(3,1,sharex=True)
+    f,axarr = plt.subplots(3,1,sharex=True,figsize=(23,13))
     axarr[2].set_xlabel('Time',fontsize=15)
     scs=map(int,[series.non_ext_sc+1,series.ext_sc+1])
     legends = ['default','ext mode default']
@@ -1012,15 +1015,7 @@ def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True):
             vfiles=vectorfiles()
             process(vfiles,sc,start_date,end_date,input,prune_start,prune_end)
             plot_axis(vfiles.array,ax)
-    figManager = plt.get_current_fig_manager()
-    figManager.window.showMaximized()
     #plt.gcf().autofmt_xdate() #angles the date labels
-    if save:
-        filename='xyz_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
-                  '__'+prune_end.strftime("%Y%m%dT%H%M%S")+image_type
-        f.savefig(pickledir+filename,dpi=dpi)
-    if show:
-        plt.show()
     if not prune:
         prune_start=start_date
         prune_end=end_date
@@ -1033,7 +1028,17 @@ def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True):
                     +" mean: "+format(series['mean'],'.3f')\
                     +" min: "+format(series['min'],'.3f')\
                     +" max: "+format(series['max'],'.3f')
-    plt.suptitle(title_string,fontsize=15)
+    plt.suptitle(title_string,fontsize=15.5)
+    if save:
+        filename='xyz_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
+                  '__'+prune_end.strftime("%Y%m%dT%H%M%S")+image_type
+        f.savefig(imagedir+filename,dpi=dpi,bbox_inches='tight',pad_inches=0.4)
+    if show:
+        figManager = plt.get_current_fig_manager()
+        figManager.window.showMaximized()
+        plt.show()
+    else:
+        plt.close()
 
 def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True):
     plt.ioff()
@@ -1057,10 +1062,11 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=Tru
             print "pruning"
             print prune_start
             print prune_end
-    f,axarr = plt.subplots(2,2,sharex=True)
-    axarr[0][1].set_xlabel('Time')
-    axarr[1][1].set_xlabel('Time')
-    axarr[0][0].set_ylabel('nT')
+    f,axarr = plt.subplots(2,2,sharex=True,figsize=(23,13))
+    axarr[1][0].set_xlabel('Time',fontsize=15)
+    axarr[1][1].set_xlabel('Time',fontsize=15)
+    axarr[0][0].set_ylabel('nT',fontsize=15)
+    axarr[1][0].set_ylabel('nT',fontsize=15)
     axarr = np.ravel(axarr)
     scs=map(int,[series.non_ext_sc+1,series.ext_sc+1])
     legends = ['default','ext mode default']
@@ -1068,24 +1074,19 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=Tru
     for ((row,plotwhich),ax) in zip(enumerate(plotwhichs),axarr):
         ax.grid(True,which='major',color='w',linestyle='-')
         ax.grid(True,which='minor',color='w',linestyle='-',alpha=0.5)
+        ax.tick_params(axis='both',which='major',labelsize=14)
         ax.minorticks_on()
         for ((ext_mode,sc),legend,colour) in zip(enumerate(scs),legends,colours):
             input=[[refdir,ext_mode,colour,legend,plotwhich]]
             vfiles=vectorfiles()
             process(vfiles,sc,start_date,end_date,input,prune_start,prune_end)
             plot_axis(vfiles.array,ax)
-    figManager = plt.get_current_fig_manager()
-    figManager.window.showMaximized()
     #plt.gcf().autofmt_xdate() #angles the date labels
-    if save:
-        filename='xyz_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
-                  '__'+prune_end.strftime("%Y%m%dT%H%M%S")+image_type
-        f.savefig(pickledir+filename,dpi=dpi)
-    if show:
-        plt.show()
     if not prune:
         prune_start=start_date
         prune_end=end_date
+        if prune_start == prune_end:
+            prune_end += timedelta(days=1)
     title_string = "From "+prune_start.strftime("%d %B %Y %H:%M:%S")\
                     +" to "+prune_end.strftime("%d %B %Y %H:%M:%S")\
                     +" with Cluster "+str(scs[0])+" in normal mode"\
@@ -1095,7 +1096,17 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=Tru
                     +" mean: "+format(series['mean'],'.3f')\
                     +" min: "+format(series['min'],'.3f')\
                     +" max: "+format(series['max'],'.3f')
-    plt.suptitle(title_string,fontsize=15)
+    plt.suptitle(title_string,fontsize=15.5)
+    if save:
+        filename='mag_xyz_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
+                  '__'+prune_end.strftime("%Y%m%dT%H%M%S")+image_type
+        f.savefig(imagedir+filename,dpi=dpi,bbox_inches='tight',pad_inches=0.4)
+    if show:
+        figManager = plt.get_current_fig_manager()
+        figManager.window.showMaximized()
+        plt.show()
+    else:
+        plt.close()
 
 def return_vectors(scs,start_date,end_date):
     if type(scs) == int or type(scs) == float:
