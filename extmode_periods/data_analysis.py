@@ -3,7 +3,7 @@ import numpy as np
 #from numpy import linalg as LA
 from datetime import datetime,timedelta
 import copy
-#import os
+import os
 from getfile import getfile
 import gzip
 import matplotlib.pyplot as plt
@@ -14,7 +14,7 @@ import pandas as pd
 #import itertools
 #import csv
 #import time
-VERBOSE=True
+VERBOSE=False
 PLOT_VERBOSE=False
 
 pickledir = 'Y:/overlap_stats/'
@@ -100,7 +100,7 @@ class vectorlist:
         self.ext=ext
         self.filename = ''
     def isempty(self):
-        if len(self.vectors):
+        if not self.vectors.empty:
             return False
         else:
             return True
@@ -140,16 +140,16 @@ class vectorlist:
 
     def read_file(self,filename):
         data_dict = {'datetime':[],'x':[],'y':[],'z':[]}
-        if '.cef.gz' in filename and '/caa/ic_archive/' in filename: #this is caa file, needs to be read differently!
-            self.filename=filename
+        self.filename=filename
+        if ('.cef.gz' in filename) and ('/caa/ic_archive/' in filename):
             data_dict['mag']=[]
+            #this is caa file, needs to be read differently!
             #gzip.open(filename) #defaults to 'rb' and 9
-            with gzip.open(self.filename, 'rb') as f:
+            with gzip.open(filename,'rb') as f:
                 for line in f:
                     if 'DATA_UNTIL = EOF' in line:
                         for line in f:
                             line = line.split(',')   
-
                             data_dict['datetime'].append(np.datetime64(line[0]))
                             x_mag = float(line[2])
                             y_mag = float(line[3])
@@ -161,8 +161,8 @@ class vectorlist:
                             data_dict['mag'].append(mag)
             self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z','mag'])
             self.vectors.set_index('datetime',drop=True,inplace=True)
+            self.vectors.sort_index(inplace=True)
         else:  
-            self.filename = filename
             with open(filename) as f:
                 for line in f:
                     try:
@@ -342,12 +342,15 @@ class vectorlist:
         std_plot_lists = []
         std_frame = vfiles.stds.dropna()
         mask = std_frame['data']<threshold
-        above_threshold = std_frame[-mask]
+        above_threshold = std_frame[~mask]
         below_threshold = std_frame[mask]
         if not above_threshold.empty:
             if VERBOSE:
                 print "Above threshold not empty"
             above_threshold = above_threshold.sort_index()
+            above_threshold = above_threshold[~above_threshold.index.duplicated()]
+            #needed for processing the caa file this way for some reason
+            #maybe overlapping data from two different orbits in the same file?
             index_times=above_threshold.index.values
             diffs=pd.Series(data=index_times[1:]-index_times[:-1],
                             index=index_times[1:])
@@ -370,6 +373,7 @@ class vectorlist:
             if VERBOSE:
                 print "Below threshold not empty"
             below_threshold = below_threshold.sort_index()
+            below_threshold = below_threshold[~below_threshold.index.duplicated()]
             index_times=below_threshold.index.values
             diffs=pd.Series(data=index_times[1:]-index_times[:-1],
                             index=index_times[1:])
@@ -504,8 +508,13 @@ class vectorfiles:
         column 1:end date of interval
         '''
         self.std_data_raw =[]
-        
         self.stds=pd.DataFrame()
+    def isempty(self):
+        for entry in self.array:
+            vlist = entry[0 ]
+            if not vlist.isempty():
+                return False
+        return True
     def add_vectorlist(self,vlist,color='red',legend='data',plotwhich='mag'):
         if not isinstance(vlist, vectorlist):
             raise Exception('Object supplied must be a vector list')
@@ -520,7 +529,6 @@ class vectorfiles:
             s.plotlists(self.array,scatter=scatter,log=log)
     def printfiles(self):
         for array in self.array:
-            #print array,array[0].filename
             print array[0].filename
     def prune(self,n=0,start_date=datetime(1,1,1),end_date=datetime(1,1,1),value=0,
               greater_than=False,
@@ -546,7 +554,12 @@ class vectorfiles:
             vlist = entry[0]
             vectors=pd.concat((vectors,vlist.vectors),axis=0)
         return vectors
-
+    def write_to_csv(self,filepath):
+        f = open(filepath,'wb')
+        vectors = self.return_vectors()
+        vectors.to_csv(f,date_format='%d/%m/%Y %H:%M:%S')
+        f.close()
+        return f.closed
     def calculate_stds(self,n=10,scatter=True,log=False):
         global sc
         if VERBOSE:
@@ -628,29 +641,55 @@ def process(vfiles,sc,start_date,end_date,input,prune_start=datetime(1,1,1),
     colours = [entry[2] for entry in input]
     legends = [entry[3] for entry in input]
     plotwhichs=[entry[4] for entry in input] 
-    if start_date==end_date or end_date=='':
-        dates = [start_date]
-    else:
-        dates = [start_date+timedelta(days=1)*i for i in xrange(abs(end_date-start_date).days+1)]
+    dates = [start_date+timedelta(days=1)*i for i in xrange(abs((end_date-start_date).days)+1)]
+    if VERBOSE:
+        print "processing dates"
+        print dates
+    files = []
     for datev in dates:
         if VERBOSE:
             print ""
+            print "processing, date"
             print datev.isoformat()
-        #print "dates"
-        #print datev
         Year = datev.year
-        #year = Year[2:4]
         month = datev.month
         day = datev.day
+        '''
+        in case of caa files, files(s) are returned in a list, which is
+        handled in the read_file function, which assumes caa data in the 
+        case of the input being a list rather than a string
+        '''
         for [dir,ext],colour,legend,plotwhich in zip(dirs,colours,legends,plotwhichs):
-            file = getfile(sc,Year,month,day,dir,ext=ext)
+            if VERBOSE:
+                print "getting file for"
+                print sc,Year,month,day,dir,ext
+            file = getfile(sc,Year,month,day,dir,ext=ext) #may return a list!
             if file:
                 if VERBOSE:
                     print "filefound:",file
-                vlist = vectorlist()
-                vlist.read_file(file)
-                vfiles.add_vectorlist(vlist,colour,legend,plotwhich)
-                #vlist.print_values(0)
+                if dir != caadir:
+                    vlist = vectorlist()
+                    vlist.read_file(file)
+                    vfiles.add_vectorlist(vlist,colour,legend,plotwhich) 
+                else:#ie. if caadir is directory!
+                    for f in file:
+                        if f not in files:
+                            if VERBOSE:
+                                print file
+                                print "caa, already read: ",files
+                                print "now reading: ",f
+                            vlist = vectorlist()
+                            vlist.read_file(f)
+                            vfiles.add_vectorlist(vlist,colour,legend,plotwhich)                                       
+                            files.append(f)
+
+            
+    if files and prune_start == datetime(1,1,1) and prune_end == datetime(1,1,1):
+        if VERBOSE:
+            print "Seting prune start and end in order to trim "\
+                    +"to start and end times (due to caa)"
+        prune_start=start_date
+        prune_end=end_date+timedelta(days=1)
     if VERBOSE:
         print "Prune Start"
     if prune_start != datetime(1,1,1) and prune_end != datetime(1,1,1):
@@ -868,6 +907,13 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
         vfiles=vectorfiles()
         process(vfiles,sc,start_date,end_date,input,prune_start,prune_end,
                 prune_n,prune_value,prune_greater_than)
+        if vfiles.isempty():
+            print "No vector data found for the following parameters:"
+            print "sc:",spacecraft
+            print "start:",start_date," (",prune_start,")"
+            print "end:",end_date," (",prune_end,")"
+            print "prunevalue:",prune_value
+            print input         
         if rm_outliers:
             plot(vfiles,sc,start_date,end_date,input,n=std_n,scatter=scatter)
             remove_outliers()
@@ -884,22 +930,24 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
         if VERBOSE:
             print "Using previous vfiles",len(vfiles.array)
     std_periods,vectors = vfiles.select_stds(threshold=std_threshold)
-    if PLOT:
+    if PLOT and not vfiles.isempty():
         plot(vfiles,sc,start_date,end_date,input,n=std_n,scatter=scatter,
              threshold=std_threshold)
         #plot(vfiles,sc,start_date,end_date,input)
     #return vfiles.threshold_std,new
     return std_periods,vectors,vfiles_store
 
-def plot_axis(array,ax):
+def plot_axis(array,ax,plotwhich_override=''):
     legend_colour_list_line = []
     for count,entry in enumerate(array):
         #print "entry ",entry
         vlist = entry[0]
         colour = entry[1]
         legend = entry[2]
-        plotwhich= entry[3]
-
+        if plotwhich_override != '':
+            plotwhich = plotwhich_override
+        else:
+            plotwhich= entry[3]
         dates = vlist.returndatetimes()
         if plotwhich=='mag':
             data = vlist.returnmagnitudes()
@@ -912,8 +960,8 @@ def plot_axis(array,ax):
         else:
             raise Exception("I need to know what to plot")
         #label = legend+' ('+plotwhich+')'+' mean: '+format(np.mean(data),'.3e')
-        ax.set_title(plotwhich,fontsize=16)
-        label = legend+' mean: '+format(np.mean(data),'.3e')
+        label = (legend+'mean: '+format(np.mean(data),'.2e')+' nT'
+                ', std: '+format(np.std(data),'.2e')+' nT')
         dates_list=[]
         data_list=[]
         '''
@@ -940,13 +988,10 @@ def plot_axis(array,ax):
             else:
                 ax.plot_date(ds,da,c=colour,label=label,fmt='-')
                 legend_colour_list_line.append([label,colour])            
-    legend = ax.legend(loc='best') 
+    legend = ax.legend(loc='best',fontsize=14) 
         
 def plot_both(scs,start_date,end_date,plotwhich='mag',return_output=False,
-              std_threshold=0,std_n=10,prune=True,prune_value=0,source='default'):
-    
-    plt.close('all')    
-    
+              std_threshold=0,std_n=10,prune=True,prune_value=0,source='default'):    
     if type(scs) == int or type(scs) == float:
         scs = [int(scs)]
     '''
@@ -959,7 +1004,10 @@ def plot_both(scs,start_date,end_date,plotwhich='mag',return_output=False,
         prune_end=datetime(1,1,1)
     else:
         prune_start = start_date
-        prune_end = end_date
+        if start_date==end_date:
+            prune_end = end_date+timedelta(days=1)
+        else:
+            prune_end = end_date
     if plotwhich not in ['x','y','z','mag']:
         raise Exception("Please select one of 'x','y','z' or 'mag'")
     if source=='default':
@@ -979,106 +1027,67 @@ def plot_both(scs,start_date,end_date,plotwhich='mag',return_output=False,
     if return_output:
         return output
                
-def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True):
-    plt.ioff()
-    if not '.' in image_type:
-        image_type='.'+image_type
+def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True,
+             source='caa',save_dir=imagedir):
     '''
     Takes a row (so, a series) from the overlap_data DataFrame as its input
     and uses the values contained within to identify which things to plot
     '''
-    global vfiles
+    plt.ioff()
+    if not '.' in image_type:
+        image_type='.'+image_type
     plotwhichs=['x','y','z']
     start_date = series.start.normalize().to_datetime()
     end_date = series.end.normalize().to_datetime()
+    dirs=[]
     if not prune:
         prune_start=datetime(1,1,1)
         prune_end=datetime(1,1,1)
     else:
         prune_start = series.start.to_datetime()
-        prune_end = series.end.to_datetime()
+        prune_end = series.end.to_datetime()        
+    if source=='default':
+        legends = ['default','ext mode default']
+        dirs.append(refdir)
+        dirs.append(refdir)
+    elif source=='caa':
+        dirs.append(caadir)
+        dirs.append(refdirahk114)
+        legends = ['','ext mode ']
+    else:
+        raise Exception("Select either 'default' or 'caa' as source")
+    colours = ['g','r']
+    scs=map(int,[series.non_ext_sc+1,series.ext_sc+1])
+    vfiles = [vectorfiles(),vectorfiles()]
+    '''
+    data collection
+    '''
+    for (ext_mode,(dir,vfile,sc,colour,legend)) in enumerate(zip(dirs,vfiles,
+                                                        scs,colours,legends)):
+        input = [[dir,ext_mode,colour,legend,'']]
+        process(vfile,sc,start_date,end_date,input,prune_start,prune_end)
+    '''
+    difference of mean calculation
+    '''
+    non_ext_mode_vecs = vfiles[0].return_vectors()
+    ext_mode_vecs = vfiles[1].return_vectors()
+    differences = []
+    for plotwhich in plotwhichs:
+        difference = np.mean(non_ext_mode_vecs[plotwhich])-\
+                        np.mean(ext_mode_vecs[plotwhich])
+        differences.append(difference)
     f,axarr = plt.subplots(3,1,sharex=True,figsize=(23,13))
     axarr[2].set_xlabel('Time',fontsize=15)
-    scs=map(int,[series.non_ext_sc+1,series.ext_sc+1])
-    legends = ['default','ext mode default']
-    colours = ['g','r']
-    for ((row,plotwhich),ax) in zip(enumerate(plotwhichs),axarr):
+    for (plotwhich,ax,difference) in zip(plotwhichs,axarr,differences):
         ax.grid(True,which='major',color='w',linestyle='-')
         ax.grid(True,which='minor',color='w',linestyle='-',alpha=0.5)
         ax.tick_params(axis='both',which='major',labelsize=14)
         ax.minorticks_on()
         ax.set_ylabel('nT',fontsize=15)
-        for ((ext_mode,sc),legend,colour) in zip(enumerate(scs),legends,colours):
-            input=[[refdir,ext_mode,colour,legend,plotwhich]]
-            vfiles=vectorfiles()
-            process(vfiles,sc,start_date,end_date,input,prune_start,prune_end)
-            plot_axis(vfiles.array,ax)
-    #plt.gcf().autofmt_xdate() #angles the date labels
-    if not prune:
-        prune_start=start_date
-        prune_end=end_date
-    title_string = "From "+prune_start.strftime("%d %B %Y %H:%M:%S")\
-                    +" to "+prune_end.strftime("%d %B %Y %H:%M:%S")\
-                    +" with Cluster "+str(scs[0])+" in normal mode"\
-                    +" and Cluster "+str(scs[1])+" in extended mode"\
-                    +"\nSummary Field Data for both Spacecraft Measurements" \
-                    +"\nstd: "+format(series['std'],'.3f')\
-                    +" mean: "+format(series['mean'],'.3f')\
-                    +" min: "+format(series['min'],'.3f')\
-                    +" max: "+format(series['max'],'.3f')
-    plt.suptitle(title_string,fontsize=15.5)
-    if save:
-        filename='xyz_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
-                  '__'+prune_end.strftime("%Y%m%dT%H%M%S")+image_type
-        f.savefig(imagedir+filename,dpi=dpi,bbox_inches='tight',pad_inches=0.4)
-    if show:
-        figManager = plt.get_current_fig_manager()
-        figManager.window.showMaximized()
-        plt.show()
-    else:
-        plt.close()
-
-def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True):
-    plt.ioff()
-    if not '.' in image_type:
-        image_type='.'+image_type
-    '''
-    Takes a row (so, a series) from the overlap_data DataFrame as its input
-    and uses the values contained within to identify which things to plot
-    '''
-    global vfiles
-    plotwhichs=['x','y','z','mag']
-    start_date = series.start.normalize().to_datetime()
-    end_date = series.end.normalize().to_datetime()
-    if not prune:
-        prune_start=datetime(1,1,1)
-        prune_end=datetime(1,1,1)
-    else:
-        prune_start = series.start.to_datetime()
-        prune_end = series.end.to_datetime()
-        if VERBOSE:
-            print "pruning"
-            print prune_start
-            print prune_end
-    f,axarr = plt.subplots(2,2,sharex=True,figsize=(23,13))
-    axarr[1][0].set_xlabel('Time',fontsize=15)
-    axarr[1][1].set_xlabel('Time',fontsize=15)
-    axarr[0][0].set_ylabel('nT',fontsize=15)
-    axarr[1][0].set_ylabel('nT',fontsize=15)
-    axarr = np.ravel(axarr)
-    scs=map(int,[series.non_ext_sc+1,series.ext_sc+1])
-    legends = ['default','ext mode default']
-    colours = ['g','r']
-    for ((row,plotwhich),ax) in zip(enumerate(plotwhichs),axarr):
-        ax.grid(True,which='major',color='w',linestyle='-')
-        ax.grid(True,which='minor',color='w',linestyle='-',alpha=0.5)
-        ax.tick_params(axis='both',which='major',labelsize=14)
-        ax.minorticks_on()
-        for ((ext_mode,sc),legend,colour) in zip(enumerate(scs),legends,colours):
-            input=[[refdir,ext_mode,colour,legend,plotwhich]]
-            vfiles=vectorfiles()
-            process(vfiles,sc,start_date,end_date,input,prune_start,prune_end)
-            plot_axis(vfiles.array,ax)
+        ax.set_title(plotwhich+(' \nmean difference (normal-ext): '
+                                '{:.3e} nT').format(difference),fontsize=16)
+        plot_axis(vfiles[0].array,ax,plotwhich_override=plotwhich)
+        plot_axis(vfiles[1].array,ax,plotwhich_override=plotwhich)
     #plt.gcf().autofmt_xdate() #angles the date labels
     if not prune:
         prune_start=start_date
@@ -1089,16 +1098,99 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=Tru
                     +" to "+prune_end.strftime("%d %B %Y %H:%M:%S")\
                     +" with Cluster "+str(scs[0])+" in normal mode"\
                     +" and Cluster "+str(scs[1])+" in extended mode"\
-                    +"\nSummary Field Data for both Spacecraft Measurements" \
-                    +"\nstd: "+format(series['std'],'.3f')\
-                    +" mean: "+format(series['mean'],'.3f')\
-                    +" min: "+format(series['min'],'.3f')\
-                    +" max: "+format(series['max'],'.3f')
+                    +" ("+source+" calibration)"
+    plt.suptitle(title_string,fontsize=15.5)
+    if save:
+        filename='xyz_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
+                  '__'+prune_end.strftime("%Y%m%dT%H%M%S")+image_type
+        f.savefig(save_dir+filename,dpi=dpi,bbox_inches='tight',pad_inches=0.4)
+    if show:
+        figManager = plt.get_current_fig_manager()
+        figManager.window.showMaximized()
+        plt.show()
+    else:
+        plt.close()
+
+def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,
+                 show=True,source='caa',save_dir=imagedir):
+    '''
+    Takes a row (so, a series) from the overlap_data DataFrame as its input
+    and uses the values contained within to identify which things to plot
+    '''
+    plt.ioff()
+    if not '.' in image_type:
+        image_type='.'+image_type
+    plotwhichs=['x','y','z','mag']
+    start_date = series.start.normalize().to_datetime()
+    end_date = series.end.normalize().to_datetime()
+    dirs=[]
+    if not prune:
+        prune_start=datetime(1,1,1)
+        prune_end=datetime(1,1,1)
+    else:
+        prune_start = series.start.to_datetime()
+        prune_end = series.end.to_datetime()        
+    if source=='default':
+        legends = ['default','ext mode default']
+        dirs.append(refdir)
+        dirs.append(refdir)
+    elif source=='caa':
+        dirs.append(caadir)
+        dirs.append(refdirahk114)
+        legends = ['','ext mode ']
+    else:
+        raise Exception("Select either 'default' or 'caa' as source")
+    colours = ['g','r']
+    scs=map(int,[series.non_ext_sc+1,series.ext_sc+1])
+    vfiles = [vectorfiles(),vectorfiles()]
+    '''
+    data collection
+    '''
+    for (ext_mode,(dir,vfile,sc,colour,legend)) in enumerate(zip(dirs,vfiles,
+                                                        scs,colours,legends)):
+        input = [[dir,ext_mode,colour,legend,'']]
+        process(vfile,sc,start_date,end_date,input,prune_start,prune_end)
+    '''
+    difference of mean calculation
+    '''
+    non_ext_mode_vecs = vfiles[0].return_vectors()
+    ext_mode_vecs = vfiles[1].return_vectors()
+    differences = []
+    for plotwhich in plotwhichs:
+        difference = np.mean(non_ext_mode_vecs[plotwhich])-\
+                        np.mean(ext_mode_vecs[plotwhich])
+        differences.append(difference)
+    f,axarr = plt.subplots(2,2,sharex=True,figsize=(23,13))
+    axarr[1][0].set_xlabel('Time',fontsize=15)
+    axarr[1][1].set_xlabel('Time',fontsize=15)
+    axarr[0][0].set_ylabel('nT',fontsize=15)
+    axarr[1][0].set_ylabel('nT',fontsize=15)
+    axarr = np.ravel(axarr)
+    for (plotwhich,ax) in zip(plotwhichs,axarr):
+        ax.grid(True,which='major',color='w',linestyle='-')
+        ax.grid(True,which='minor',color='w',linestyle='-',alpha=0.5)
+        ax.tick_params(axis='both',which='major',labelsize=14)
+        ax.minorticks_on()
+        ax.set_title(plotwhich+(' \nmean difference (normal-ext): '
+                                '{:.3e} nT').format(difference),fontsize=16)
+        plot_axis(vfiles[0].array,ax,plotwhich_override=plotwhich)
+        plot_axis(vfiles[1].array,ax,plotwhich_override=plotwhich)
+    #plt.gcf().autofmt_xdate() #angles the date labels
+    if not prune:
+        prune_start=start_date
+        prune_end=end_date
+        if prune_start == prune_end:
+            prune_end += timedelta(days=1)
+    title_string = "From "+prune_start.strftime("%d %B %Y %H:%M:%S")\
+                    +" to "+prune_end.strftime("%d %B %Y %H:%M:%S")\
+                    +" with Cluster "+str(scs[0])+" in normal mode"\
+                    +" and Cluster "+str(scs[1])+" in extended mode"\
+                    +" ("+source+" calibration)"
     plt.suptitle(title_string,fontsize=15.5)
     if save:
         filename='mag_xyz_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
                   '__'+prune_end.strftime("%Y%m%dT%H%M%S")+image_type
-        f.savefig(imagedir+filename,dpi=dpi,bbox_inches='tight',pad_inches=0.4)
+        f.savefig(save_dir+filename,dpi=dpi,bbox_inches='tight',pad_inches=0.4)
     if show:
         figManager = plt.get_current_fig_manager()
         figManager.window.showMaximized()
@@ -1121,21 +1213,91 @@ def return_vectors(scs,start_date,end_date):
         vecs = pd.concat((vecs,vfiles.return_vectors()))
     return vecs
     
-def return_vectors_from_vfiles(vfiles,start,end):
+def return_vectors_from_vfiles(vfiles,start='',end=''):
+    if type(vfiles) != list:
+        vfiles = [vfiles]
     vecs=pd.DataFrame()
     for vfile in vfiles:
-        vfile.prune(start_date=start,end_date=end)
+        if start != '' and end != '':
+            vfile.prune(start_date=start,end_date=end)
         vecs = pd.concat((vecs,vfile.return_vectors()),axis=0)
     return vecs
- 
- 
-input=[[caadir,0,'r','caa','mag']]
-output = analyse(spacecraft=3,input=input,start_date=datetime(2016,1,1),
-                 end_date=datetime(2016,1,4),std_n=10,
+    
+def dt_to_strings(dt):
+    return str(dt.year),format(dt.month,'02d'),format(dt.day,'02d')
+    
+def package_data(series,dpi=300,image_type='.pdf',source='caa'):
+    '''
+    Takes a row (so, a series) from the overlap_data DataFrame as its input
+    and uses the values contained within to identify which things to plot,
+    both using the plot_xyz and the plot_mag_xyz functions. The relevant data
+    is also written to two files, for the extended mode and normal mode data.
+    The two figure files and two data files are saved in their own 
+    directory.
+    '''
+    start_date = series.start.normalize().to_datetime()
+    end_date = series.end.normalize().to_datetime()
+    dirs=[]
+    prune_start = series.start.to_datetime()
+    prune_end = series.end.to_datetime()        
+    if source=='default':
+        legends = ['','']
+        dirs.append(refdir)
+        dirs.append(refdir)
+    elif source=='caa':
+        dirs.append(caadir)
+        dirs.append(refdirahk114)
+        legends = ['','']
+    else:
+        raise Exception("Select either 'default' or 'caa' as source")
+    colours = ['','']
+    scs=map(int,[series.non_ext_sc+1,series.ext_sc+1])
+    vfiles = [vectorfiles(),vectorfiles()]
+    '''
+    data collection
+    '''
+    for (ext_mode,(dir,vfile,sc,colour,legend)) in enumerate(zip(dirs,vfiles,
+                                                        scs,colours,legends)):
+        input = [[dir,ext_mode,colour,legend,'']]
+        process(vfile,sc,start_date,end_date,input,prune_start,prune_end)
+    Year,month,day = dt_to_strings(prune_start)
+    directory = 'Y:/overlap_stats/results_caa/'+Year+'/'+month+'/'
+    if not os.path.isdir(directory):
+        os.makedirs(directory)   
+    plot_xyz(series,save=True,dpi=dpi,image_type=image_type,show=False,
+             source=source,save_dir=directory)
+    plot_mag_xyz(series,save=True,dpi=dpi,image_type=image_type,show=False,
+             source=source,save_dir=directory)    
+    for ((ext_mode,dir),vfile) in zip(enumerate(dirs),vfiles):
+        if ext_mode:
+            ext_mode_label = 'extended_mode'
+        else:
+            ext_mode_label = 'normal_mode'
+        filename = ext_mode_label+'_'+source+'_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
+                  '__'+prune_end.strftime("%Y%m%dT%H%M%S")
+        vfile.write_to_csv(directory+filename+'.csv')
+        
+#prune_start = datetime(2015,12,21,10,0,0)
+#prune_end = datetime(2015,12,21,19,0,0)
+#to get all of the relevant caa data, need to start from 3-4 days 
+#earlier than the first day of interest in extreme cases, since the
+#caa data is grouped by orbit times
+#this is now done in the process function
+'''
+input=[[caadir,0,'g','caa','mag'],[refdirahk114,1,'r','ext mode caa','mag']]
+output = analyse(spacecraft=3,input=input,start_date=datetime(2015,12,20),
+                 end_date=datetime(2015,12,26),std_n=10,
                  PLOT=True, scatter=False,std_threshold=1.,
-                 prune_value = 0
+                 prune_value = 0,prune_start=prune_start,prune_end=prune_end
                  )
 
+input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
+output = analyse(spacecraft=3,input=input,start_date=datetime(2015,12,20),
+                 end_date=datetime(2015,12,26),std_n=10,
+                 PLOT=True, scatter=False,std_threshold=1.,
+                 prune_value = 0,prune_start=prune_start,prune_end=prune_end
+                 )
+'''
 '''
 input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
 output = analyse(spacecraft=3,input=input,start_date=datetime(2015,1,8),
