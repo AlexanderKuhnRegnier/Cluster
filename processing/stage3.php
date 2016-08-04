@@ -331,6 +331,10 @@ function getcal($sc,$filepicked)
 		$calfile = "/cluster/operations/calibration/default/C".$sc.".fgmcal";
 		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!
 	}
+	if (!$use_caa)
+	{
+		exit("No caa cal found, exiting!");
+	}
 	if ($cal)			#if cal file can be opened!
 	{
 		$dummy=fgets($cal,256); 												#skips first line, containing date/time info
