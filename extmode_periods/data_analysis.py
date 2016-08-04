@@ -6,14 +6,16 @@ import copy
 import os
 from getfile import getfile
 import gzip
+import bz2
 import matplotlib.pyplot as plt
-plt.style.use('seaborn-darkgrid')
-#import cPickle as pickle
+plt.style.use('classic')
+import cPickle as pickle
 #import pickle
 import pandas as pd
 #import itertools
 #import csv
 #import time
+logdir = 'Y:/logs/data_analysis/'
 VERBOSE=False
 PLOT_VERBOSE=False
 
@@ -155,6 +157,33 @@ class vectorlist:
                             y_mag = float(line[3])
                             z_mag = float(line[4])
                             mag = float(line[5])
+                            data_dict['x'].append(x_mag)
+                            data_dict['y'].append(y_mag)
+                            data_dict['z'].append(z_mag)
+                            data_dict['mag'].append(mag)
+            self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z','mag'])
+            self.vectors.set_index('datetime',drop=True,inplace=True)
+            self.vectors.sort_index(inplace=True)
+        elif ('.cef.bz2' in filename) and ('/caa/ic_archive/' in filename):
+            data_dict['mag']=[]
+            #this is caa file, needs to be read differently!
+            #gzip.open(filename) #defaults to 'rb' and 9
+            with bz2.BZ2File(filename,'rb') as f:
+                for line in f:
+                    if 'DATA_UNTIL = EOF' in line:
+                        for line in f:
+                            line = line.split(',')   
+                            data_dict['datetime'].append(np.datetime64(line[0]))
+                            x_mag = float(line[2])
+                            y_mag = float(line[3])
+                            z_mag = float(line[4])
+                            mag = float(line[5])
+                            sc_range = int(line[9])
+                            '''
+                            can the range be plotted as well somehow??
+                            can it be included as an optional parameter
+                            without influencing the rest of the code?
+                            '''
                             data_dict['x'].append(x_mag)
                             data_dict['y'].append(y_mag)
                             data_dict['z'].append(z_mag)
@@ -632,6 +661,13 @@ class vectorfiles:
         else:
             print "No overlaps could be selected"
             return threshold_std,threshold_std
+
+def write_to_logfile(errormsg,logdir=logdir):
+    current_time = datetime.now().isoformat()
+    errormsg=str(errormsg)
+    filepath = logdir+'data_analysis.log'
+    with open(filepath,'a') as f:
+        f.write(current_time+' '+errormsg+'\n')
         
 def process(vfiles,sc,start_date,end_date,input,prune_start=datetime(1,1,1),
             prune_end=datetime(1,1,1),prune_n=0,prune_value=0,
@@ -682,7 +718,18 @@ def process(vfiles,sc,start_date,end_date,input,prune_start=datetime(1,1,1),
                             vlist.read_file(f)
                             vfiles.add_vectorlist(vlist,colour,legend,plotwhich)                                       
                             files.append(f)
-
+            else:
+                errormsg = "No file(s) for the following input: "
+                errormsg += "Directory: "+dir
+                errormsg += " Extende Mode: "+str(ext)
+                errormsg += " Date: "+datev.date().isoformat()
+                write_to_logfile(errormsg)
+    if vfiles.isempty():
+        errormsg = "Couldn't find any data for the following [dir,ext_mode] "
+        errormsg+=str(dirs)
+        errormsg+= " Dates: "
+        errormsg+=', '.join([d.date().isoformat() for d in dates])
+        write_to_logfile(errormsg)
             
     if files and prune_start == datetime(1,1,1) and prune_end == datetime(1,1,1):
         if VERBOSE:
@@ -1034,6 +1081,7 @@ def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True,
     and uses the values contained within to identify which things to plot
     '''
     plt.ioff()
+    plt.style.use('classic')
     if not '.' in image_type:
         image_type='.'+image_type
     plotwhichs=['x','y','z']
@@ -1066,6 +1114,9 @@ def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True,
                                                         scs,colours,legends)):
         input = [[dir,ext_mode,colour,legend,'']]
         process(vfile,sc,start_date,end_date,input,prune_start,prune_end)
+    if vfiles[0].isempty() or vfiles[1].isempty():
+        print "No data could be collected - see log"
+        return 0
     '''
     difference of mean calculation
     '''
@@ -1077,14 +1128,18 @@ def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True,
                         np.mean(ext_mode_vecs[plotwhich])
         differences.append(difference)
     f,axarr = plt.subplots(3,1,sharex=True,figsize=(23,13))
-    axarr[2].set_xlabel('Time',fontsize=15)
+    labelsize=17.5
+    axarr[2].set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+    axarr[0].set_ylabel(r'$\mathrm{B_x (nT)}$',fontsize=labelsize)
+    axarr[1].set_ylabel(r'$\mathrm{B_y (nT)}$',fontsize=labelsize)
+    axarr[2].set_ylabel(r'$\mathrm{B_z (nT)}$',fontsize=labelsize)
     for (plotwhich,ax,difference) in zip(plotwhichs,axarr,differences):
-        ax.grid(True,which='major',color='w',linestyle='-')
-        ax.grid(True,which='minor',color='w',linestyle='-',alpha=0.5)
-        ax.tick_params(axis='both',which='major',labelsize=14)
+        ax.grid(True,which='major',color='0.6',linestyle='-',
+                alpha=0.7,axis='y')
+        #ax.grid(True,which='minor',color='k',linestyle='-',alpha=0.1)
+        ax.tick_params(axis='both',which='major',labelsize=14,pad=20)
         ax.minorticks_on()
-        ax.set_ylabel('nT',fontsize=15)
-        ax.set_title(plotwhich+(' \nmean difference (normal-ext): '
+        ax.set_title(('mean difference (normal-ext): '
                                 '{:.3e} nT').format(difference),fontsize=16)
         plot_axis(vfiles[0].array,ax,plotwhich_override=plotwhich)
         plot_axis(vfiles[1].array,ax,plotwhich_override=plotwhich)
@@ -1118,6 +1173,7 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,
     and uses the values contained within to identify which things to plot
     '''
     plt.ioff()
+    plt.style.use('classic')
     if not '.' in image_type:
         image_type='.'+image_type
     plotwhichs=['x','y','z','mag']
@@ -1150,6 +1206,9 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,
                                                         scs,colours,legends)):
         input = [[dir,ext_mode,colour,legend,'']]
         process(vfile,sc,start_date,end_date,input,prune_start,prune_end)
+    if vfiles[0].isempty() or vfiles[1].isempty():
+        print "No data could be collected - see log"
+        return 0    
     '''
     difference of mean calculation
     '''
@@ -1161,17 +1220,21 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,
                         np.mean(ext_mode_vecs[plotwhich])
         differences.append(difference)
     f,axarr = plt.subplots(2,2,sharex=True,figsize=(23,13))
-    axarr[1][0].set_xlabel('Time',fontsize=15)
-    axarr[1][1].set_xlabel('Time',fontsize=15)
-    axarr[0][0].set_ylabel('nT',fontsize=15)
-    axarr[1][0].set_ylabel('nT',fontsize=15)
+    labelsize=17.5
+    axarr[1][0].set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+    axarr[1][1].set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
     axarr = np.ravel(axarr)
-    for (plotwhich,ax) in zip(plotwhichs,axarr):
-        ax.grid(True,which='major',color='w',linestyle='-')
-        ax.grid(True,which='minor',color='w',linestyle='-',alpha=0.5)
-        ax.tick_params(axis='both',which='major',labelsize=14)
+    axarr[0].set_ylabel(r'$\mathrm{B_x (nT)}$',fontsize=labelsize)
+    axarr[1].set_ylabel(r'$\mathrm{B_y (nT)}$',fontsize=labelsize)
+    axarr[2].set_ylabel(r'$\mathrm{B_z (nT)}$',fontsize=labelsize)
+    axarr[3].set_ylabel(r'$\mathrm{\vert B \vert (nT)}$',fontsize=labelsize)
+    for (plotwhich,ax,difference) in zip(plotwhichs,axarr,differences):
+        ax.grid(True,which='major',color='0.6',linestyle='-',
+                alpha=0.7,axis='y')
+        #ax.grid(True,which='minor',color='k',linestyle='-',alpha=0.1)
+        ax.tick_params(axis='both',which='major',labelsize=14,pad=20)
         ax.minorticks_on()
-        ax.set_title(plotwhich+(' \nmean difference (normal-ext): '
+        ax.set_title(('mean difference (normal-ext): '
                                 '{:.3e} nT').format(difference),fontsize=16)
         plot_axis(vfiles[0].array,ax,plotwhich_override=plotwhich)
         plot_axis(vfiles[1].array,ax,plotwhich_override=plotwhich)
@@ -1187,6 +1250,7 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,
                     +" and Cluster "+str(scs[1])+" in extended mode"\
                     +" ("+source+" calibration)"
     plt.suptitle(title_string,fontsize=15.5)
+    #plt.tight_layout()
     if save:
         filename='mag_xyz_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
                   '__'+prune_end.strftime("%Y%m%dT%H%M%S")+image_type
@@ -1223,10 +1287,73 @@ def return_vectors_from_vfiles(vfiles,start='',end=''):
         vecs = pd.concat((vecs,vfile.return_vectors()),axis=0)
     return vecs
     
+def update_interval_files(series,result_dir):
+    interval_file = 'intervals.xlsx'
+    interval_frame = 'intervals.pickle'
+    pickle_path = result_dir+interval_frame
+    path = result_dir+interval_file
+    if os.path.isfile(path):
+        intervals = pd.read_excel(path)
+        intervals.columns = ['start',
+                             'end',
+                             'duration (h)',
+                             'std',
+                             'max',
+                             'min',
+                             'mean',
+                             'ext_sc',
+                             'non_ext_sc']
+    else:
+        intervals = pd.DataFrame()
+    use = ['start',
+         'end',
+         'duration (h)',
+         'std',
+         'max',
+         'min',
+         'mean',
+         'ext_sc',
+         'non_ext_sc']
+    series = series[use]
+    series.set_value('ext_sc',series['ext_sc']+1)
+    series.set_value('non_ext_sc',series['non_ext_sc']+1)
+    intervals = intervals.append(series)
+    intervals.drop_duplicates(inplace=True,subset=['start','end',
+                                                   'ext_sc','non_ext_sc'])
+    intervals.reset_index(drop=True,inplace=True)
+    intervals.to_excel(path,sheet_name='Intervals',
+                       index=False,header=['start',
+                             'end',
+                             'duration (h)',
+                             'std (DEFAULT CAL)',
+                             'max (DEFAULT CAL)',
+                             'min (DEFAULT CAL)',
+                             'mean (DEFAULT CAL)',
+                             'ext_sc',
+                             'non_ext_sc'],
+                            columns=['start',
+                             'end',
+                             'duration (h)',
+                             'std',
+                             'max',
+                             'min',
+                             'mean',
+                             'ext_sc',
+                             'non_ext_sc'])  
+    '''
+    for legacy reasons, need to reset the spacecraft numbers to comply with
+    the methods that all add 1. This should be changed in future revisions!
+    '''
+    intervals['ext_sc'] = intervals['ext_sc'].add(-1)
+    intervals['non_ext_sc'] = intervals['non_ext_sc'].add(-1)
+    with open(pickle_path,'wb') as f:    
+        pickle.dump(intervals,f,protocol=2)
+        
 def dt_to_strings(dt):
     return str(dt.year),format(dt.month,'02d'),format(dt.day,'02d')
     
-def package_data(series,dpi=300,image_type='.pdf',source='caa'):
+def package_data(series,dpi=300,image_type='.pdf',source='caa',
+                 result_dir='Y:/overlap_stats/results_caa/'):
     '''
     Takes a row (so, a series) from the overlap_data DataFrame as its input
     and uses the values contained within to identify which things to plot,
@@ -1261,9 +1388,13 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa'):
         input = [[dir,ext_mode,colour,legend,'']]
         process(vfile,sc,start_date,end_date,input,prune_start,prune_end)
     Year,month,day = dt_to_strings(prune_start)
-    directory = 'Y:/overlap_stats/results_caa/'+Year+'/'+month+'/'
-    if not os.path.isdir(directory):
-        os.makedirs(directory)   
+    directory = result_dir+Year+'/'+month+'/'
+    for i in range(0,100):
+        newdir = directory+'interval'+format(i,'03d')+'/'
+        if not os.path.isdir(newdir):
+            os.makedirs(newdir)
+            break
+    directory=newdir
     plot_xyz(series,save=True,dpi=dpi,image_type=image_type,show=False,
              source=source,save_dir=directory)
     plot_mag_xyz(series,save=True,dpi=dpi,image_type=image_type,show=False,
@@ -1276,7 +1407,9 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa'):
         filename = ext_mode_label+'_'+source+'_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
                   '__'+prune_end.strftime("%Y%m%dT%H%M%S")
         vfile.write_to_csv(directory+filename+'.csv')
-        
+    update_interval_files(series,result_dir)
+
+    
 #prune_start = datetime(2015,12,21,10,0,0)
 #prune_end = datetime(2015,12,21,19,0,0)
 #to get all of the relevant caa data, need to start from 3-4 days 
@@ -1299,11 +1432,11 @@ output = analyse(spacecraft=3,input=input,start_date=datetime(2015,12,20),
                  )
 '''
 '''
-input=[[refdir,1,'r','ext mode default','mag'],[refdir,0,'b','default','mag']]
-output = analyse(spacecraft=3,input=input,start_date=datetime(2015,1,8),
-                 end_date=datetime(2015,1,11),std_n=10,
+input=[[caadir,0,'g','caa','mag'],[refdirahk114,1,'r','caa ext mode','mag']]
+output = analyse(spacecraft=3,input=input,start_date=datetime(2008,5,8),
+                 end_date=datetime(2008,5,15),std_n=10,
                  PLOT=True, scatter=False,std_threshold=1.,
-                 prune_value = 11
+                 prune_value = 0
                  )
 #print output
 '''

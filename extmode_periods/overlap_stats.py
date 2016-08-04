@@ -4,11 +4,12 @@ from overlap_data_dict_processing import read_overlap_data_dicts
 import cPickle as pickle
 import os
 import matplotlib.pyplot as plt
-plt.style.use('seaborn-darkgrid')
+import itertools
+#plt.style.use('seaborn-darkgrid')
 plt.close('all')
 import data_analysis as da
 import PyPDF2 as pdf
-
+results_root = 'Y:/overlap_stats/results_'
 pickledir = 'Y:/overlap_stats/'
 imagedir=pickledir+'images/'
 data_file = 'overlap_stats.pickle'
@@ -17,7 +18,22 @@ def append_pdf(input,output):
     [output.addPage(input.getPage(page_num)) for page_num in 
                             range(input.numPages)]
 
-def save_filtered(filtered_frame,filetypes=['.pdf'],dpi=330,prune=True):
+def report_frame(filtered_frame,source='caa'):
+    results_dir = results_root+source
+    for i in range(0,100):
+        results_dir_new = results_dir+format(i,'03d')+'/'
+        if not os.path.isdir(results_dir_new):
+            os.makedirs(results_dir_new)
+            break
+    '''
+    calls the package_data function from the data analysis
+    code for every row in the input frame
+    '''
+    for index,row in filtered_frame.iterrows():
+        da.package_data(row,source=source,result_dir=results_dir_new)
+
+def save_filtered(filtered_frame,filetypes=['.pdf'],dpi=330,prune=True,
+                  source='caa'):
     '''
     Take a dataframe that has been filtered using certain criteria,
     and saves figures depicting the time intervals and spacecraft 
@@ -27,9 +43,9 @@ def save_filtered(filtered_frame,filetypes=['.pdf'],dpi=330,prune=True):
     for image_type in filetypes:
         for index,row in filtered_frame.iterrows():
             da.plot_mag_xyz(row,save=True,dpi=dpi,image_type=image_type,
-                            show=False,prune=prune)
+                            show=False,prune=prune,source=source)
             da.plot_xyz(row,save=True,dpi=dpi,image_type=image_type,
-                            show=False,prune=prune)
+                            show=False,prune=prune,source=source)
         if image_type=='.pdf':
             merger = pdf.PdfFileMerger()
             for f in os.listdir(imagedir):
@@ -92,6 +108,7 @@ print "\nAll overlaps longer than {0:.1f} hours".format(min_time)
 print overlap_data[overlap_data['duration (h)']>min_time]
 '''
 
+'''
 print "\nAll overlaps sorted by time in descending order"
 print overlap_data.sort_values(by='duration (h)',ascending=False)
 
@@ -106,6 +123,7 @@ print overlap_data.groupby(overlap_data['start'].dt.year).size()
 
 print "\nNumber of overlaps by month"
 print overlap_data.groupby(overlap_data['start'].dt.month).size()
+'''
 
 '''
 upper_percentile=0.98
@@ -195,3 +213,21 @@ filtered = overlap_data.sort_values('duration (h)',ascending=False).iloc[:40].\
             sort_values('std').iloc[:2]
 save_filtered(filtered)
 '''
+
+filtered = []
+for (ext_sc,non_ext_sc) in itertools.permutations([0,1,2,3],2):
+    df=overlap_data[(overlap_data['ext_sc']==ext_sc) & 
+                    (overlap_data['non_ext_sc']==non_ext_sc)]
+    m_list = [0.5,1.2,2,4]#min hours
+    for m in m_list:
+        filtered.append(df[df['duration (h)']>m].sort_values('std',
+                          ascending=True).groupby(
+                          overlap_data['start'].dt.year).first())
+
+
+results = pd.concat(filtered,ignore_index=True).\
+                    drop_duplicates(['start','end','ext_sc','non_ext_sc'])
+results.sort_values('start',inplace=True)
+results.reset_index(drop=True,inplace=True)
+filtered_results = results[results['std']<2.5]
+#filtered_results.plot(kind='hexbin',x='ext_sc',y='non_ext_sc',gridsize=7)
