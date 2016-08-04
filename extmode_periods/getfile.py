@@ -2,6 +2,7 @@
 import os
 import pandas as pd
 from datetime import datetime,timedelta
+import gzip,bz2
 
 def getfile(sc,Year,month,day,directory,ext=False):
     Year = str(Year)
@@ -43,20 +44,48 @@ def getreffile(sc,Year,month,day,directory):
             return filepath
     return 0
 
+def count_lines(filename,directory):
+    filepath = directory+filename
+    file_ending = filepath.split('.')[-1]
+    assert file_ending=='bz2' or file_ending=='gz',("File must be a compressed" 
+                                            "file of either bz2 or gz type!")
+    openers = {'bz2':bz2.BZ2File,'gz':gzip.open}
+    opener = openers[file_ending]
+    linecount = 0
+    with opener(filepath,'rb') as f:
+        for _ in f:
+            linecount += 1
+            if linecount > 550:
+                return True
+        return False
+        #return linecount
+        
 def dt_to_strings(dt):
     return str(dt.year),format(dt.month,'02d'),format(dt.day,'02d')
 
-def caa_version_filter(file_list):
-    assert len(file_list)>2,"File list to be filtered should contain multiple"\
-                            +" versions, and thus be longer than 2"
+def caa_version_filter(file_list,directory):
+    assert len(file_list)>1,"File list to be filtered should contain multiple"\
+                            +" versions, and thus be longer than 1"
     dummy = {}
     dummy['file_basis'] = [f[0:49] for f in file_list]
     dummy['file_versions'] = [int(f[49:51]) for f in file_list]
     dummy['remainder'] = [f[51:] for f in file_list]
+    dummy['data'] = [count_lines(f,directory) for f in file_list]
     files = pd.DataFrame(dummy)
-    files.sort_values('file_versions',inplace=True,ascending=False)
+
+    '''
+    some of the data files don't seem to contain any data, mostly some
+    high-version files
+    so this code will count the number of lines and decide based upon that
+    whether the file contains data!
+    '''
+    #files.sort_values('file_versions',inplace=True,ascending=False)
+    files = files.sort_values(['data','file_versions'],ascending=False).\
+                                                        drop('data',axis=1)
     files.drop_duplicates(subset=['file_basis'],inplace=True,keep='first')
-    files['file_versions']=files['file_versions'].apply(func=lambda x: format(x,'02d'))
+    files['file_versions']=files['file_versions'].apply(func=lambda x: 
+                                                            format(x,'02d'))
+    files.columns=['file_basis','file_versions','remainder']
     results = files.apply(func=lambda x:''.join(x.values.tolist()),axis=1).values
     assert len(results)<=2,("Filtered list should only contain one or two files"
     "(not {}), one for the orbit end, and one for the start!").format(len(results))
@@ -67,8 +96,7 @@ def getcaafile(sc,Year,month,day,directory):
     Called by the getfile method - not to be used on its own!
     '''
     sc = str(sc)
-    files = [s for s in os.listdir(directory) if 'SPIN' in s and 'C'+sc in s
-                                                and 'cef.gz' in s]
+    files = [s for s in os.listdir(directory) if 'SPIN' in s and 'C'+sc in s]
     files_string = ''.join(files)
     current_date = datetime(int(Year),int(month),int(day))
     str_start = 'C'+sc+'_CP_FGM_SPIN__'+Year+month+day
@@ -87,7 +115,7 @@ def getcaafile(sc,Year,month,day,directory):
                                     and 'cef.gz' in s
                                     and pd.Timestamp(s[32:40])>=current_date]
         if len(found)>1:
-            found = caa_version_filter(found)
+            found = caa_version_filter(found,prev_directory)
             assert len(found)==1,("1 file should be found this way," 
                                 " not {}!").format(len(found))
         results.extend([prev_directory+s for s in found])  
@@ -99,8 +127,8 @@ def getcaafile(sc,Year,month,day,directory):
     if str_start in files_string:
         if [s for s in files if str_end in s[31:]]:
             found = [s for s in files if (str_start in s) or (str_end in s[31:])]
-            if len(results)>2:
-                found = caa_version_filter(found)
+            if len(found)>2:
+                found = caa_version_filter(found,directory)
             assert len(found)==2,"Two files should be found here"
             results.extend([directory+s for s in found])
             assert len(results)==2,"Two files should have been found by now"
@@ -109,7 +137,7 @@ def getcaafile(sc,Year,month,day,directory):
                                 +" found in a previous month's folder!"
             found = [s for s in files if (str_start in s)]
             if len(found)>1:
-                found = caa_version_filter(found)
+                found = caa_version_filter(found,directory)
             results.extend([directory+s for s in found])
             assert len(results)==2,"Two files should have been found by now"
 
@@ -126,7 +154,7 @@ def getcaafile(sc,Year,month,day,directory):
             if str_start in files_string:
                 found =  [s for s in files if str_start in s]
                 if len(found)>1:
-                    found = caa_version_filter(found)
+                    found = caa_version_filter(found,directory)
                 assert len(found)==1,"There should only be one such file!"
                 results.extend([directory+s for s in found])
                 break
@@ -140,10 +168,11 @@ Testing
 '''
 #print "results"
 dir = 'Z:/caa/ic_archive/'
-#print getfile(1,2016,1,1,dir)
+print getfile(1,2008,5,14,dir)
 #print getfile(1,2015,12,31,dir)
 #refdir = "Z:/data/reference/" 
-
+'''
+'''
 for i in range(1,20):
     print "new"
     print 2015,1,i
