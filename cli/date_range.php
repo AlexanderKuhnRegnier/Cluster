@@ -93,6 +93,22 @@ $time_unix=$initial_unix;
 
 $time_unix=$initial_unix;
 #start at the earliest date always, so here start at $initial_unix
+
+$counter=0;
+$nr = sprintf('%03d',$counter);
+$filename = '/home/ahk114/logs/date_range_stage3/'.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.($number/365.).'-years'.'__'.$nr.'.log';			
+while (file_exists($filename))
+{
+	$counter+=1;
+	$nr = sprintf('%03d',$counter);
+	$filename = '/home/ahk114/logs/date_range_stage3/'.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.($number/365.).'-years'.'__'.$nr.'.log';			
+}
+echo "Logfile:".$filename.PHP_EOL;
+$logfile = fopen($filename,'a');
+if (!$logfile)
+{
+	exit('Unable to open log file!');
+}
 for ($i=0; $i<abs($number); $i+=1)
 {
 	echo "Input date: ".date("Y/m/d",$time_unix).PHP_EOL;
@@ -104,24 +120,27 @@ for ($i=0; $i<abs($number); $i+=1)
 	#$cmd = "php stage1.php".$option_string." | php stage2.php";		
 	echo "Executing: ".$cmd.PHP_EOL;
 	exec($cmd,$output);
-	$stringout = implode("\n",$output);
+	$filtered_output = array();
+	foreach($output as $value)
+	{
+		if(strpos($value,'Warning: Unknown:') !== false || strlen($value)<1)
+		{
+			continue;
+		}
+		else
+		{
+			$filtered_output[]=$value;
+		}
+	}
+	$stringout = implode("\n",$filtered_output);
 	echo "Processing output".PHP_EOL."++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 	echo $stringout.PHP_EOL;
 	echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 	$time_unix = $time_unix + 86400;
-	$counter=0;
-	$nr = sprintf('%03d',$counter);
-	$filename = '/home/ahk114/logs/'.$year.$month.$day.$nr.'.log';
-	while (file_exists($filename))
-	{
-		$counter+=1;
-		$nr = sprintf('%03d',$counter);
-		$filename = '/home/ahk114/logs/'.$year.$month.$day.$nr.'.log';			
-	}
-	echo $filename.PHP_EOL;
-	file_put_contents($filename,$stringout);
-}
 
+	fwrite($logfile,$stringout.PHP_EOL);
+}
+fclose($logfile);
 echo PHP_EOL;
 #session_destroy();
 ?>

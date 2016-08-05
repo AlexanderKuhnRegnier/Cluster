@@ -50,7 +50,7 @@ define( "RESET_PERIOD", 5.152221 );
 define( "SPIN_PERIOD", 4 );
 define( "RESETPERIOD", 5.152 );
 define( "PREREAD", 32768 );
-
+$verbose = FALSE;
 require_once 'getcalfile.php';	#needed to put this after constant definitions, otherwise the if loops in 
 								#getfile.php complained about the constants being undefined!
 // ========== FUNCTIONS ==========
@@ -345,21 +345,20 @@ function getcal($sc,$filepicked)
 	}
 	elseif ($calfile=getcalfile($sc,$filepicked,DAILYCAL))
 	{
+		if (!$use_caa){exit("No caa cal found, exiting!".PHP_EOL);}
 		echo "Using DAILY calibration!".PHP_EOL;
 		$use_daily = TRUE;
 		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!			
 	}
 	else
 	{
+		if (!$use_caa){exit("No caa cal found, exiting!".PHP_EOL);}
 		$use_default = TRUE;
 		echo "Using default calibration".PHP_EOL;
 		$calfile = "/cluster/operations/calibration/default/C".$sc.".fgmcal";
 		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!
 	}
-	if (!$use_caa)
-	{
-		exit("No caa cal found, exiting!".PHP_EOL);
-	}
+	if (!$use_caa){exit("No caa cal found, exiting!".PHP_EOL);}
 	if ($cal)			#if cal file can be opened!
 	{
 		$dummy=fgets($cal,256); 												#skips first line, containing date/time info
@@ -525,14 +524,23 @@ function modifycal( $sc )
 function displaycal( $sc )
 {
 	global $gainx, $gainy, $gainz, $offsetx, $offsety, $offsetz;
-	
 	for ( $adc = 1; $adc < 3; $adc++ )
 	{
+		echo "adc:".$adc.PHP_EOL;
 		for ( $sensor = 0; $sensor < 2; $sensor++ )
 		{
+			echo "sensor:".$sensor.PHP_EOL;
+			echo "Range   Gain x  Gain y  Gain z   Offset x   Offset y   Offset z".PHP_EOL;
 			for ( $range = 2; $range < 8; $range++ )
 			{
-				printf( "%d : <FONT COLOR=GRAY>%3.3f,%3.3f,%3.3f %3.3f %3.3f %3.3f</FONT> ", $range, $gainx[ $adc ][ $sensor ][ $range ], $gainy[ $adc ][ $sensor ][ $range ], $gainz[ $adc ][ $sensor ][ $range ], $offsetx[ $adc ][ $sensor ][ $range ], $offsety[ $adc ][ $sensor ][ $range ], $offsetz[ $adc ][ $sensor ][ $range ] );
+				echo $range.'       '
+					.sprintf('%05.3f',$gainx[ $adc ][ $sensor ][ $range ]).'   '
+					.sprintf('%05.3f',$gainy[ $adc ][ $sensor ][ $range ]).'   '
+					.sprintf('%05.3f',$gainz[ $adc ][ $sensor ][ $range ]).'    '
+					.sprintf('%08.3f',$offsetx[ $adc ][ $sensor ][ $range ]).'   '
+					.sprintf('%08.3f',$offsety[ $adc ][ $sensor ][ $range ]).'   '
+					.sprintf('%08.3f',$offsetz[ $adc ][ $sensor ][ $range ])
+					.PHP_EOL;
 			}
 		}
 	}
@@ -642,7 +650,12 @@ for ( $ext = 0; $ext < 10; $ext++ )
 					
 					getcal( $sc ,$filepicked);
 					modifycal( $sc );
-					
+					if ($verbose)
+					{
+						//Debugging only!!!!
+						displaycal( $sc );
+						//
+					}
 					$satt_name = RAW . '20' . $year . '/' . $month . '/C' . $sc . '_' . $year . $month . $day . '_' . $version . '.SATT';
 					
 					if ( file_exists( $satt_name ) && ( $satt_h = fopen( $satt_name, "rb" ) ) )
@@ -827,9 +840,8 @@ for ( $ext = 0; $ext < 10; $ext++ )
 							// process file before we generate new one
 							$tmp2 = tempnam( '/var/tmp', 'ExtProcDecoded_' );
 							
-							echo ">";
 							exec( "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat " . $tmp . " | /cluster/operations/software/dp/bin/fgmhrt -s gse -a " . $sattfile . " | /cluster/operations/software/dp/bin/fgmpos -p " . $stoffile . " | /cluster/operations/software/dp/bin/igmvec -o " . $tmp2 . " 2>/dev/null ; cat " . $tmp2 . " >> " . $procfile );
-							echo "<";
+							echo "Output file:".$procfile.PHP_EOL;
 							if ( !is_dir( EXT . date( 'Y', $time ) ) )
 								mkdir( EXT . date( 'Y', $time ), 0750 );
 							
@@ -865,6 +877,7 @@ for ( $ext = 0; $ext < 10; $ext++ )
 					
 					$tmp2 = tempnam( '/var/tmp', 'ExtProcDecoded_' );
 					exec( "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat " . $tmp . " | /cluster/operations/software/dp/bin/fgmhrt -s gse -a " . $sattfile . " | /cluster/operations/software/dp/bin/fgmpos -p " . $stoffile . " | /cluster/operations/software/dp/bin/igmvec -o " . $tmp2 . " 2>/dev/null ; cp " . $tmp2 . " " . $procfile );
+					echo "Output file:".$procfile.PHP_EOL;
 				}
 			}
 		}
