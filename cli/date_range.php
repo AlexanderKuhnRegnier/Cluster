@@ -104,11 +104,7 @@ while (file_exists($filename))
 	$filename = '/home/ahk114/logs/date_range_stage3/'.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.($number/365.).'-years'.'__'.$nr.'.log';			
 }
 echo "Logfile:".$filename.PHP_EOL;
-$logfile = fopen($filename,'a');
-if (!$logfile)
-{
-	exit('Unable to open log file!');
-}
+
 for ($i=0; $i<abs($number); $i+=1)
 {
 	echo "Input date: ".date("Y/m/d",$time_unix).PHP_EOL;
@@ -119,6 +115,7 @@ for ($i=0; $i<abs($number); $i+=1)
 	$cmd = "php ExtMode_stage3_cli_0_1.php ".$option_string;
 	#$cmd = "php stage1.php".$option_string." | php stage2.php";		
 	echo "Executing: ".$cmd.PHP_EOL;
+	$output = array();
 	exec($cmd,$output);
 	$filtered_output = array();
 	foreach($output as $value)
@@ -132,15 +129,24 @@ for ($i=0; $i<abs($number); $i+=1)
 			$filtered_output[]=$value;
 		}
 	}
-	$stringout = implode("\n",$filtered_output);
+	$stringout = implode(PHP_EOL,$filtered_output);
+	/*
 	echo "Processing output".PHP_EOL."++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 	echo $stringout.PHP_EOL;
 	echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
+	*/
 	$time_unix = $time_unix + 86400;
-
-	fwrite($logfile,$stringout.PHP_EOL);
+	if (count($filtered_output)>0)
+	{
+		$logfile = fopen($filename,'a');
+		if (!$logfile)
+		{
+			exit('Unable to open log file!');
+		}
+		fwrite($logfile,$stringout.PHP_EOL.PHP_EOL);
+		fclose($logfile);
+	}
 }
-fclose($logfile);
 echo PHP_EOL;
 #session_destroy();
 ?>

@@ -841,7 +841,7 @@ for ( $ext = 0; $ext < 10; $ext++ )
 							$tmp2 = tempnam( '/var/tmp', 'ExtProcDecoded_' );
 							
 							exec( "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat " . $tmp . " | /cluster/operations/software/dp/bin/fgmhrt -s gse -a " . $sattfile . " | /cluster/operations/software/dp/bin/fgmpos -p " . $stoffile . " | /cluster/operations/software/dp/bin/igmvec -o " . $tmp2 . " 2>/dev/null ; cat " . $tmp2 . " >> " . $procfile );
-							echo "Output file:".$procfile.PHP_EOL;
+							echo "Output file (appended):".$procfile.PHP_EOL;
 							if ( !is_dir( EXT . date( 'Y', $time ) ) )
 								mkdir( EXT . date( 'Y', $time ), 0750 );
 							
@@ -877,7 +877,16 @@ for ( $ext = 0; $ext < 10; $ext++ )
 					
 					$tmp2 = tempnam( '/var/tmp', 'ExtProcDecoded_' );
 					exec( "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat " . $tmp . " | /cluster/operations/software/dp/bin/fgmhrt -s gse -a " . $sattfile . " | /cluster/operations/software/dp/bin/fgmpos -p " . $stoffile . " | /cluster/operations/software/dp/bin/igmvec -o " . $tmp2 . " 2>/dev/null ; cp " . $tmp2 . " " . $procfile );
-					echo "Output file:".$procfile.PHP_EOL;
+					#cp not >> since this is the first time that data *should* be written to this .EXT.GSE file if data is processed chronologically
+					#above, content is appended with cat and then >> , since in theory, that *should* be the second time that file is written to
+					#it would be problematic, if there were 2 extended modes in one day, then using cp would simply overwrite previously processed data!
+					#However, the testhandle (tmp file) is openend in 'wb' mode, overwriting previous changes. 
+					#On the current date, the output from the dp software is appended to an output file if already present
+					#On the next day, a new file is created and previous output files overwritten!
+					
+					#When running the same dates through the processing software, some .EXT.GSE files will grow in magnitude, as will all of the 
+					#.EXT files, since these files are appended to, rather than overwritten!
+					echo "Output file (copy (overwrite)):".$procfile.PHP_EOL;
 				}
 			}
 		}
