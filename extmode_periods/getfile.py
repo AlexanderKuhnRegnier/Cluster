@@ -17,6 +17,11 @@ def getfile(sc,Year,month,day,directory,ext=False):
             return getextreffile(sc,Year,month,day,directory)
         else:    
             return getreffile(sc,Year,month,day,directory)
+    elif '/referencecaa/' in directory:
+        if ext:
+            return getextreffile(sc,Year,month,day,directory)
+        else:    
+            raise Exception("Only caa calibrated ext data is in this directory!")
     else:
         raise Exception("Not valid caa or reference directory")
 

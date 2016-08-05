@@ -16,16 +16,17 @@ import pandas as pd
 #import csv
 #import time
 logdir = 'Y:/logs/data_analysis/'
-VERBOSE=False
+VERBOSE=True
 PLOT_VERBOSE=False
 
 pickledir = 'Y:/overlap_stats/'
 imagedir=pickledir+'images/'
 refdirahk114 = 'Y:/reference/'
+refdirahk114caa = 'Y:/referencecaa/'
 refdir = 'Z:/data/reference/'
 caadir = 'Z:/caa/ic_archive/'
-dirs = [refdirahk114,refdir,caadir]
-dir_names=['refdirahk114','refdir','caadir']
+dirs = [refdirahk114,refdir,caadir,refdirahk114caa]
+dir_names=['refdirahk114','refdir','caadir','refdirahk114caa']
 prune_start=datetime(1,1,1)
 prune_end=datetime(1,1,1)
 prune_n=1
@@ -1060,7 +1061,7 @@ def plot_both(scs,start_date,end_date,plotwhich='mag',return_output=False,
     if source=='default':
         input=[[refdir,1,'r','ext mode default',plotwhich],[refdir,0,'b','default',plotwhich]]
     elif source=='caa':
-        input=[[refdirahk114,1,'r','ext mode caa',plotwhich],[caadir,0,'b','caa',plotwhich]]        
+        input=[[refdirahk114caa,1,'r','ext mode caa',plotwhich],[caadir,0,'b','caa',plotwhich]]        
     else:
         raise Exception("Select either 'default' or 'caa' as source")
     for s in scs:
@@ -1100,7 +1101,7 @@ def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True,
         dirs.append(refdir)
     elif source=='caa':
         dirs.append(caadir)
-        dirs.append(refdirahk114)
+        dirs.append(refdirahk114caa)
         legends = ['','ext mode ']
     else:
         raise Exception("Select either 'default' or 'caa' as source")
@@ -1192,7 +1193,7 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,
         dirs.append(refdir)
     elif source=='caa':
         dirs.append(caadir)
-        dirs.append(refdirahk114)
+        dirs.append(refdirahk114caa)
         legends = ['','ext mode ']
     else:
         raise Exception("Select either 'default' or 'caa' as source")
@@ -1351,6 +1352,9 @@ def update_interval_files(series,result_dir):
         
 def dt_to_strings(dt):
     return str(dt.year),format(dt.month,'02d'),format(dt.day,'02d')
+
+def dt_time_to_strings(dt):
+    return format(dt.hour,'02d')+'-'+format(dt.minute,'02d')+'-'+format(dt.second,'02d')
     
 def package_data(series,dpi=300,image_type='.pdf',source='caa',
                  result_dir='Y:/overlap_stats/results_caa/'):
@@ -1373,7 +1377,7 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa',
         dirs.append(refdir)
     elif source=='caa':
         dirs.append(caadir)
-        dirs.append(refdirahk114)
+        dirs.append(refdirahk114caa)
         legends = ['','']
     else:
         raise Exception("Select either 'default' or 'caa' as source")
@@ -1390,7 +1394,8 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa',
     Year,month,day = dt_to_strings(prune_start)
     directory = result_dir+Year+'/'+month+'/'
     for i in range(0,100):
-        newdir = directory+'interval'+format(i,'03d')+'/'
+        newdir = directory+format(i,'03d')+'__'+Year+'_'+month+'_'+day+'T'+\
+                                        dt_time_to_strings(prune_start)+'/'
         if not os.path.isdir(newdir):
             os.makedirs(newdir)
             break
@@ -1417,7 +1422,7 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa',
 #caa data is grouped by orbit times
 #this is now done in the process function
 '''
-input=[[caadir,0,'g','caa','mag'],[refdirahk114,1,'r','ext mode caa','mag']]
+input=[[caadir,0,'g','caa','mag'],[refdirahk114caa,1,'r','ext mode caa','mag']]
 output = analyse(spacecraft=3,input=input,start_date=datetime(2015,12,20),
                  end_date=datetime(2015,12,26),std_n=10,
                  PLOT=True, scatter=False,std_threshold=1.,
@@ -1432,7 +1437,7 @@ output = analyse(spacecraft=3,input=input,start_date=datetime(2015,12,20),
                  )
 '''
 '''
-input=[[caadir,0,'g','caa','mag'],[refdirahk114,1,'r','caa ext mode','mag']]
+input=[[caadir,0,'g','caa','mag'],[refdirahk114caa,1,'r','caa ext mode','mag']]
 output = analyse(spacecraft=3,input=input,start_date=datetime(2008,5,8),
                  end_date=datetime(2008,5,15),std_n=10,
                  PLOT=True, scatter=False,std_threshold=1.,
