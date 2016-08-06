@@ -96,12 +96,12 @@ $time_unix=$initial_unix;
 
 $counter=0;
 $nr = sprintf('%03d',$counter);
-$filename = '/home/ahk114/logs/date_range_stage3/'.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.($number/365.).'-years'.'__'.$nr.'.log';			
+$filename = '/home/ahk114/logs/date_range_stage3/'.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.sprintf('%06.3f',($number/365.25)).'-years'.'__'.$nr.'.log';			
 while (file_exists($filename))
 {
 	$counter+=1;
 	$nr = sprintf('%03d',$counter);
-	$filename = '/home/ahk114/logs/date_range_stage3/'.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.($number/365.).'-years'.'__'.$nr.'.log';			
+	$filename = '/home/ahk114/logs/date_range_stage3/'.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.sprintf('%06.3f',($number/365.25)).'-years'.'__'.$nr.'.log';			
 }
 echo "Logfile:".$filename.PHP_EOL;
 
