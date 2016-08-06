@@ -141,7 +141,7 @@ for ($i=0; $i<abs($number); $i+=1)
 		$logfile = fopen($filename,'a');
 		if (!$logfile)
 		{
-			exit('Unable to open log file!');
+			exit('Unable to open log file!'.PHP_EOL);
 		}
 		fwrite($logfile,$stringout.PHP_EOL.PHP_EOL);
 		fclose($logfile);

@@ -50,6 +50,9 @@ define( "RESET_PERIOD", 5.152221 );
 define( "SPIN_PERIOD", 4 );
 define( "RESETPERIOD", 5.152 );
 define( "PREREAD", 32768 );
+define( "APPENDED",'/home/ahk114/logs/date_range_stage3/');
+$ext_appended = APPENDED.'ext_appended.log';
+$ext_gse_appended = APPENDED.'ext_gse_appended.log';
 $verbose = FALSE;
 require_once 'getcalfile.php';	#needed to put this after constant definitions, otherwise the if loops in 
 								#getfile.php complained about the constants being undefined!
@@ -714,8 +717,20 @@ for ( $ext = 0; $ext < 10; $ext++ )
 					{
 						mkdir($dir_path,0750,true);
 					}
+					$outfile = OUTEXT . date( 'Y/m/', $start ) . 'C' . $sc . '_' . date( 'ymd', $start ) . '_' . $version . '.EXT';
 					
-					$outhandle = fopen( OUTEXT . date( 'Y/m/', $start ) . 'C' . $sc . '_' . date( 'ymd', $start ) . '_' . $version . '.EXT', 'ab' );
+					if (file_exists($outfile))
+					{
+						$appended_handle = fopen($ext_appended,'ab');
+						if (!$appended_handle)
+						{
+							exit('Unable to open ext appended log file!'.PHP_EOL);
+						}
+						fwrite($appended_handle,date("Y-m-d H:i:s").' '.$outfile.PHP_EOL);
+						fclose($appended_handle);
+					}	
+					
+					$outhandle = fopen( $outfile , 'ab' );
 					if ( !$outhandle )
 					{
 						exit( "Bugger!" );
@@ -840,6 +855,17 @@ for ( $ext = 0; $ext < 10; $ext++ )
 							// process file before we generate new one
 							$tmp2 = tempnam( '/var/tmp', 'ExtProcDecoded_' );
 							
+							if (file_exists($procfile))
+							{
+								$appended_handle = fopen($ext_gse_appended,'ab');
+								if (!$appended_handle)
+								{
+									exit('Unable to open ext.gse appended log file!'.PHP_EOL);
+								}
+								fwrite($appended_handle,date("Y-m-d H:i:s").' '.$procfile.PHP_EOL);
+								fclose($appended_handle);
+							}								
+							
 							exec( "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat " . $tmp . " | /cluster/operations/software/dp/bin/fgmhrt -s gse -a " . $sattfile . " | /cluster/operations/software/dp/bin/fgmpos -p " . $stoffile . " | /cluster/operations/software/dp/bin/igmvec -o " . $tmp2 . " 2>/dev/null ; cat " . $tmp2 . " >> " . $procfile );
 							echo "Output file (appended):".$procfile.PHP_EOL;
 							if ( !is_dir( EXT . date( 'Y', $time ) ) )
@@ -858,7 +884,21 @@ for ( $ext = 0; $ext < 10; $ext++ )
 							{
 								mkdir($dir_path,0750,true);
 							}
-							$outhandle = fopen( OUTEXT . date( 'Y/m/', $time ) . 'C' . $sc . '_' . date( 'ymd', $time ) . '_' . $version . '.EXT', 'ab' );
+							
+							$outfile = OUTEXT . date( 'Y/m/', $time ) . 'C' . $sc . '_' . date( 'ymd', $time ) . '_' . $version . '.EXT';
+
+							if (file_exists($outfile))
+							{
+								$appended_handle = fopen($ext_appended,'ab');
+								if (!$appended_handle)
+								{
+									exit('Unable to open ext appended log file!'.PHP_EOL);
+								}
+								fwrite($appended_handle,date("Y-m-d H:i:s").' '.$outfile.PHP_EOL);
+								fclose($appended_handle);
+							}	
+							
+							$outhandle = fopen( $outfile , 'ab' );							
 							if ( !$outhandle )
 							{
 								exit( "yes another Bugger" );
@@ -886,6 +926,7 @@ for ( $ext = 0; $ext < 10; $ext++ )
 					
 					#When running the same dates through the processing software, some .EXT.GSE files will grow in magnitude, as will all of the 
 					#.EXT files, since these files are appended to, rather than overwritten!
+					#Log files for appended .EXT and .EXT.GSE files are now being created!
 					echo "Output file (copy (overwrite)):".$procfile.PHP_EOL;
 				}
 			}
