@@ -314,13 +314,11 @@ function getcal($sc,$filepicked)
 	$use_default = FALSE;
 	if ($calfile=getcalfile($sc,$filepicked,CAACAL))
 	{
-		echo "Using CAA calibration!".PHP_EOL;
 		$use_caa = TRUE;
 		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!		
 	}
 	elseif ($calfile=getcalfile($sc,$filepicked,DAILYCAL))
 	{
-		echo "Using DAILY calibration!".PHP_EOL;
 		$use_daily = TRUE;
 		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!			
 	}
@@ -330,10 +328,6 @@ function getcal($sc,$filepicked)
 		echo "Using default calibration".PHP_EOL;
 		$calfile = "/cluster/operations/calibration/default/C".$sc.".fgmcal";
 		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!
-	}
-	if (!$use_caa)
-	{
-		exit("No caa cal found, exiting!");
 	}
 	if ($cal)			#if cal file can be opened!
 	{
@@ -571,8 +565,8 @@ To Do - get orbit times - and from there, get the proper calibration filename in
 -> in file getcalfile.php!
 */
 
-#getcaldefault($sc,$filepicked);
-getcal($sc,$filepicked);
+echo "DEFAULT CAL".PHP_EOL;
+getcaldefault($sc,$filepicked);
 modifycal($sc);
 displaycal($sc);
 
@@ -673,8 +667,9 @@ if (!$outhandle)																						#error message if file can't be opened for
 	exit -1;
 }
 
-$tmp=tempnam('/var/tmp','ExtProcRaw_');																	#creates file with unique file name in '/var/tmp'
-#$tmp='/home/ahk114/testdata/ExtProcRaw_1';
+#$tmp=tempnam('/var/tmp','ExtProcRaw_');
+$tmp='/home/ahk114/testdata/ExtProcRaw_1jk23';																	#creates file with unique file name in '/var/tmp'
+
 $testhandle=fopen($tmp,'wb'); // NB wb not ab															#opens file for writing 'wb' (not append)
 if (!$testhandle)
 {
@@ -689,8 +684,9 @@ $stoffile=RAW.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.
 
 if (!file_exists(PROC.date("Y",$start)))	{mkdir(PROC.date("Y",$start));}
 if (!file_exists(PROC.date("Y/m",$start)))	{mkdir(PROC.date("Y/m",$start));}
-$procfile=PROC.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT.GSE';				#Where the data goes - into the reference folder!
-
+#$procfile=PROC.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT.GSE';
+#$procfile=PROC.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.EXT.GSEtest';				#Where the data goes - into the reference folder!
+$procfile='/home/ahk114/testdata/'.'testfile.'.'EXT.GSE';				#Where the data goes - into the reference folder!
 //$testhandle=fopen(EXT.date('Y/m/',$start).'C'.$sc.'_'.date('ymd',$start).'_'.$version.'.G','wb'); // NB wb not ab
 
 
@@ -732,7 +728,7 @@ for($n=0;$n<$loopsize;$n++)			#goes through all vectors in file
 			// Since Reset count only incs every 16 resets (so every 5.152*16), take this and divide by
 			// spin to get rough time/reset increment.
 
-			$time+=$deltatime*($deltareset-1)*16*RESETPERIOD/$deltatime; // remove 1, since already added deltatime on previous iteration
+			#$time+=$deltatime*($deltareset-1)*16*RESETPERIOD/$deltatime; // remove 1, since already added deltatime on previous iteration
 																									#deltatime is spin period
 
 			#echo "<FONT COLOR=RED>BIG RESET JUMP : Ammending time by ".($deltareset-1)*16*RESETPERIOD/$deltatime." seconds.</FONT><BR>";
@@ -815,9 +811,41 @@ for($n=0;$n<$loopsize;$n++)			#goes through all vectors in file
 
 	}
 	
+
+	$sinei = $n/100.0;
+	#$val = (sin($n/30.)+1)*8.6;
+	$val = 100.2;
+	$hexbx=float2hex($val);
+	$hexby=float2hex($val);
+	$hexbz=float2hex($val);
+	#$hexbx=float2hex(1000.5);
+	#$hexby=float2hex(1000.5);
+	#$hexbz=float2hex(1000.5);
+	#echo PHP_EOL."Argument:".$sinei."Returned:".(sin($sinei)+1)*3.2;
+	$time1=integer2hex($time);					#seconds
+	$time2=integer2hex(floatbit($time)*1e9);	#nanoseconds
+	$range = 2;
+	$teststuff=array(	($range<<4)+14,
+						16,
+						128+(COORD&7),									#COORD = 1, constant
+						(($sc-1)<<6)+1,
+	                  $time1[0],$time1[1],$time1[2],$time1[3],
+	                  $time2[0],$time2[1],$time2[2],$time2[3],
+	                  $hexbx[0],$hexbx[1],$hexbx[2],$hexbx[3],
+	                  $hexby[0],$hexby[1],$hexby[2],$hexby[3],
+	                  $hexbz[0],$hexbz[1],$hexbz[2],$hexbz[3],
+	                  0,0,0,0,
+	                  0,0,0,0);	
+
+	
 	fputs($outhandle,$stuff);
+	#var_dump($teststuff);
+	#exit("Testing");
 	for($i=0;$i<32;$i++)
+		{
+		#echo "Index i:".$i." Array element:".$teststuff[$i];
 		fputb($testhandle,$teststuff[$i]);
+		}
 	// echo substr(str_pad(substr($extfile[$n],0,-1),80,' '),0,80).' <FONT COLOR=GRAY>'.$stuff.'</FONT>';
 
 	if (isset($flibble))			#$flibble related to printing data to webpage
@@ -827,8 +855,8 @@ for($n=0;$n<$loopsize;$n++)			#goes through all vectors in file
 	if (($flibble%$onepercent)==0) { echo (int)$flibble/$onepercent."% "; flush(); } #flush() flushes system output buffer - attempts to push current output to browser
 	if ($flibble==($loopsize-1)) echo "<BR>";
 
-	$time+=$deltatime;																#increments time by 1 spin period
-	
+	#$time+=$deltatime;		#increments time by 1 spin period
+	$time += 4.2;
 	if (date("d",$current)!=date("d",$time))										#if a new day is reached!
 	/*
 	Repeat much of the above, but with the new day
@@ -854,7 +882,8 @@ for($n=0;$n<$loopsize;$n++)			#goes through all vectors in file
 			-o <outfile>, data is written to $tmp2
 		using cat, data from $tmp2 is written to $procfile
 		*/
-		$tmp2=tempnam('/var/tmp','ExtProcDecoded_');
+		#$tmp2=tempnam('/var/tmp','ExtProcDecoded_');
+		$tmp2='/home/ahk114/testdata/ExtProcDecoded_1jk23';
 		echo "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cat ".$tmp2." >> ".$procfile;
 		exec("FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cat ".$tmp2." >> ".$procfile);
 
@@ -902,7 +931,8 @@ fclose($testhandle);
 //echo ">>>>>>>>>>>>>>>End of output from popen";
 
 #repeats above steps (from the if() loop) to write the remaining data from the *last* day
-$tmp2=tempnam('/var/tmp','ExtProcDecoded_');
+#$tmp2=tempnam('/var/tmp','ExtProcDecoded_');
+$tmp2='/home/ahk114/testdata/ExtProcDecoded_1jk23';
 echo "FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile;
 exec("FGMPATH=/cluster/operations/calibration/default ; export FGMPATH ; cat ".$tmp." | /cluster/operations/software/dp/bin/fgmhrt -s gse -a ".$sattfile." | /cluster/operations/software/dp/bin/fgmpos -p ".$stoffile." | /cluster/operations/software/dp/bin/igmvec -o ".$tmp2." ; cp ".$tmp2." ".$procfile);
 
