@@ -16,7 +16,7 @@ import pandas as pd
 #import csv
 #import time
 logdir = 'Y:/logs/data_analysis/'
-VERBOSE=True
+VERBOSE=False
 PLOT_VERBOSE=False
 
 pickledir = 'Y:/overlap_stats/'
@@ -1288,7 +1288,9 @@ def return_vectors_from_vfiles(vfiles,start='',end=''):
         vecs = pd.concat((vecs,vfile.return_vectors()),axis=0)
     return vecs
     
-def update_interval_files(series,result_dir):
+def update_interval_files(series,result_dir,differences):
+    diff_keys = ['x_mean_diff','y_mean_diff',
+                 'z_mean_diff','mag_mean_diff']
     interval_file = 'intervals.xlsx'
     interval_frame = 'intervals.pickle'
     pickle_path = result_dir+interval_frame
@@ -1303,7 +1305,7 @@ def update_interval_files(series,result_dir):
                              'min',
                              'mean',
                              'ext_sc',
-                             'non_ext_sc']
+                             'non_ext_sc']+diff_keys
     else:
         intervals = pd.DataFrame()
     use = ['start',
@@ -1318,10 +1320,12 @@ def update_interval_files(series,result_dir):
     series = series[use]
     series.set_value('ext_sc',series['ext_sc']+1)
     series.set_value('non_ext_sc',series['non_ext_sc']+1)
-    intervals = intervals.append(series)
+    series = series.append(pd.Series(differences,index=diff_keys))
+    intervals = intervals.append(series,ignore_index=True)
     intervals.drop_duplicates(inplace=True,subset=['start','end',
                                                    'ext_sc','non_ext_sc'])
     intervals.reset_index(drop=True,inplace=True)
+    intervals.sort_values('start',inplace=True)
     intervals.to_excel(path,sheet_name='Intervals',
                        index=False,header=['start',
                              'end',
@@ -1331,7 +1335,7 @@ def update_interval_files(series,result_dir):
                              'min (DEFAULT CAL)',
                              'mean (DEFAULT CAL)',
                              'ext_sc',
-                             'non_ext_sc'],
+                             'non_ext_sc']+diff_keys,
                             columns=['start',
                              'end',
                              'duration (h)',
@@ -1340,7 +1344,7 @@ def update_interval_files(series,result_dir):
                              'min',
                              'mean',
                              'ext_sc',
-                             'non_ext_sc'])  
+                             'non_ext_sc']+diff_keys)  
     '''
     for legacy reasons, need to reset the spacecraft numbers to comply with
     the methods that all add 1. This should be changed in future revisions!
@@ -1382,6 +1386,7 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa',
     else:
         raise Exception("Select either 'default' or 'caa' as source")
     colours = ['','']
+    plotwhichs=['x','y','z','mag']
     scs=map(int,[series.non_ext_sc+1,series.ext_sc+1])
     vfiles = [vectorfiles(),vectorfiles()]
     '''
@@ -1391,6 +1396,20 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa',
                                                         scs,colours,legends)):
         input = [[dir,ext_mode,colour,legend,'']]
         process(vfile,sc,start_date,end_date,input,prune_start,prune_end)
+    if vfiles[0].isempty() or vfiles[1].isempty():
+        print "No data could be collected - see log"
+        return 0    
+    '''
+    difference of mean calculation
+    '''
+    non_ext_mode_vecs = vfiles[0].return_vectors()
+    ext_mode_vecs = vfiles[1].return_vectors()
+    differences = []
+    for plotwhich in plotwhichs:
+        difference = np.mean(non_ext_mode_vecs[plotwhich])-\
+                        np.mean(ext_mode_vecs[plotwhich])
+        differences.append(difference)        
+        
     Year,month,day = dt_to_strings(prune_start)
     directory = result_dir+Year+'/'+month+'/'
     for i in range(0,100):
@@ -1412,7 +1431,7 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa',
         filename = ext_mode_label+'_'+source+'_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
                   '__'+prune_end.strftime("%Y%m%dT%H%M%S")
         vfile.write_to_csv(directory+filename+'.csv')
-    update_interval_files(series,result_dir)
+    update_interval_files(series,result_dir,differences)
 
     
 #prune_start = datetime(2015,12,21,10,0,0)
