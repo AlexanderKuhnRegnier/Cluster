@@ -219,8 +219,10 @@ for (ext_sc,non_ext_sc) in itertools.permutations([0,1,2,3],2):
     df=overlap_data[(overlap_data['ext_sc']==ext_sc) & 
                     (overlap_data['non_ext_sc']==non_ext_sc)]
     m_list = [0.5,1.2,2,4]#min hours
+    max_field = 8 #nT
     for m in m_list:
-        filtered.append(df[df['duration (h)']>m].sort_values('std',
+        filtered.append(df[(df['duration (h)']>m)
+                        & (df['mean']<max_field)].sort_values('std',
                           ascending=True).groupby(
                           overlap_data['start'].dt.year).first())
 
@@ -231,3 +233,4 @@ results.sort_values('start',inplace=True)
 results.reset_index(drop=True,inplace=True)
 filtered_results = results[results['std']<2.5]
 #filtered_results.plot(kind='hexbin',x='ext_sc',y='non_ext_sc',gridsize=7)
+filtered2 = filtered_results[filtered_results['start'].dt.year != 2013]

@@ -12,11 +12,12 @@ plt.style.use('classic')
 import cPickle as pickle
 #import pickle
 import pandas as pd
+from collections import OrderedDict
 #import itertools
 #import csv
 #import time
 logdir = 'Y:/logs/data_analysis/'
-VERBOSE=True
+VERBOSE=False
 PLOT_VERBOSE=False
 
 pickledir = 'Y:/overlap_stats/'
@@ -125,6 +126,8 @@ class vectorlist:
         '''
         if not self.vectors.empty:
             if start_date != datetime(1,1,1) and end_date != datetime(1,1,1):
+                #self.vectors.drop_duplicates(inplace=True)
+                #self.vectors.sort_index(inplace=True)
                 self.vectors=self.vectors[start_date:end_date]
             if n > 0:
                 #self.vectors=[v for (i,v) in enumerate(self.vectors) if not i%n] 
@@ -142,7 +145,8 @@ class vectorlist:
                     print "After value pruning:",len(self.vectors)
 
     def read_file(self,filename):
-        data_dict = {'datetime':[],'x':[],'y':[],'z':[]}
+        data_dict = {'datetime':[],'x':[],'y':[],'z':[],'x_pos_gse':[],
+                                                 'y_pos_gse':[],'z_pos_gse':[]}
         self.filename=filename
         if ('.cef.gz' in filename) and ('/caa/ic_archive/' in filename):
             data_dict['mag']=[]
@@ -158,12 +162,21 @@ class vectorlist:
                             y_mag = float(line[3])
                             z_mag = float(line[4])
                             mag = float(line[5])
+                            x_pos_gse = float(line[6])
+                            y_pos_gse = float(line[7])
+                            z_pos_gse = float(line[8])                            
+                            sc_range = int(line[9])
                             data_dict['x'].append(x_mag)
                             data_dict['y'].append(y_mag)
                             data_dict['z'].append(z_mag)
                             data_dict['mag'].append(mag)
-            self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z','mag'])
+                            data_dict['x_pos_gse'].append(x_pos_gse)
+                            data_dict['y_pos_gse'].append(y_pos_gse)
+                            data_dict['z_pos_gse'].append(z_pos_gse)
+            self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z',
+            'mag','x_pos_gse','y_pos_gse','z_pos_gse'])
             self.vectors.set_index('datetime',drop=True,inplace=True)
+            self.vectors.drop_duplicates(inplace=True)
             self.vectors.sort_index(inplace=True)
         elif ('.cef.bz2' in filename) and ('/caa/ic_archive/' in filename):
             data_dict['mag']=[]
@@ -179,6 +192,9 @@ class vectorlist:
                             y_mag = float(line[3])
                             z_mag = float(line[4])
                             mag = float(line[5])
+                            x_pos_gse = float(line[6])
+                            y_pos_gse = float(line[7])
+                            z_pos_gse = float(line[8])  
                             sc_range = int(line[9])
                             '''
                             can the range be plotted as well somehow??
@@ -189,8 +205,13 @@ class vectorlist:
                             data_dict['y'].append(y_mag)
                             data_dict['z'].append(z_mag)
                             data_dict['mag'].append(mag)
-            self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z','mag'])
+                            data_dict['x_pos_gse'].append(x_pos_gse)
+                            data_dict['y_pos_gse'].append(y_pos_gse)
+                            data_dict['z_pos_gse'].append(z_pos_gse)
+            self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z',
+            'mag','x_pos_gse','y_pos_gse','z_pos_gse'])
             self.vectors.set_index('datetime',drop=True,inplace=True)
+            self.vectors.drop_duplicates(inplace=True)
             self.vectors.sort_index(inplace=True)
         else:  
             with open(filename) as f:
@@ -201,10 +222,19 @@ class vectorlist:
                         x_mag = float(line[1])
                         y_mag = float(line[2])
                         z_mag = float(line[3])
+                        x_pos_gse = float(line[4])
+                        y_pos_gse = float(line[5])
+                        z_pos_gse = float(line[6])  
                         data_dict['x'].append(x_mag)
                         data_dict['y'].append(y_mag)
                         data_dict['z'].append(z_mag)
+                        data_dict['x_pos_gse'].append(x_pos_gse)
+                        data_dict['y_pos_gse'].append(y_pos_gse)
+                        data_dict['z_pos_gse'].append(z_pos_gse)
                         data_dict['datetime'].append(np.datetime64(line[0]))
+                        #np.datetime64 conversion needs to be last so that
+                        #the other assignments are still carried out in the 
+                        #case of a ValueError
                     except ValueError:
                         if "60.000" in line[0]:
                             print "Replacing 60.000 by 59.999"
@@ -213,50 +243,18 @@ class vectorlist:
                             data_dict['datetime'].append(np.datetime64(line[0]))                  
                         else:
                             print "Unknown Error"
-            self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z'])
+            self.vectors=pd.DataFrame(data_dict,columns=['datetime','x','y','z',
+            'x_pos_gse','y_pos_gse','z_pos_gse'])
             self.vectors.set_index('datetime',drop=True,inplace=True)
-            '''
-            self.vectors=pd.read_csv(filename,
-                                     header=None,
-                                     delim_whitespace=True,
-                                     index_col=0,
-                                     usecols=[0,1,2,3],
-                                     engine='c',
-                                     dtype={1:np.float64,2:np.float64,3:np.float64},
-                                     skip_blank_lines=True,
-                                     na_filter=False,
-                                     verbose=False,
-                                     infer_datetime_format=True,
-                                     compression=None,
-                                     parse_dates=True,
-                                     names=['datetime','x','y','z'])
-            '''
+            self.vectors.drop_duplicates(inplace=True)
+            self.vectors.sort_index(inplace=True)
             if not self.vectors.empty:
-                mag = np.linalg.norm(self.vectors.ix[:,:],axis=1)
+                mag = np.linalg.norm(self.vectors.ix[:,['x','y','z']],axis=1)
                 self.vectors['mag'] = mag
-                if type(self.vectors.index[0])==str:
-                    print "Time format error in file"
-                    self.vectors.reset_index(inplace=True)
-                    datetimes=self.vectors['datetime']
-                    mask = datetimes.str.contains(':60.000')
-                    indices_to_replace = self.vectors.ix[mask,'datetime'].index
-                    #print indices_to_replace
-                    for i in indices_to_replace:
-                        #print "i", i, self.vectors.loc[i,'datetime']
-                        date_string = self.vectors.loc[i,'datetime']
-                        date_string = date_string.replace(':60.000',':59.999')
-                        self.vectors.loc[i,'datetime'] = date_string
-                    #print "New entry"
-                    #print self.vectors.loc[indices_to_replace,'datetime']
-                    #print self.vectors.loc[18350:18355]
-                    self.vectors.set_index('datetime',drop=True,inplace=True)
-                    #print self.vectors
-                    self.vectors.index = pd.to_datetime(self.vectors.index)
-                    #print self.vectors
-                    #raise Exception
-                self.vectors.sort_index(inplace=True)
             else:
                 self.vectors['mag']=[]
+            self.vectors = self.vectors[['x','y','z',
+                                 'mag','x_pos_gse','y_pos_gse','z_pos_gse']]
     def returndatetimes(self):
         '''
         return np.asarray(self.vectors['datetime'])
@@ -276,8 +274,6 @@ class vectorlist:
         #labels = '-'.join(set(labels))
         #array = [vlist,color,legend,plotwhich]
         f,ax = plt.subplots(1,1)
-        min_date = np.datetime64(datetime(9999,1,1))
-        max_date = np.datetime64(datetime(1,1,1))
         legend_colour_list_scatter = []
         legend_colour_list_line = []
         for count,entry in enumerate(array):
@@ -310,11 +306,9 @@ class vectorlist:
             label = legend+' ('+plotwhich+')'
             if scatter:
                 if [label,colour] in legend_colour_list_scatter:
-                    ax.scatter(dates,data,c=colour,
-                         s=scatter_size)
+                    ax.plot_date(dates,data,c=colour)
                 else:
-                    ax.scatter(dates,data,c=colour,label=label,
-                         s=scatter_size)
+                    ax.plot_date(dates,data,c=colour,label=label)
                     legend_colour_list_scatter.append([label,colour])
             else: #ie. if line plot is selected
                 dates_list=[]
@@ -339,21 +333,11 @@ class vectorlist:
                     total_entries+=len(dates_list[-1])
                 for ds,da in zip(dates_list,data_list):
                     if [label,colour] in legend_colour_list_line:
-                        ax.plot(ds,da,c=colour)
+                        ax.plot_date(ds,da,c=colour,fmt='-')
                     else:
-                        ax.plot(ds,da,c=colour,label=legend)
+                        ax.plot_date(ds,da,c=colour,label=legend,fmt='-')
                         legend_colour_list_line.append([label,colour]) 
-            print "plotted the following",len(dates),len(data)
-            print "From:",min(dates).astype(object)
-            print "  To:",max(dates).astype(object)
-            if min(dates)<min_date:
-                min_date = min(dates)
-            if max(dates)>max_date:
-                max_date = max(dates)
-
-        ax.set_xlim((min_date.astype(object)-timedelta(hours=2),max_date.astype(object)+timedelta(hours=2)))
         legend = ax.legend()
-        
         ax.set_xlabel('Time')
         ax.set_ylabel('nT')
         if log:
@@ -743,6 +727,9 @@ def process(vfiles,sc,start_date,end_date,input,prune_start=datetime(1,1,1),
     if prune_start != datetime(1,1,1) and prune_end != datetime(1,1,1):
         if VERBOSE:
             print "Pruning Dates:",prune_start,prune_end
+            vecs =vfiles.return_vectors()
+            print vecs.head()
+            print vecs.tail()
         vfiles.prune(start_date=prune_start,end_date=prune_end)
     if prune_n > 1:
         if VERBOSE:
@@ -764,7 +751,6 @@ def plot(vfiles,sc,start_date,end_date,input,std=True,scatter=True,n=10,
         log=False
     else:
         log=True
-
     vfiles.plotfiles(scatter=scatter,log=log,std=std,n=n,threshold=threshold)
 
 def plot_timeseries():
@@ -827,13 +813,12 @@ vfiles = vectorfiles()
 sc=0
 scatter_size = 10
 
-
 def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
             prune_start=datetime(1,1,1),prune_end=datetime(1,1,1),prune_n=0,
             prune_value = 0,input=[[refdir,1,'b','default','mag']],
             scatter_s=50,prune_greater_than=False,
             std_threshold=0,rm_outliers=0,std_n=50,PLOT=0,reprocess=1,
-            scatter=False,vectorfile_storage=vfile_store()):
+            scatter=False,vectorfile_storage=vfile_store(),plot_std=True):
     '''
     spacecraft    = spacecraft (1,2,3,4)    
     input = [[directory,extmode 0 or 1 (off or on), colour, legend (string), 
@@ -980,11 +965,94 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
     std_periods,vectors = vfiles.select_stds(threshold=std_threshold)
     if PLOT and not vfiles.isempty():
         plot(vfiles,sc,start_date,end_date,input,n=std_n,scatter=scatter,
-             threshold=std_threshold)
+             threshold=std_threshold,std=plot_std)
         #plot(vfiles,sc,start_date,end_date,input)
     #return vfiles.threshold_std,new
     return std_periods,vectors,vfiles_store
 
+def plot_x_pos_mag(scs,start,end,save_dir=imagedir,image_type='.pdf',save=False,
+                   show=True,source='caa',dpi=330):
+    assert len(scs)==2,"Need two spacecraft to compare!"
+    if not '.' in image_type:
+        image_type='.'+image_type
+    dirs=[]
+    if source=='default':
+        dirs.append(refdir)
+        dirs.append(refdir)
+    elif source=='caa':
+        dirs.append(caadir)
+        dirs.append(refdirahk114caa)
+    else:
+        raise Exception("Select either 'default' or 'caa' as source")
+    '''
+    data collection
+    '''
+    start_date = pd.Timestamp(start).normalize().to_datetime()
+    end_date = pd.Timestamp(end).normalize().to_datetime()
+    prune_start = pd.Timestamp(start).to_datetime()
+    prune_end = pd.Timestamp(end).to_datetime()
+    vfiles = [vectorfiles(),vectorfiles()]
+    for sc,vfile in zip(scs,vfiles):
+        input = [[dirs[0],0,'','',''],[dirs[1],1,'','','']]
+        process(vfile,sc,start_date,end_date,input,prune_start,prune_end,
+                prune_value=0)
+    if vfiles[0].isempty() or vfiles[1].isempty():
+        print "No data could be collected - see log"
+        return 0
+    colour_dict = {'C1':'k','C2':'r','C3':'ForestGreen','C4':'Magenta'}
+    plt.ioff()
+    plt.style.use('classic')
+    f,axes = plt.subplots(2,1,sharex=True,figsize=(23,13))
+    labelsize=17.5
+    axes[1].set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+    for vfile,axis in zip(vfiles,axes):
+        axis2 = axis.twinx()
+        axis2.set_ylabel(r'$\mathrm{GSE \ X \ (km)}$',
+                                    fontsize=labelsize)
+        axis.tick_params(axis='both',which='major',labelsize=14,pad=20)
+        axis2.tick_params(axis='both',which='major',labelsize=14,pad=20)
+        axis.set_ylabel(r'$\mathrm{\vert B \vert \ (nT)}$',fontsize=labelsize)
+        axis.minorticks_on()
+        axis2.minorticks_on()
+        sc_string = vfile.array[0][0].filename.split('/')[-1][:2]
+        axis.set_title('Cluster '+sc_string[1])
+        vectors = vfile.return_vectors()
+        dataframe = vectors[['mag','x_pos_gse']]
+        if not dataframe.empty:
+            dataframe = dataframe.sort_index()
+            times = dataframe.index.values
+            diffs=pd.Series(data=times[1:]-times[:-1],
+                            index=times[1:])
+            delta = diffs/pd.Timedelta(1,'s')
+            dataframe['delta']=delta
+            interval_mask = dataframe['delta']>5
+            break_times = dataframe[interval_mask].index
+            plot_list = []
+            for i in xrange(break_times.shape[0]):
+                mask = dataframe.index<break_times[i]
+                plot_list.append(dataframe[mask])
+                dataframe = dataframe[~mask]
+            plot_list.append(dataframe)
+            for frame in plot_list:
+                axis.plot_date(frame.index,frame['mag'],fmt='-',
+                               c=colour_dict[sc_string])
+                axis2.plot_date(frame.index,frame['x_pos_gse'],fmt='-',
+                                c='b')
+            axis.set_yscale('log')
+            for tl in axis.get_yticklabels():
+                tl.set_color(colour_dict[sc_string])
+            for tl in axis2.get_yticklabels():
+                tl.set_color('b')
+    if save:
+        filename='mag_gse_x_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
+                  '__'+prune_end.strftime("%Y%m%dT%H%M%S")+image_type
+        plt.savefig(save_dir+filename,dpi=dpi,bbox_inches='tight',pad_inches=0.4)
+    if show:
+        figManager = plt.get_current_fig_manager()
+        figManager.window.showMaximized()
+        plt.show()
+    else:
+        plt.close()
 def plot_axis(array,ax,plotwhich_override=''):
     legend_colour_list_line = []
     for count,entry in enumerate(array):
@@ -1038,8 +1106,10 @@ def plot_axis(array,ax,plotwhich_override=''):
                 legend_colour_list_line.append([label,colour])            
     legend = ax.legend(loc='best',fontsize=14) 
         
-def plot_both(scs,start_date,end_date,plotwhich='mag',return_output=False,
-              std_threshold=0,std_n=10,prune=True,prune_value=0,source='default'):    
+def plotting(scs,start_date,end_date,plotwhich='mag',return_output=False,
+              std_threshold=0,std_n=10,prune=True,prune_value=0,source='default',
+              plot_std=True):   
+    plt.ion()
     if type(scs) == int or type(scs) == float:
         scs = [int(scs)]
     '''
@@ -1070,7 +1140,7 @@ def plot_both(scs,start_date,end_date,plotwhich='mag',return_output=False,
                  PLOT=True, scatter=False,std_threshold=std_threshold,
                  prune_start=prune_start,
                  prune_end=prune_end,
-                 prune_value=prune_value
+                 prune_value=prune_value,plot_std=plot_std
                  )       
     if return_output:
         return output
@@ -1131,9 +1201,9 @@ def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True,
     f,axarr = plt.subplots(3,1,sharex=True,figsize=(23,13))
     labelsize=17.5
     axarr[2].set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
-    axarr[0].set_ylabel(r'$\mathrm{B_x (nT)}$',fontsize=labelsize)
-    axarr[1].set_ylabel(r'$\mathrm{B_y (nT)}$',fontsize=labelsize)
-    axarr[2].set_ylabel(r'$\mathrm{B_z (nT)}$',fontsize=labelsize)
+    axarr[0].set_ylabel(r'$\mathrm{B_x \ (nT)}$',fontsize=labelsize)
+    axarr[1].set_ylabel(r'$\mathrm{B_y \ (nT)}$',fontsize=labelsize)
+    axarr[2].set_ylabel(r'$\mathrm{B_z \ (nT)}$',fontsize=labelsize)
     for (plotwhich,ax,difference) in zip(plotwhichs,axarr,differences):
         ax.grid(True,which='major',color='0.6',linestyle='-',
                 alpha=0.7,axis='y')
@@ -1225,10 +1295,10 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,
     axarr[1][0].set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
     axarr[1][1].set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
     axarr = np.ravel(axarr)
-    axarr[0].set_ylabel(r'$\mathrm{B_x (nT)}$',fontsize=labelsize)
-    axarr[1].set_ylabel(r'$\mathrm{B_y (nT)}$',fontsize=labelsize)
-    axarr[2].set_ylabel(r'$\mathrm{B_z (nT)}$',fontsize=labelsize)
-    axarr[3].set_ylabel(r'$\mathrm{\vert B \vert (nT)}$',fontsize=labelsize)
+    axarr[0].set_ylabel(r'$\mathrm{B_x \ (nT)}$',fontsize=labelsize)
+    axarr[1].set_ylabel(r'$\mathrm{B_y \ (nT)}$',fontsize=labelsize)
+    axarr[2].set_ylabel(r'$\mathrm{B_z \ (nT)}$',fontsize=labelsize)
+    axarr[3].set_ylabel(r'$\mathrm{\vert B \vert \ (nT)}$',fontsize=labelsize)
     for (plotwhich,ax,difference) in zip(plotwhichs,axarr,differences):
         ax.grid(True,which='major',color='0.6',linestyle='-',
                 alpha=0.7,axis='y')
@@ -1288,7 +1358,10 @@ def return_vectors_from_vfiles(vfiles,start='',end=''):
         vecs = pd.concat((vecs,vfile.return_vectors()),axis=0)
     return vecs
     
-def update_interval_files(series,result_dir):
+def update_interval_files(series,result_dir,differences,coords):
+    diff_keys = ['x_mean_diff_(normal-ext)','y_mean_diff_(normal-ext)',
+                 'z_mean_diff_(normal-ext)','mag_mean_diff_(normal-ext)']
+    coord_keys = coords.index.tolist()
     interval_file = 'intervals.xlsx'
     interval_frame = 'intervals.pickle'
     pickle_path = result_dir+interval_frame
@@ -1303,7 +1376,7 @@ def update_interval_files(series,result_dir):
                              'min',
                              'mean',
                              'ext_sc',
-                             'non_ext_sc']
+                             'non_ext_sc']+diff_keys+coord_keys
     else:
         intervals = pd.DataFrame()
     use = ['start',
@@ -1318,20 +1391,25 @@ def update_interval_files(series,result_dir):
     series = series[use]
     series.set_value('ext_sc',series['ext_sc']+1)
     series.set_value('non_ext_sc',series['non_ext_sc']+1)
-    intervals = intervals.append(series)
+    series = series.append(pd.Series(differences,index=diff_keys))
+    series = series.append(coords)
+    intervals = intervals.append(series,ignore_index=True)
     intervals.drop_duplicates(inplace=True,subset=['start','end',
                                                    'ext_sc','non_ext_sc'])
-    intervals.reset_index(drop=True,inplace=True)
+    intervals.sort_values('start',inplace=True)
+    #intervals.reset_index(drop=True,inplace=True)
     intervals.to_excel(path,sheet_name='Intervals',
                        index=False,header=['start',
                              'end',
                              'duration (h)',
-                             'std (DEFAULT CAL)',
-                             'max (DEFAULT CAL)',
-                             'min (DEFAULT CAL)',
-                             'mean (DEFAULT CAL)',
+                             'std (DEFAULT CAL) (nT)',
+                             'max (DEFAULT CAL) (nT)',
+                             'min (DEFAULT CAL) (nT)',
+                             'mean (DEFAULT CAL) (nT)',
                              'ext_sc',
-                             'non_ext_sc'],
+                             'non_ext_sc']
+                             +[key+' (nT)' for key in diff_keys]
+                             +[key+' (km)' for key in coord_keys],
                             columns=['start',
                              'end',
                              'duration (h)',
@@ -1340,7 +1418,7 @@ def update_interval_files(series,result_dir):
                              'min',
                              'mean',
                              'ext_sc',
-                             'non_ext_sc'])  
+                             'non_ext_sc']+diff_keys+coord_keys)  
     '''
     for legacy reasons, need to reset the spacecraft numbers to comply with
     the methods that all add 1. This should be changed in future revisions!
@@ -1382,6 +1460,7 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa',
     else:
         raise Exception("Select either 'default' or 'caa' as source")
     colours = ['','']
+    plotwhichs=['x','y','z','mag']
     scs=map(int,[series.non_ext_sc+1,series.ext_sc+1])
     vfiles = [vectorfiles(),vectorfiles()]
     '''
@@ -1391,6 +1470,30 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa',
                                                         scs,colours,legends)):
         input = [[dir,ext_mode,colour,legend,'']]
         process(vfile,sc,start_date,end_date,input,prune_start,prune_end)
+    if vfiles[0].isempty() or vfiles[1].isempty():
+        print "No data could be collected - see log"
+        return 0    
+    '''
+    difference of mean calculation
+    '''
+    non_ext_mode_vecs = vfiles[0].return_vectors()
+    ext_mode_vecs = vfiles[1].return_vectors()
+    differences = []
+    for plotwhich in plotwhichs:
+        difference = np.mean(non_ext_mode_vecs[plotwhich])-\
+                        np.mean(ext_mode_vecs[plotwhich])
+        differences.append(difference)   
+    coords = OrderedDict()
+    for coord in ['x_pos_gse','y_pos_gse','z_pos_gse']:
+        coords[coord+'_non_ext_mean'] = np.mean(non_ext_mode_vecs[coord])
+        coords[coord+'_non_ext_max'] = np.max(non_ext_mode_vecs[coord])
+        coords[coord+'_non_ext_min'] = np.min(non_ext_mode_vecs[coord])
+        coords[coord+'_ext_mean'] = np.mean(ext_mode_vecs[coord])
+        coords[coord+'_ext_max'] = np.max(ext_mode_vecs[coord])
+        coords[coord+'_ext_min'] = np.min(ext_mode_vecs[coord])
+        coords[coord+'_mean_diff_(normal-ext)'] = coords[coord+'_non_ext_mean']-\
+                                coords[coord+'_ext_mean']
+    coords = pd.Series(coords)
     Year,month,day = dt_to_strings(prune_start)
     directory = result_dir+Year+'/'+month+'/'
     for i in range(0,100):
@@ -1403,7 +1506,10 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa',
     plot_xyz(series,save=True,dpi=dpi,image_type=image_type,show=False,
              source=source,save_dir=directory)
     plot_mag_xyz(series,save=True,dpi=dpi,image_type=image_type,show=False,
-             source=source,save_dir=directory)    
+             source=source,save_dir=directory) 
+    plot_x_pos_mag(scs,prune_start-timedelta(days=3),prune_end,
+                   save_dir=directory,image_type=image_type,show=False,
+                   save=True,dpi=dpi,source=source)
     for ((ext_mode,dir),vfile) in zip(enumerate(dirs),vfiles):
         if ext_mode:
             ext_mode_label = 'extended_mode'
@@ -1412,9 +1518,8 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa',
         filename = ext_mode_label+'_'+source+'_'+prune_start.strftime("%Y%m%dT%H%M%S")+\
                   '__'+prune_end.strftime("%Y%m%dT%H%M%S")
         vfile.write_to_csv(directory+filename+'.csv')
-    update_interval_files(series,result_dir)
+    update_interval_files(series,result_dir,differences,coords)
 
-    
 #prune_start = datetime(2015,12,21,10,0,0)
 #prune_end = datetime(2015,12,21,19,0,0)
 #to get all of the relevant caa data, need to start from 3-4 days 
