@@ -233,3 +233,4 @@ results.sort_values('start',inplace=True)
 results.reset_index(drop=True,inplace=True)
 filtered_results = results[results['std']<2.5]
 #filtered_results.plot(kind='hexbin',x='ext_sc',y='non_ext_sc',gridsize=7)
+filtered2 = filtered_results[filtered_results['start'].dt.year != 2013]
