@@ -13,6 +13,7 @@ import cPickle as pickle
 #import pickle
 import pandas as pd
 from collections import OrderedDict
+from matplotlib.ticker import MaxNLocator
 #import itertools
 #import csv
 #import time
@@ -1054,9 +1055,9 @@ def plot_x_pos_mag(scs,start,end,save_dir=imagedir,image_type='.pdf',save=False,
             plot_list.append(dataframe)
             for frame in plot_list:
                 axis.plot_date(frame.index,frame['mag'],fmt='-',
-                               c=colour_dict[sc_string])
+                               c=colour_dict[sc_string],zorder=10)
                 axis2.plot_date(frame.index,frame['x_pos_gse'],fmt='-',
-                                c='b')
+                                c='b',zorder=9)
             axis.set_yscale('log')
             for tl in axis.get_yticklabels():
                 tl.set_color(colour_dict[sc_string])
@@ -1119,11 +1120,162 @@ def plot_axis(array,ax,plotwhich_override=''):
             total_entries+=len(dates_list[-1])
         for ds,da in zip(dates_list,data_list):
             if [label,colour] in legend_colour_list_line:
-                ax.plot_date(ds,da,c=colour,fmt='-')
+                ax.plot_date(ds,da,c=colour,fmt='-',zorder=10)
             else:
-                ax.plot_date(ds,da,c=colour,label=label,fmt='-')
+                ax.plot_date(ds,da,c=colour,label=label,fmt='-',zorder=10)
                 legend_colour_list_line.append([label,colour])            
     legend = ax.legend(loc='best',fontsize=14) 
+
+def invisible_labels(ax,which='x'):
+    if which=='x':
+        for label in ax.get_xticklabels():
+            label.set_visible(False)  
+    elif which=='y':
+        for label in ax.get_yticklabels():
+            label.set_visible(False)   
+    else:
+        raise Exception("Axis must be either 'x' or 'y'")
+
+def plotting_overlay(scs,start_date,end_date,plotwhichs,source='caa'):  
+    plt.ioff()
+    colour_dict = {1:'Black',2:'Red',3:'Green',4:'Magenta'}
+    if type(scs) == int or type(scs) == float:
+        scs = [int(scs)]
+    if plotwhichs == 'all' or plotwhichs =='ALL':
+        plotwhichs = ['x','y','z','mag']
+    elif type(plotwhichs)==str:
+        plotwhichs=[plotwhichs]
+
+    start = pd.Timestamp(start_date).normalize().to_datetime()
+    end = pd.Timestamp(end_date).normalize().to_datetime()
+    prune_start = start_date
+    if start_date==end_date:
+        prune_end = end_date+timedelta(days=1)
+    else:
+        prune_end = end_date
+        
+    if source=='default':
+        ext_dir = refdir
+        norm_dir = refdir
+    elif source=='caa':
+        ext_dir = refdirahk114caa
+        norm_dir = caadir
+    else:
+        raise Exception("Select either 'default' or 'caa' as source")
+    vfiles = {}
+    for sc in scs:
+        for ext_mode,dir in enumerate([norm_dir,ext_dir]):
+            input = [[dir,ext_mode,'','','']]
+            vfile = vectorfiles()
+            process(vfile,sc,start,end,input,prune_start,prune_end)
+            vfiles[str(sc)+str(ext_mode)]=vfile
+    rows = len(plotwhichs)
+    columns = 1
+    labelsize=17.5
+    #fig, axarr = plt.subplots(rows,columns,sharex=True,sharey=True,figsize=(23,13))
+    fig = plt.figure()
+    if rows==1:
+        axarr = fig.add_subplot(1,1,1)
+
+    else:
+        axarr = []
+        for i in range(rows):
+            if i==0:
+                axarr.append(fig.add_subplot(rows,1,i+1))
+            else:
+                axarr.append(fig.add_subplot(rows,1,i+1,sharex=axarr[0]))
+
+    if rows ==1:
+        ax = axarr
+        plotwhich = plotwhichs[0]
+        ax.set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+        if plotwhich == 'x':
+            ax.set_ylabel(r'$\mathrm{B_x \ (nT)}$',fontsize=labelsize)
+        elif plotwhich == 'y':
+            ax.set_ylabel(r'$\mathrm{B_y \ (nT)}$',fontsize=labelsize)
+        elif plotwhich == 'z':
+            ax.set_ylabel(r'$\mathrm{B_z \ (nT)}$',fontsize=labelsize)
+        elif plotwhich == 'mag':
+            ax.set_ylabel(r'$\mathrm{\vert B \vert \ (nT)}$',
+                        fontsize=labelsize)
+   
+    else:
+        ax = axarr[-1]
+        ax.set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+        for ax,plotwhich in zip(axarr,plotwhichs):
+            if plotwhich == 'x':
+                ax.set_ylabel(r'$\mathrm{B_x \ (nT)}$',fontsize=labelsize)
+            elif plotwhich == 'y':
+                ax.set_ylabel(r'$\mathrm{B_y \ (nT)}$',fontsize=labelsize)
+            elif plotwhich == 'z':
+                ax.set_ylabel(r'$\mathrm{B_z \ (nT)}$',fontsize=labelsize)
+            elif plotwhich == 'mag':
+                ax.set_ylabel(r'$\mathrm{\vert B \vert \ (nT)}$',
+                            fontsize=labelsize)
+
+    for row,plotwhich in enumerate(plotwhichs):
+        if rows==1:
+            ax=axarr
+        else:
+            ax=axarr[row]
+        ax.minorticks_on()
+        ax.grid(True,which='major',color='0.6',linestyle='-',
+                alpha=0.8,axis='both')
+        ax.tick_params(axis='x',which='major',labelsize=12,pad=10)
+        ax.tick_params(axis='y',which='major',labelsize=12)
+        if row!=rows-1:
+            invisible_labels(ax,'x')
+            
+        lines = []
+        labels = []           
+        for sc in scs:            
+            for ext_mode in range(2):
+                vfile_index = str(sc)+str(ext_mode)
+                vfile = vfiles[vfile_index]
+                vectors = vfile.return_vectors()
+                '''
+                if ext_mode:
+                    label = 'ext mode'
+                    colour = 'DarkOrange'
+                else:
+                    label = 'normal mode'
+                    colour = colour_dict[sc]
+                '''
+                label = 'Cluster '+str(sc)
+                colour = colour_dict[sc]
+                plotting_list = generate_dataframe_plotting_list(vectors)
+                for frame in plotting_list:
+                    line,=ax.plot_date(frame.index.values,
+                            frame[plotwhich],fmt='-',c=colour,zorder=10)
+                if plotting_list:
+                    lines.append(line)
+                    labels.append(label)
+        print "labels",labels
+        if lines and labels:
+            if len(lines)==1 and len(labels)==1:
+                lines = (lines[0],)
+                labels = (labels[0],)
+            ax.legend((lines),(labels),loc='best')
+            
+    #ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
+    if start_date.strftime("%H:%M:%S") != '00:00:00':
+        fmt = "%d/%m/%Y %H:%M:%S"
+    else:
+        fmt = "%d/%m/%Y"
+    start_str = start_date.strftime(fmt)
+    if end_date.strftime("%H:%M:%S") != '00:00:00':
+        fmt = "%d/%m/%Y %H:%M:%S"
+    else:
+        fmt = "%d/%m/%Y"
+    end_str = end_date.strftime(fmt)
+    plt.suptitle(('From '+start_str+' to '+end_str+' ('+source+' calibration) ' 
+                    '(ext mode in same colour)'),fontsize=16)
+    plt.gcf().autofmt_xdate()
+    #plt.tight_layout()
+    plt.subplots_adjust(top=0.92,bottom=0.1)
+    figManager = plt.get_current_fig_manager()
+    figManager.window.showMaximized()
+    plt.show()
         
 def plotting(scs,start_date,end_date,plotwhichs,source='caa'):  
     plt.ioff()
@@ -1262,6 +1414,17 @@ def plotting(scs,start_date,end_date,plotwhichs,source='caa'):
                 ax=axarr[column]
             else:
                 ax=axarr[row][column]
+            ax.minorticks_on()
+            ax.grid(True,which='major',color='0.6',linestyle='-',
+                    alpha=0.8,axis='both')
+            ax.tick_params(axis='x',which='major',labelsize=12,pad=10)
+            ax.tick_params(axis='y',which='major',labelsize=12)
+            if column>0:
+                invisible_labels(ax,'y')
+            if row!=rows-1:
+                invisible_labels(ax,'x')
+            if row==0:
+                ax.set_title('Cluster '+str(sc),fontsize=14)
             lines = []
             labels = []
             for ext_mode in range(2):
@@ -1277,7 +1440,7 @@ def plotting(scs,start_date,end_date,plotwhichs,source='caa'):
                 plotting_list = generate_dataframe_plotting_list(vectors)
                 for frame in plotting_list:
                     line,=ax.plot_date(frame.index.values,
-                            frame[plotwhich],fmt='-',c=colour)
+                            frame[plotwhich],fmt='-',c=colour,zorder=10)
                 if plotting_list:
                     lines.append(line)
                     labels.append(label)
@@ -1288,12 +1451,26 @@ def plotting(scs,start_date,end_date,plotwhichs,source='caa'):
                     labels = (labels[0],)
                 ax.legend((lines),(labels),loc='best')
             '''
-    
+    #ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
+    if start_date.strftime("%H:%M:%S") != '00:00:00':
+        fmt = "%d/%m/%Y %H:%M:%S"
+    else:
+        fmt = "%d/%m/%Y"
+    start_str = start_date.strftime(fmt)
+    if end_date.strftime("%H:%M:%S") != '00:00:00':
+        fmt = "%d/%m/%Y %H:%M:%S"
+    else:
+        fmt = "%d/%m/%Y"
+    end_str = end_date.strftime(fmt)
+    plt.suptitle(('From '+start_str+' to '+end_str+' ('+source+' calibration) ' 
+                    '(Extended Mode in Orange)'),fontsize=16)
+    plt.gcf().autofmt_xdate()
     #plt.tight_layout()
+    plt.subplots_adjust(top=0.92,bottom=0.1)
     figManager = plt.get_current_fig_manager()
     figManager.window.showMaximized()
     plt.show()
-    
+
 def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True,
              source='caa',save_dir=imagedir):
     '''
