@@ -13,12 +13,12 @@ import cPickle as pickle
 #import pickle
 import pandas as pd
 from collections import OrderedDict
-from matplotlib.ticker import MaxNLocator
+
 #import itertools
 #import csv
 #import time
 logdir = 'Y:/logs/data_analysis/'
-VERBOSE=False
+VERBOSE=True
 PLOT_VERBOSE=False
 
 pickledir = 'Y:/overlap_stats/'
@@ -1136,7 +1136,8 @@ def invisible_labels(ax,which='x'):
     else:
         raise Exception("Axis must be either 'x' or 'y'")
 
-def plotting_overlay(scs,start_date,end_date,plotwhichs,source='caa'):  
+def plotting_overlay(scs,start_date,end_date,plotwhichs,source='caa',show=True,
+                     save=False,dpi=300,filetype='.png',savedir=''):  
     plt.ioff()
     colour_dict = {1:'Black',2:'Red',3:'Green',4:'Magenta'}
     if type(scs) == int or type(scs) == float:
@@ -1173,10 +1174,9 @@ def plotting_overlay(scs,start_date,end_date,plotwhichs,source='caa'):
     columns = 1
     labelsize=17.5
     #fig, axarr = plt.subplots(rows,columns,sharex=True,sharey=True,figsize=(23,13))
-    fig = plt.figure()
+    fig = plt.figure(figsize=(23,13))
     if rows==1:
         axarr = fig.add_subplot(1,1,1)
-
     else:
         axarr = []
         for i in range(rows):
@@ -1198,7 +1198,6 @@ def plotting_overlay(scs,start_date,end_date,plotwhichs,source='caa'):
         elif plotwhich == 'mag':
             ax.set_ylabel(r'$\mathrm{\vert B \vert \ (nT)}$',
                         fontsize=labelsize)
-   
     else:
         ax = axarr[-1]
         ax.set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
@@ -1250,7 +1249,6 @@ def plotting_overlay(scs,start_date,end_date,plotwhichs,source='caa'):
                 if plotting_list:
                     lines.append(line)
                     labels.append(label)
-        print "labels",labels
         if lines and labels:
             if len(lines)==1 and len(labels)==1:
                 lines = (lines[0],)
@@ -1260,24 +1258,43 @@ def plotting_overlay(scs,start_date,end_date,plotwhichs,source='caa'):
     #ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
     if start_date.strftime("%H:%M:%S") != '00:00:00':
         fmt = "%d/%m/%Y %H:%M:%S"
+        save_fmt = "%d_%m_%YT%H-%M-%S"
     else:
         fmt = "%d/%m/%Y"
+        save_fmt = "%d_%m_%Y"
     start_str = start_date.strftime(fmt)
+    start_str_save = start_date.strftime(save_fmt)
     if end_date.strftime("%H:%M:%S") != '00:00:00':
         fmt = "%d/%m/%Y %H:%M:%S"
+        save_fmt = "%d_%m_%YT%H-%M-%S"
     else:
         fmt = "%d/%m/%Y"
+        save_fmt = "%d_%m_%Y"
     end_str = end_date.strftime(fmt)
+    end_str_save = end_date.strftime(save_fmt)
     plt.suptitle(('From '+start_str+' to '+end_str+' ('+source+' calibration) ' 
                     '(ext mode in same colour)'),fontsize=16)
     plt.gcf().autofmt_xdate()
     #plt.tight_layout()
     plt.subplots_adjust(top=0.92,bottom=0.1)
-    figManager = plt.get_current_fig_manager()
-    figManager.window.showMaximized()
-    plt.show()
+    if save:
+        if not os.path.isdir(savedir):
+            print (savedir+" is not a valid directory!\nPlease"
+                            "provide valid directory!")
+        else:
+            save_string = 'plotting_overlay_scs--'+'--'.join(map(str,scs))+'__'+\
+                                    start_str_save+'__'+end_str_save+filetype
+            fig.savefig(savedir+save_string,dpi=dpi,bbox_inches='tight',
+                                                        pad_inches=0.4)
+    if show:
+        figManager = plt.get_current_fig_manager()
+        figManager.window.showMaximized()
+        plt.show()
+    else:
+        plt.close()
         
-def plotting(scs,start_date,end_date,plotwhichs,source='caa'):  
+def plotting(scs,start_date,end_date,plotwhichs,source='caa',show=True,
+             save=False,dpi=300,filetype='.png',savedir=''):  
     plt.ioff()
     colour_dict = {1:'Black',2:'Red',3:'Green',4:'Magenta'}
     if type(scs) == int or type(scs) == float:
@@ -1314,7 +1331,7 @@ def plotting(scs,start_date,end_date,plotwhichs,source='caa'):
     columns = len(scs)
     labelsize=17.5
     #fig, axarr = plt.subplots(rows,columns,sharex=True,sharey=True,figsize=(23,13))
-    fig = plt.figure()
+    fig = plt.figure(figsize=(23,13))
     if rows==1 and columns==1:
         axarr = fig.add_subplot(1,1,1)
     elif rows==1:
@@ -1454,22 +1471,40 @@ def plotting(scs,start_date,end_date,plotwhichs,source='caa'):
     #ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
     if start_date.strftime("%H:%M:%S") != '00:00:00':
         fmt = "%d/%m/%Y %H:%M:%S"
+        save_fmt = "%d_%m_%YT%H-%M-%S"
     else:
         fmt = "%d/%m/%Y"
+        save_fmt = "%d_%m_%Y"
     start_str = start_date.strftime(fmt)
+    start_str_save = start_date.strftime(save_fmt)
     if end_date.strftime("%H:%M:%S") != '00:00:00':
         fmt = "%d/%m/%Y %H:%M:%S"
+        save_fmt = "%d_%m_%YT%H-%M-%S"
     else:
         fmt = "%d/%m/%Y"
+        save_fmt = "%d_%m_%Y"
     end_str = end_date.strftime(fmt)
+    end_str_save = end_date.strftime(save_fmt)
     plt.suptitle(('From '+start_str+' to '+end_str+' ('+source+' calibration) ' 
                     '(Extended Mode in Orange)'),fontsize=16)
     plt.gcf().autofmt_xdate()
     #plt.tight_layout()
     plt.subplots_adjust(top=0.92,bottom=0.1)
-    figManager = plt.get_current_fig_manager()
-    figManager.window.showMaximized()
-    plt.show()
+    if save:
+        if not os.path.isdir(savedir):
+            print (savedir+" is not a valid directory!\nPlease"
+                            "provide valid directory!")
+        else:
+            save_string = 'plotting_scs--'+'--'.join(map(str,scs))+'__'+\
+                                    start_str_save+'__'+end_str_save+filetype
+            fig.savefig(savedir+save_string,dpi=dpi,bbox_inches='tight',
+                                                        pad_inches=0.4)
+    if show:
+        figManager = plt.get_current_fig_manager()
+        figManager.window.showMaximized()
+        plt.show()
+    else:
+        plt.close()
 
 def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True,
              source='caa',save_dir=imagedir):
@@ -1937,7 +1972,39 @@ def surrounding_data_plot(series,dpi=300,image_type='.pdf',source='caa',
             ax.tick_params(axis='both',which='major',labelsize=14,pad=20)
             ax.minorticks_on()           
     plt.show()
-            
+           
+def extmode_start_ends(start_date,end_date,time_pad=30,components=['z'],
+         source='caa',show=False,save=False,dpi=350,filetype='.png',savedir=''):
+    '''
+    time padding around start and end times in minutes!!
+    '''
+    import find_extmode_periods as exmps 
+    ext_intervals = exmps.find_overlap_data(start_date,end_date,
+                                            overlay_plot=0)[0]
+    for row in ext_intervals:
+        start = row[0]
+        end = row[1]
+        ext_sc = row[2]+1
+        inspect = start
+        start_date = (inspect-np.timedelta64(time_pad*60,'s')).tolist()
+        end_date = (inspect+np.timedelta64(time_pad*60,'s')).tolist()
+        plotting(ext_sc,start_date,end_date,components,filetype=filetype,
+                 dpi=dpi,savedir=savedir,show=show,save=save)  
+        inspect = end
+        start_date = (inspect-np.timedelta64(time_pad*60,'s')).tolist()
+        end_date = (inspect+np.timedelta64(time_pad*60,'s')).tolist()
+        plotting(ext_sc,start_date,end_date,components,filetype=filetype,
+                 dpi=dpi,savedir=savedir,show=show,save=save)
+        
+def jumps(start_date,end_date):  
+    extmode_start_ends(start_date,end_date,show=False,
+    save=True,filetype='.png',dpi=380,savedir='Y:/results images/jumps/',
+    time_pad=5,components=['z'],source='caa')
+    '''
+    this had to be done within another function so that the circular dependency 
+    find_extmode_periods/data_analysis works out
+    '''
+
 #prune_start = datetime(2015,12,21,10,0,0)
 #prune_end = datetime(2015,12,21,19,0,0)
 #to get all of the relevant caa data, need to start from 3-4 days 
