@@ -18,7 +18,7 @@ from collections import OrderedDict
 #import csv
 #import time
 logdir = 'Y:/logs/data_analysis/'
-VERBOSE=True
+VERBOSE=False
 PLOT_VERBOSE=False
 
 pickledir = 'Y:/overlap_stats/'
