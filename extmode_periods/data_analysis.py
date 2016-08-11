@@ -1294,7 +1294,8 @@ def plotting_overlay(scs,start_date,end_date,plotwhichs,source='caa',show=True,
         plt.close()
         
 def plotting(scs,start_date,end_date,plotwhichs,source='caa',show=True,
-             save=False,dpi=300,filetype='.png',savedir=''):  
+             save=False,dpi=300,filetype='.png',savedir='',
+             override_filepath=False):  
     plt.ioff()
     colour_dict = {1:'Black',2:'Red',3:'Green',4:'Magenta'}
     if type(scs) == int or type(scs) == float:
@@ -1490,7 +1491,10 @@ def plotting(scs,start_date,end_date,plotwhichs,source='caa',show=True,
     plt.gcf().autofmt_xdate()
     #plt.tight_layout()
     plt.subplots_adjust(top=0.92,bottom=0.1)
-    if save:
+    if override_filepath:
+        fig.savefig(override_filepath,dpi=dpi,bbox_inches='tight',
+                                                pad_inches=0.4)  
+    elif save:
         if not os.path.isdir(savedir):
             print (savedir+" is not a valid directory!\nPlease"
                             "provide valid directory!")
@@ -1498,7 +1502,7 @@ def plotting(scs,start_date,end_date,plotwhichs,source='caa',show=True,
             save_string = 'plotting_scs--'+'--'.join(map(str,scs))+'__'+\
                                     start_str_save+'__'+end_str_save+filetype
             fig.savefig(savedir+save_string,dpi=dpi,bbox_inches='tight',
-                                                        pad_inches=0.4)
+                                                        pad_inches=0.4)              
     if show:
         figManager = plt.get_current_fig_manager()
         figManager.window.showMaximized()
