@@ -97,23 +97,31 @@ def resample_frames(df1,df2,time_sampling=0.15,factor=100):
     df3.index = new_index
     df4.index = new_index
     return df3,df4
-
-
+'''
 #this actually works!!
 start = datetime(2007,11,30,19,35)
 end   = datetime(2007,11,30,20,14)
 extsc  = 3
 normsc = 2
+'''
+
+start = datetime(2007,11,30,19,49,20)
+end   = datetime(2007,11,30,20,19)
+extsc  = 3
+normsc = 4
+
 df_ext = da.return_ext_data(extsc,start,end,source='caa')[['mag']]
 df_norm = da.return_normal_data(normsc,start,end,source='caa')[['mag']]
 
 plt.close('all')
 plt.ion()
+'''
 plt.figure()
 plt.plot_date(df_ext.index.values,df_ext.ix[:,0],label='ext',c='r',fmt='-')
 plt.plot_date(df_norm.index.values,df_norm.ix[:,0],label='normal',c='g',fmt='-')
 plt.title('Before')
-plt.legend()
+plt.legend(loc='best')
+'''
 
 time_sampling = 0.1
 factor=10
@@ -124,17 +132,53 @@ plt.figure()
 plt.plot_date(df_ext_new.index.values,df_ext_new.ix[:,0],label='ext',c='r',fmt='-')
 plt.plot_date(df_norm_new.index.values,df_norm_new.ix[:,0],label='normal',c='g',fmt='-')
 plt.title('After')
-plt.legend()
-'''
-corr = np.correlate(df_norm_new.ix[:,0].values,df_ext_new.ix[:,0].values,"full")
+plt.legend(loc='best')
 
-corr_shift = np.correlate(df_norm_new.ix[:,0].values-np.mean(df_norm_new.ix[:,0].values),
-                          df_ext_new.ix[:,0].values-np.mean(df_ext_new.ix[:,0].values),
+length = 300
+data_new = pd.DataFrame({'ext':pd.rolling_mean(df_ext_new,length,center=True).values.reshape(-1,),
+                         'norm':pd.rolling_mean(df_norm_new,length,center=True).values.reshape(-1,)},
+                            index = df_ext_new.index).dropna()
+data_new.plot(title='rolling mean:'+str(length))
+
+factor= 6
+data_new['ext'] -= pd.rolling_mean(data_new['ext'],length*factor,center=True)
+data_new['norm'] -= pd.rolling_mean(data_new['norm'],length*factor,center=True)
+data_new = data_new.dropna()
+data_new.plot(title='rolling mean subracted:'+str(length*factor))
+
+corr_shift = np.correlate(data_new['norm'].values,
+                          data_new['ext'].values,
                           "full")
+shifts = pd.DataFrame({'shift steps':np.arange(-(data_new.shape[0]-1),data_new.shape[0]),
+                       'xcorr adjusted':corr_shift})
+shifts['seconds'] = shifts['shift steps']*time_sampling
+shifts.drop('shift steps',inplace=True,axis=1)
+s_shifts = shifts.set_index('seconds')
+s_shifts.plot()
 
-shifts = pd.DataFrame({'shift steps':np.arange(-(df_ext_new.shape[0]-1),df_ext_new.shape[0]),
-                       'xcorr':corr,'xcorr adjusted':corr_shift})
-shifts = shifts[['seconds','xcorr','xcorr adjusted']]
+'''
+window_length = 1600 #seconds
+window_length_samples = int(window_length/float(time_sampling))
+#randomly select start sample out of available samples!
+corrs=[]
+for i in xrange(100):
+    start_sample = np.random.randint(0,df_ext_new.shape[0])
+    ext_sample = df_ext_new.iloc[start_sample:start_sample+window_length_samples]
+    norm_sample = df_norm_new.iloc[start_sample:start_sample+window_length_samples]
+    ext_sample -= ext_sample.mean()[0]
+    norm_sample -= norm_sample.mean()[0]
+    ext_len = ext_sample.shape[0]
+    corr_shifts = np.arange(-ext_len-1,ext_len)
+    corr = np.correlate(norm_sample.ix[:,0].values,ext_sample.ix[:,0].values,
+                                'full')
+    corrs.append(corr_shifts[corr.argsort()[-1]]*time_sampling) #in seconds again!!
+
+plt.figure()
+plt.suptitle('Random windows, length:'+str(window_length))
+plt.hist(corrs)
+plt.xlabel('seconds')
+'''
+
 '''
 corr_shift = np.correlate(df_norm_new.ix[:,0].values-np.mean(df_norm_new.ix[:,0].values),
                           df_ext_new.ix[:,0].values-np.mean(df_ext_new.ix[:,0].values),
@@ -145,6 +189,7 @@ shifts['seconds'] = shifts['shift steps']*time_sampling
 shifts.drop('shift steps',inplace=True,axis=1)
 s_shifts = shifts.set_index('seconds')
 s_shifts.plot()
+'''
 
 best_shift = s_shifts.sort_values('xcorr adjusted',ascending=False).iloc[0].name
 df_ext_new.index = df_ext_new.index+pd.Timedelta(best_shift,'s')
@@ -153,4 +198,4 @@ plt.figure()
 plt.plot_date(df_ext_new.index.values,df_ext_new.ix[:,0],label='ext',c='r',fmt='-')
 plt.plot_date(df_norm_new.index.values,df_norm_new.ix[:,0],label='normal',c='g',fmt='-')
 plt.title('Shifted ext data by '+str(best_shift)+' seconds!')
-plt.legend()
+plt.legend(loc='best')
