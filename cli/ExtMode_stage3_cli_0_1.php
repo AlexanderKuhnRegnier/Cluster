@@ -53,7 +53,9 @@ define( "PREREAD", 32768 );
 define( "APPENDED",'/home/ahk114/logs/date_range_stage3/');
 $ext_appended = APPENDED.'ext_appended.log';
 $ext_gse_appended = APPENDED.'ext_gse_appended.log';
-$verbose = FALSE;
+$verbose = TRUE;
+echo "Stage 3".PHP_EOL;
+echo var_dump($verbose);
 require_once 'getcalfile.php';	#needed to put this after constant definitions, otherwise the if loops in 
 								#getfile.php complained about the constants being undefined!
 // ========== FUNCTIONS ==========
@@ -652,7 +654,12 @@ for ( $ext = 0; $ext < 10; $ext++ )
 					$version = substr( basename( $filepicked ), 10, 1 );
 					
 					getcal( $sc ,$filepicked);
+					echo "Before mod".PHP_EOL;
+					displaycal( $sc );
 					modifycal( $sc );
+					echo "Displaying calibration".PHP_EOL;
+					#echo var_dump($verbose);
+					displaycal( $sc );
 					if ($verbose)
 					{
 						//Debugging only!!!!
@@ -698,7 +705,8 @@ for ( $ext = 0; $ext < 10; $ext++ )
 					// 2001-11-16T19:46:00.750Z   26.887    0.000    0.000
 					// 2001-11-16T19:46:04.760Z   26.829    0.000    0.000
 					// 2001-11-16T19:46:08.772Z   26.800    0.000    0.000
-					
+					echo "Reading raw from:".PHP_EOL;
+					echo var_dump($filepicked);					
 					$extfile = file( $filepicked );
 					
 					if ( !is_dir( EXT . date( 'Y', $start ) ) )
@@ -753,7 +761,6 @@ for ( $ext = 0; $ext < 10; $ext++ )
 					$time = $start;
 					
 					$lastreset = 999999;
-					
 					$loopsize   = count( $extfile );
 					$onepercent = (int) ( $loopsize / 100 );
 					
@@ -800,6 +807,17 @@ for ( $ext = 0; $ext < 10; $ext++ )
 							
 							if ( $range < 2 or $range > 7 )
 								exit( "WTf?" );
+							if ($n<3)
+							{
+								echo "Raw bx".PHP_EOL;
+								echo var_dump($instrx);
+								echo "bx before".PHP_EOL."bx after".PHP_EOL;
+								echo var_dump($bx);
+								echo var_dump($bx * $gainx[ $extadc ][ $extsensor ][ $range ] - $offsetx[ $extadc ][ $extsensor ][ $range ]);
+								echo "gain, offset (which is subtracted)".PHP_EOL;
+								echo var_dump($gainx[ $extadc ][ $extsensor ][ $range ]);
+								echo var_dump($offsetx[ $extadc ][ $extsensor ][ $range ]);
+							}
 							$bx = $bx * $gainx[ $extadc ][ $extsensor ][ $range ] - $offsetx[ $extadc ][ $extsensor ][ $range ];
 							$by = $by * $k2 * $gainy[ $extadc ][ $extsensor ][ $range ] - $offsety[ $extadc ][ $extsensor ][ $range ];
 							$bz = $bz * $k2 * $gainz[ $extadc ][ $extsensor ][ $range ] - $offsetz[ $extadc ][ $extsensor ][ $range ];

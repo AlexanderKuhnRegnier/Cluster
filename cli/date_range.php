@@ -130,11 +130,11 @@ for ($i=0; $i<abs($number); $i+=1)
 		}
 	}
 	$stringout = implode(PHP_EOL,$filtered_output);
-	/*
+	
 	echo "Processing output".PHP_EOL."++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 	echo $stringout.PHP_EOL;
 	echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
-	*/
+	
 	$time_unix = $time_unix + 86400;
 	if (count($filtered_output)>0)
 	{
