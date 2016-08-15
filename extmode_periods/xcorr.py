@@ -98,14 +98,12 @@ def resample_frames(df1,df2,time_sampling=0.15,factor=100):
     df4.index = new_index
     return df3,df4
 '''
-#this actually works!!
 start = datetime(2007,11,30,19,35)
 end   = datetime(2007,11,30,20,14)
 extsc  = 3
 normsc = 2
 '''
 '''
-#works now, as well!
 start = datetime(2007,11,30,19,49,20)
 end   = datetime(2007,11,30,20,19)
 extsc  = 3
@@ -117,9 +115,15 @@ end   = datetime(2016,1,30,11,32)
 extsc  = 2
 normsc = 4
 '''
-
+'''
 start = datetime(2008,4,28,12,8,3)
 end   = datetime(2008,4,28,13,24,25)
+extsc  = 3
+normsc = 2
+'''
+
+start = datetime(2007,5,24,12,3,36,35)
+end   = datetime(2007,5,24,13,4,7,48)
 extsc  = 3
 normsc = 2
 
