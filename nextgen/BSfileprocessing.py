@@ -17,6 +17,9 @@ class extdata:
         self.packet_offset = 0
         self.data = []
         self.packet_info = pd.DataFrame()
+        self.evenodd = pd.DataFrame()
+        self.oddeven = pd.DataFrame()
+        self.combined = pd.DataFrame()
         with open(filename,'rb') as f:
             self.data = f.read()
         if not self.data:
@@ -281,16 +284,17 @@ class extdata:
                     raise Exception("Expected -1 in odd half vector!")
             if not even_half.empty and not odd_half.empty:
                 '''
-                join the vectors, put them into both dataframes!
-                use odd_vector as starting point
+                join the vectors, put them into the even dataframe!
+                use odd_vector as 'starting point'
                 '''
-                new = pd.Series(odd_half)
+                new = odd_half.copy()
                 new['x'] = even_half['x']
                 new['y'] = even_half['y']
                 if np.any(-1==new.values):
                     raise Exception("All -1 values should have been filled!")
                 self.even.loc[packet].iloc[-1]=new
-                self.odd.loc[next_packet].iloc[0]=new
+                odd_half_label = (next_packet,self.odd.loc[next_packet].iloc[0].name)
+                self.odd.drop(odd_half_label,axis=0,inplace=True)
         '''
         remove half vector entry from last even packet, since this can
         never be reconstructed
@@ -369,6 +373,8 @@ class extdata:
         #####odd#######
         mask = (self.odd['sensor']==0).values
         self.odd = self.odd[mask]       
+    def two_series(self):
+        pass
         
 def browse_frame_ipython(frame,window=40):
     frame['reset']=frame['reset'].apply(hex)
@@ -497,17 +503,19 @@ packet length  - 34 should be last data index
 '''        
 
 '''
-When combining half-vectors -> place result into BOTH the even and odd dataframes.
+When combining half-vectors -> place result into ONLY the even dataframes.
 They will have different indices, which may be very confusing, so that needs
 to be considered throughout future filtering operations!!!
+-> NOW, reconstructed vectors placed only in the even frames,
+numbering of odd frames??
 
 Need to make sure that the reconstructed half-vector lying between
 two adjacent even & odd packets is removed, so as to avoid its duplication
 in the final data!!!!
 '''
-
-RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'
-#RAW = 'Z:/data/raw/'
+hex_format = lambda i:'{:x}'.format(i).upper()
+#RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+RAW = 'Z:/data/raw/' #cluster alsvid server
 pd.options.display.expand_frame_repr=False
 Year= '2016'
 year='16'
@@ -522,19 +530,28 @@ ext.read_data()
 print "Before filtering (even),(odd)"
 print ext.even.shape,
 print ext.odd.shape
-even1 = ext.even
-odd1 = ext.odd
+even1 = ext.even.copy()
+odd1 = ext.odd.copy()
 print "joining half vecs"
 ext.join_half_vecs()
 print "joined"
 print ext.even.shape,
 print ext.odd.shape
+
+evenj = ext.even.copy()
+oddj = ext.odd.copy()
+packet_sizes_evenj = evenj.groupby(level=['packet']).size()
+packet_sizes_evenj.name = 'even'
+packet_sizes_oddj = oddj.groupby(level=['packet']).size()
+packet_sizes_oddj.name = 'odd'
+packet_sizesj = pd.concat((packet_sizes_evenj,packet_sizes_oddj),axis=1)
+
 ext.filter_data()
 print "After filtering"
 print ext.even.shape,
 print ext.odd.shape
-even = ext.even
-odd = ext.odd
+even = ext.even.copy()
+odd = ext.odd.copy()
 packet_sizes_even = even.groupby(level=['packet']).size()
 packet_sizes_even.name = 'even'
 packet_sizes_odd = odd.groupby(level=['packet']).size()
@@ -542,6 +559,55 @@ packet_sizes_odd.name = 'odd'
 packet_sizes = pd.concat((packet_sizes_even,packet_sizes_odd),axis=1)
 packetinfo=ext.packet_info
 removed = ext.removed_packets
-#packet_info['Reset Count'] = packet_info['Reset Count'].apply(hex)
-#print packet_info
+'''
+hex formatting of reset counts
+'''
+packetinfo_hex = packetinfo.copy(deep=True)
+packetinfo_hex['Reset Count'] = packetinfo_hex['Reset Count'].apply(hex_format)
+even_hex = even.copy(deep=True)
+even_hex['reset']=even_hex['reset'].apply(hex_format)
+odd_hex = odd.copy(deep=True)
+odd_hex['reset']=odd_hex['reset'].apply(hex_format)
 #print packet_info.groupby('Telemetry Mode').count()
+
+'''
+2 different pathways to choose between at this point
+-join up all packets in the two possible ways, ie. even first then odd,
+or odd first then even, and then analyse this further
+create -> two_series
+create 'evenodd' chain of packets with even packet, then odd packet, etc...
+create 'oddeven' chain of packets with odd packet, then even packet, etc...
+analyse -> reset count contiguity
+based on the analysis, define 'blocks' of valid data
++++++++++++++++++++++++
+-or, one could analyse every packet and see if the packet should be even or odd,
+and then proceed from there -> 'combined'
+analyse -> reset count contiguity
+        -> even/odd packet size (perhaps relative to other packet)
+pick odd/even packets based on this, and join them up correspondingly,
+this will introduce missing packets at this stage, which will have to be
+taken care of
+
++++++++++++++++++++++
+reset count contiguity analysis
+12-bit reset count (top 12-bits of the 16-bit HF counter)
+Reset count increases every ~5.1522 seconds.
+Spin periods range from ~ 3.9 to 4.4 seconds.
+Top 12-bits of reset count increase every 16*5.1522 = ~ 81 to 82 seconds
+So should see approx. 81.5/3.9 to 81.5/4.4 vectors per 12-bit reset count 
+increase, ie. ~ 18 to 21 vectors (spins)!
+
+So good 'elementary blocks' of 18 to 21 vectors can be identified by summing
+the difference in reset counts for 22 vectors starting from the first vector
+after an observed reset period. If there is a +1 increase in those 22 vectors,
+it is a good piece of data.
+BUT, this cannot be used to ascertain whether vectors at the start/end 
+are usable, since those will almost certainly be shorter. It also does little
+to help with the identification of problematic areas, with missing/wrong 
+vectors, etc...
+
+Compute reset count difference between current and next row,ie.
+diff = df['reset'].diff()
+first element of diff will be NaN here
+then go through each row and 
+'''
