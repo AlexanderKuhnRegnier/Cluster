@@ -31,7 +31,7 @@ function calfile_array($Year,$month,$day,$sc,$calibration_dir)
 	}
 	if ($verbose)
 	{
-		echo "GETCALFILE Executing:".$cmd;
+		echo "Executing:".$cmd;
 	}
 	exec($cmd,$output);
 	if ($verbose)
