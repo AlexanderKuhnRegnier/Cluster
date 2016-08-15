@@ -255,6 +255,52 @@ class extdata:
         mask = ~maski
         self.odd = self.odd[mask]        
 
+    def join_half_vecs(self):
+        even_packet_list = self.even.index.levels[0].values
+        odd_packet_list = self.odd.index.levels[0].values
+        if not np.all(even_packet_list == odd_packet_list):
+            raise Exception("At this point, even and odd frames should contain"
+                            " equal number of packets!")
+        packets = even_packet_list
+        for packet,next_packet in zip(packets[:-1],packets[1:]):
+            even_half=pd.Series()
+            odd_half=pd.Series()
+            #####even,end of packet#####
+            even_packet=self.even.xs(packet,level='packet',
+                         drop_level=False)
+            if not even_packet.empty:
+                even_half = even_packet.iloc[-1]
+                if not np.any(even_half.values==-1):
+                    raise Exception("Expected -1 in even half vector!")
+            #####odd,start of packet####
+            odd_packet=self.odd.xs(next_packet,level='packet',
+                         drop_level=False)
+            if not odd_packet.empty:
+                odd_half = odd_packet.iloc[0]
+                if not np.any(odd_half.values==-1):
+                    raise Exception("Expected -1 in odd half vector!")
+            if not even_half.empty and not odd_half.empty:
+                '''
+                join the vectors, put them into both dataframes!
+                use odd_vector as starting point
+                '''
+                new = pd.Series(odd_half)
+                new['x'] = even_half['x']
+                new['y'] = even_half['y']
+                if np.any(-1==new.values):
+                    raise Exception("All -1 values should have been filled!")
+                self.even.loc[packet].iloc[-1]=new
+                self.odd.loc[next_packet].iloc[0]=new
+        '''
+        remove half vector entry from last even packet, since this can
+        never be reconstructed
+        similarly, remove half vector entry from first odd packet
+        '''
+        even_drop = self.even.iloc[-1].name
+        self.even.drop(even_drop,inplace=True,axis=0)
+        odd_drop = self.odd.iloc[0].name
+        self.odd.drop(odd_drop,inplace=True,axis=0)
+        
     def filter_data(self):
         '''
         unused vector areas could be set to 
@@ -305,15 +351,12 @@ class extdata:
         self.odd = self.odd[mask]
         '''
         filter out invalid ranges, ie range<2 (range 7 is technically allowed)
-        but need to keep half-vector rows containing -1s!
         '''        
         #####even######
-        mask = (self.even['range']>1).values | (self.even.apply(lambda x:np.any(x==-1),
-                                                axis=1,raw=True).values)
+        mask = (self.even['range']>1).values
         self.even = self.even[mask]
         #####odd#######
-        mask = (self.odd['range']>1).values | (self.odd.apply(lambda x:np.any(x==-1),
-                                                axis=1,raw=True).values)
+        mask = (self.odd['range']>1).values
         self.odd = self.odd[mask]   
         '''
         filter out the inboard sensor, since this is never used 
@@ -321,12 +364,10 @@ class extdata:
         the inboard sensor??
         '''
         #####even######
-        mask = (self.even['sensor']==0).values | (self.even.apply(lambda x:np.any(x==-1),
-                                                axis=1,raw=True).values)
+        mask = (self.even['sensor']==0).values
         self.even = self.even[mask]
         #####odd#######
-        mask = (self.odd['sensor']==0).values | (self.odd.apply(lambda x:np.any(x==-1),
-                                                axis=1,raw=True).values)
+        mask = (self.odd['sensor']==0).values
         self.odd = self.odd[mask]       
         
 def browse_frame_ipython(frame,window=40):
@@ -459,6 +500,10 @@ packet length  - 34 should be last data index
 When combining half-vectors -> place result into BOTH the even and odd dataframes.
 They will have different indices, which may be very confusing, so that needs
 to be considered throughout future filtering operations!!!
+
+Need to make sure that the reconstructed half-vector lying between
+two adjacent even & odd packets is removed, so as to avoid its duplication
+in the final data!!!!
 '''
 
 RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'
@@ -474,11 +519,16 @@ BSfile = RAW+Year+'/'+month+'/'+'C'+sc+'_'+year+month+day+'_'+version+'.BS'
 print BSfile
 ext = extdata(BSfile)
 ext.read_data()
-print "Before filtering"
+print "Before filtering (even),(odd)"
 print ext.even.shape,
 print ext.odd.shape
 even1 = ext.even
 odd1 = ext.odd
+print "joining half vecs"
+ext.join_half_vecs()
+print "joined"
+print ext.even.shape,
+print ext.odd.shape
 ext.filter_data()
 print "After filtering"
 print ext.even.shape,
