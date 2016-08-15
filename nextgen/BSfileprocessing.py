@@ -261,13 +261,12 @@ class extdata:
         self.odd = self.odd[mask]        
 
     def join_half_vecs(self):
-        even_packet_list = self.even.index.levels[0].values
-        odd_packet_list = self.odd.index.levels[0].values
+        even_packet_list =np.unique(self.even.index.get_level_values(0).values)
+        odd_packet_list = np.unique(self.odd.index.get_level_values(0).values)
         if not np.all(even_packet_list == odd_packet_list):
             raise Exception("At this point, even and odd frames should contain"
                             " equal number of packets!")
         self.full_packets = even_packet_list
-        
         for packet,next_packet in zip(self.full_packets[:-1],
                                       self.full_packets[1:]):
             even_half=pd.Series()
@@ -414,18 +413,6 @@ class extdata:
         if even_packets.shape[0] != odd_packets.shape[0]:
             raise Exception("The packet list lengths should be equal "
                                 "at this point!")
-        '''
-        #this actually goes against what we are trying to achieve
-        delete_list = []
-        for i in xrange(even_packets.shape[0]):
-            even = even_packets[i]
-            odd = odd_packets[i]
-            if (not np.any(even==even_packet_list)) or \
-                    (not np.any(odd==odd_packet_list)):
-                delete_list.append(i)
-        even_packets = np.delete(even_packets,delete_list)
-        odd_packets = np.delete(odd_packets,delete_list)
-        '''
         frames = []
         for even_packet,odd_packet in zip(even_packets,odd_packets):
             if np.any(even_packet == even_packets_existing):
