@@ -20,6 +20,9 @@ class extdata:
         self.evenodd = pd.DataFrame()
         self.oddeven = pd.DataFrame()
         self.combined = pd.DataFrame()
+        self.full_packets = np.array([])
+        self.evenodd=pd.DataFrame()
+        self.oddeven = pd.DataFrame()
         with open(filename,'rb') as f:
             self.data = f.read()
         if not self.data:
@@ -236,7 +239,6 @@ class extdata:
                                              names=['packet','vector'])
         self.even.index=multiindex
         self.odd.index=multiindex
-                                             
         '''
         filter out non-MSA dump data
         '''
@@ -264,8 +266,10 @@ class extdata:
         if not np.all(even_packet_list == odd_packet_list):
             raise Exception("At this point, even and odd frames should contain"
                             " equal number of packets!")
-        packets = even_packet_list
-        for packet,next_packet in zip(packets[:-1],packets[1:]):
+        self.full_packets = even_packet_list
+        
+        for packet,next_packet in zip(self.full_packets[:-1],
+                                      self.full_packets[1:]):
             even_half=pd.Series()
             odd_half=pd.Series()
             #####even,end of packet#####
@@ -391,8 +395,64 @@ class extdata:
         mask = (self.odd['sensor']==0).values
         self.odd = self.odd[mask]       
     def two_series(self):
-        pass
-        
+        '''
+        create two chains of frames from the even and odd dataframes
+        'evenodd' chain with even frame, odd frame, ...
+        'oddeven' chain with odd frame, even frame, ...
+        '''
+        even_packets_existing = np.unique(self.even.index.get_level_values('packet').values)
+        odd_packets_existing = np.unique(self.odd.index.get_level_values('packet').values)
+        '''
+        the two lists above will deviate from the 'full' packet list
+        before any filtering has been done
+        '''
+        '''
+        create 'evenodd' chain of frames,
+        ''' 
+        even_packets = self.full_packets[0:-1:2]#can't use last packet here!
+        odd_packets = self.full_packets[1::2]
+        if even_packets.shape[0] != odd_packets.shape[0]:
+            raise Exception("The packet list lengths should be equal "
+                                "at this point!")
+        '''
+        #this actually goes against what we are trying to achieve
+        delete_list = []
+        for i in xrange(even_packets.shape[0]):
+            even = even_packets[i]
+            odd = odd_packets[i]
+            if (not np.any(even==even_packet_list)) or \
+                    (not np.any(odd==odd_packet_list)):
+                delete_list.append(i)
+        even_packets = np.delete(even_packets,delete_list)
+        odd_packets = np.delete(odd_packets,delete_list)
+        '''
+        frames = []
+        for even_packet,odd_packet in zip(even_packets,odd_packets):
+            if np.any(even_packet == even_packets_existing):
+                frames.append(self.even.xs(even_packet,level='packet',
+                             drop_level=False))
+            if np.any(odd_packet == odd_packets_existing):
+                frames.append(self.odd.xs(odd_packet,level='packet',
+                             drop_level=False))
+        self.evenodd = pd.concat((frames))
+        '''
+        create 'oddeven' chain of frames,
+        ''' 
+        even_packets = self.full_packets[1::2]
+        odd_packets = self.full_packets[0:-1:2]
+        if even_packets.shape[0] != odd_packets.shape[0]:
+            raise Exception("The packet list lengths should be equal "
+                                "at this point!")
+        frames = []
+        for odd_packet,even_packet in zip(odd_packets,even_packets):
+            if np.any(odd_packet == odd_packets_existing):
+                frames.append(self.odd.xs(odd_packet,level='packet',
+                             drop_level=False))
+            if np.any(even_packet == even_packets_existing):
+                frames.append(self.even.xs(even_packet,level='packet',
+                             drop_level=False))
+        self.oddeven = pd.concat((frames))
+                  
 def browse_frame_ipython(frame,window=40):
     frame['reset']=frame['reset'].apply(hex)
     from IPython.utils.coloransi import TermColors as tc
@@ -552,13 +612,16 @@ BSfile = RAW+Year+'/'+month+'/'+'C'+sc+'_'+year+month+day+'_'+version+'.BS'
 print BSfile
 ext = extdata(BSfile)
 ext.read_data()
+
 print "Before filtering (even),(odd)"
 print ext.even.shape,
 print ext.odd.shape
 even1 = ext.even.copy()
 odd1 = ext.odd.copy()
 print "joining half vecs"
+
 ext.join_half_vecs()
+
 print "joined"
 print ext.even.shape,
 print ext.odd.shape
@@ -572,6 +635,7 @@ packet_sizes_oddj.name = 'odd'
 packet_sizesj = pd.concat((packet_sizes_evenj,packet_sizes_oddj),axis=1)
 
 ext.filter_data()
+
 print "After filtering"
 print ext.even.shape,
 print ext.odd.shape
@@ -636,3 +700,6 @@ diff = df['reset'].diff()
 first element of diff will be NaN here
 then go through each row and 
 '''
+ext.two_series()
+evenodd = ext.evenodd.copy()
+oddeven = ext.oddeven.copy()
