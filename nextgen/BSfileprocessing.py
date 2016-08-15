@@ -293,8 +293,25 @@ class extdata:
                 if np.any(-1==new.values):
                     raise Exception("All -1 values should have been filled!")
                 self.even.loc[packet].iloc[-1]=new
-                odd_half_label = (next_packet,self.odd.loc[next_packet].iloc[0].name)
+                vector_number = self.odd.loc[next_packet].iloc[0].name
+                odd_half_label = (next_packet,vector_number)
                 self.odd.drop(odd_half_label,axis=0,inplace=True)
+                '''
+                since vector was dropped, we need to shift the vector index
+                backwards by 1, ie subtract 1 to every vector in the index
+                starting from the vector that was removed!
+                '''
+                packetlevel = self.odd.index.get_level_values('packet').values
+                vectorlevel = self.odd.index.get_level_values('vector').values
+                mask = vectorlevel>vector_number
+                modify = vectorlevel[mask] #higher vector numbers
+                nomod = vectorlevel[~mask] #lower vector numbers
+                np.add(modify,-1,modify)
+                vectorlevel = np.append(nomod,modify)
+                new_multiindex = pd.MultiIndex.from_arrays((packetlevel,
+                                                            vectorlevel),
+                                            names = self.odd.index.names)
+                self.odd.index = new_multiindex
         '''
         remove half vector entry from last even packet, since this can
         never be reconstructed
@@ -512,6 +529,14 @@ numbering of odd frames??
 Need to make sure that the reconstructed half-vector lying between
 two adjacent even & odd packets is removed, so as to avoid its duplication
 in the final data!!!!
+
+Index for the odd dataframe has been reconstructed in order to avoid a 
+jump in vector numbers at packet transitions,since the half vector 
+has been moved to the even dataframe
+
+Only putting the joing half-vector into the even dataframe - is that wise,
+or could it introduce some errors, if there are missing packets or otherwise
+corrupted data?
 '''
 hex_format = lambda i:'{:x}'.format(i).upper()
 #RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
