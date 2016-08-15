@@ -48,11 +48,42 @@ class extdata:
             data_dict['sensor'].append(sensor)
             data_dict['range'].append(inst_range)
             data_dict['reset'].append(reset)
+        '''
+        Read 1/2 vetor at end of even packet!
+        '''
+        offset = 444*8
+        data_dict['x'].append(extdata.read_bytes([offset,offset+1],data))
+        data_dict['y'].append(extdata.read_bytes([offset+2,offset+3],data))
+        '''
+        fill missing half vector with -1
+        '''   
+        data_dict['z'].append(-1)
+        data_dict['sensor'].append(-1)
+        data_dict['range'].append(-1)
+        data_dict['reset'].append(-1)
+        
         df = pd.DataFrame(data_dict,columns = ['range','reset','sensor',
-                                                       'x','y','z'])
+                                                       'x','y','z'])                                 
         return df
     def read_odd(self,data):
         data_dict = {'x':[],'y':[],'z':[],'sensor':[],'range':[],'reset':[]}
+        '''
+        get 1/2 vector at the start of the odd packet!
+        '''
+        data_dict['z'].append(extdata.read_bytes([0,1],data))
+        last_bytes = extdata.read_bytes([2,3],data)
+        sensor = last_bytes>>15
+        inst_range = (last_bytes>>12) & 0b0111
+        reset = last_bytes & (0b111111111111)
+        data_dict['sensor'].append(sensor)
+        data_dict['range'].append(inst_range)
+        data_dict['reset'].append(reset)  
+        '''
+        fill missing half vector with -1
+        '''
+        data_dict['x'].append(-1)
+        data_dict['y'].append(-1)
+        
         for offset in range(4,(444*8)+4,8):
             #print "offset",offset
             data_dict['x'].append(extdata.read_bytes([offset,offset+1],data))
@@ -274,12 +305,15 @@ class extdata:
         self.odd = self.odd[mask]
         '''
         filter out invalid ranges, ie range<2 (range 7 is technically allowed)
+        but need to keep half-vector rows containing -1s!
         '''        
         #####even######
-        mask = self.even['range']>1
+        mask = (self.even['range']>1).values | (self.even.apply(lambda x:np.any(x==-1),
+                                                axis=1,raw=True).values)
         self.even = self.even[mask]
         #####odd#######
-        mask = self.odd['range']>1
+        mask = (self.odd['range']>1).values | (self.odd.apply(lambda x:np.any(x==-1),
+                                                axis=1,raw=True).values)
         self.odd = self.odd[mask]   
         '''
         filter out the inboard sensor, since this is never used 
@@ -287,10 +321,12 @@ class extdata:
         the inboard sensor??
         '''
         #####even######
-        mask = self.even['sensor']==0
+        mask = (self.even['sensor']==0).values | (self.even.apply(lambda x:np.any(x==-1),
+                                                axis=1,raw=True).values)
         self.even = self.even[mask]
         #####odd#######
-        mask = self.odd['sensor']==0
+        mask = (self.odd['sensor']==0).values | (self.odd.apply(lambda x:np.any(x==-1),
+                                                axis=1,raw=True).values)
         self.odd = self.odd[mask]       
         
 def browse_frame_ipython(frame,window=40):
@@ -418,6 +454,12 @@ combined - 49 - should be first index of data
 since packet length includes fgm science header
 packet length  - 34 should be last data index
 '''        
+
+'''
+When combining half-vectors -> place result into BOTH the even and odd dataframes.
+They will have different indices, which may be very confusing, so that needs
+to be considered throughout future filtering operations!!!
+'''
 
 RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'
 #RAW = 'Z:/data/raw/'
