@@ -716,7 +716,6 @@ class extdata:
         if dataframe.index.names != ['packet','vector']:
             raise Exception("Input Dataframe needs to have a multiindex with"
                             "level names 'packet' and 'vector'")
-            
         dataframe.index = dataframe.index.droplevel('packet') 
         vector_numbers = pd.Series(dataframe.index.values,
                                    index=dataframe.index.values)
@@ -757,6 +756,7 @@ hex_format = lambda i:'{:x}'.format(i).upper()
 #RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
 RAW = 'Z:/data/raw/' #cluster alsvid server
 pd.options.display.expand_frame_repr=False
+pd.options.display.max_rows=20
 Year= '2016'
 year='16'
 month = '01'
@@ -862,6 +862,11 @@ diff = df['reset'].diff()
 first element of diff will be NaN here
 then go through each row and 
 '''
+ext.reset_filter()
+
+evenr = ext.even.copy()
+oddr = ext.odd.copy()
+
 ext.two_series()
 evenodd = ext.evenodd.copy()
 oddeven = ext.oddeven.copy()
@@ -871,8 +876,6 @@ new_packetsizes=ext.packet_sizes.copy()
 
 print "blocks"
 print ext.blocks
-
-ext.reset_filter()
 
 reset_even = ext.even.copy()
 reset_odd = ext.odd.copy()
