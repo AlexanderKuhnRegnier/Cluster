@@ -619,7 +619,6 @@ class extdata:
         #in order to match the index of the frame, reassign index as well
         packet_numbers = pd.Series(selected_packets.index.values,
                                    index=selected_packets.index)
-        
         #basically just detect where the packet number changes by more than 1!
         selected_packets['contiguous_packets']=\
               ~(packet_numbers!=packet_numbers.shift().\
@@ -660,19 +659,72 @@ class extdata:
         'start_parity':block_ranges.apply(
         lambda x:'even' if selected_packets['iseven'].loc[x[0]] else 'odd')})
         
-    def reset_filter(self,packets):
+    def reset_filter(self):
         '''
-        takes a list of packets as its input, and then looks at the reset
-        values of the vectors within the packets, and checks, whether they
-        are increasing 'slowly', ie by either 0 or 1. If that is not the case,
-        the packets which do not fulfill the criteria are removed.
-        However, a packet may be PARTIAL
-        So the code looks at the number of vectors which are 'bad'
-        
-        ------- and does what with that info????????
-        
+        Looks at the reset values of the vectors within the dataframe, and 
+        checks whether they are increasing 'slowly', ie by either 0 or 1. 
+        If that is not the case, the vectors quality is set to 'False'.
+        -The input dataframe should contain a contiguous block of vectors
+        packets - (expects columns: 'reset' - and index:'packets','vectors') -
+        which is achieved by utilising the other filtering and segregation
+        functions in this class.
+        --Returns dataframe which has the vector number as its index - this
+        is achieved by dropping the 'packet' multiindex level. The vectors
+        should all be contiguous - this is part of the analysis. The resets
+        should also be monotonically (increasing) by either 0 or 1.
         '''
-
+        '''
+        add new 'reset_quality' column to the 'even' and 'odd' dataframes,
+        which indicates if the reset increase is good or not
+        use 'reset'.shift(-1) - 'reset' to compare rows to next rows,
+        and 'reset' - 'reset'.shift(1) to compare rows to previous rows
+        This then looks at the differences of a vector to the previous,
+        and the next vector! - If one of those is valid, then use it.
+        The differences have to be 0 or 1 for there to be valid data.
+        
+        --The analysis is performed for all vectors in the frame,
+        partly for convenience, since this is slightly easier to write,
+        and also because this allows for a more straightforward manual visual 
+        inspection of the data, should this be needed.
+        Also, computing 'rdiff_prev','rdiff_next','reset_quality',
+        'quality_change' and 'vblock' takes only around 5 ms 
+        for even & odd dataframes of length ~6000
+        '''
+        '''
+        rough checks on the input dataframe
+        '''
+        frames = [self.even,self.odd]
+        for frame in frames:
+            frame['rdiff_prev'] = frame['reset']-frame['reset'].shift(1)
+            frame['rdiff_next'] = frame['reset'].shift(-1)-frame['reset']
+            frame['reset_quality']=((frame['rdiff_prev']==0) | 
+                                    (frame['rdiff_prev']==1) |
+                                    (frame['rdiff_next']==0) |
+                                    (frame['rdiff_next']==1))
+            '''
+            The following is used in order to isolate valid vector blocks.
+            '''
+            frame['quality_change']=((frame['reset_quality']) != \
+                                    (frame['reset_quality'].shift()))
+            frame['vblock_resets']=frame['quality_change'].cumsum()
+    def vector_analysis(self,dataframe=pd.DataFrame()):
+        '''
+        Analyse the vector numbers for contiguity, in a fashion similar to 
+        above, just for vector numbers, not for reset counts.
+        Also, 'valid' vector count increases are now +1 only.
+        '''
+        if dataframe.index.names != ['packet','vector']:
+            raise Exception("Input Dataframe needs to have a multiindex with"
+                            "level names 'packet' and 'vector'")
+            
+        dataframe.index = dataframe.index.droplevel('packet') 
+        vector_numbers = pd.Series(dataframe.index.values,
+                                   index=dataframe.index.values)
+        vdiff = vector_numbers-vector_numbers.shift(1)
+        dataframe['contiguousness_change'] = (vdiff!=1)
+        dataframe['vblock_vnumbers'] = dataframe['contiguousness_change'].\
+                                                                      cumsum()
+        return dataframe
 '''
 header lengths
 dds - 15
@@ -819,3 +871,10 @@ new_packetsizes=ext.packet_sizes.copy()
 
 print "blocks"
 print ext.blocks
+
+ext.reset_filter()
+
+reset_even = ext.even.copy()
+reset_odd = ext.odd.copy()
+
+rfilter_evenodd = ext.vector_analysis(evenodd)
