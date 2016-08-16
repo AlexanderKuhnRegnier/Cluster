@@ -172,7 +172,6 @@ class extdata:
         tel_mode = extdata.telem_mode[telemetry_mode]
         self.fgm_data['Telemetry Mode'].append(tel_mode)
         self.fgm_data['Reset Count'].append(reset_count)
-        return 1
         '''
         bits 14 - 33 not used
         '''
@@ -195,10 +194,11 @@ class extdata:
         print first_2ry_hf
         print reset_count
         '''
+        return 1
     def read_data(self):
         even = []
         odd = []
-        for i in range(20000):#arbitrary limit
+        for i in range(20000):#arbitrary limit to the number of packets
             dds_data = self.read_dds(self.data[self.packet_offset:
                                                 self.packet_offset+15])
             self.packet_offset+=15
@@ -218,7 +218,6 @@ class extdata:
         '''
         changes fgm data dict inplace - acceptable?
         '''
-        packet_str = lambda n:'packet'+format(n,'03d')
         self.fgm_data.update(self.dds_data)
         number_of_packets = len(self.fgm_data[self.fgm_data.keys()[0]])
         
@@ -226,7 +225,7 @@ class extdata:
             raise Exception("Packet number mismatch between header info"
                             " and number of read packets")
                             
-        self.packet_info = pd.DataFrame(self.fgm_data,index=[packet_str(i) for
+        self.packet_info = pd.DataFrame(self.fgm_data,index=[i for
                                             i in range(1,number_of_packets+1)])
 
         self.even = pd.concat((even))
@@ -242,7 +241,7 @@ class extdata:
                 raise Exception("Unequal number of vectors in packet nr:"+
                                     str(packet_count))
             length = packete.shape[0]
-            top_level.extend([packet_str(packet_count)]*length)
+            top_level.extend([packet_count]*length)
             packet_count += 1    
         bottom_level=range(1,self.odd.shape[0]+1)            
             
@@ -335,7 +334,6 @@ class extdata:
         self.even.drop(even_drop,inplace=True,axis=0)
         odd_drop = self.odd.iloc[0].name
         self.odd.drop(odd_drop,inplace=True,axis=0)
-        
     def filter_data(self):
         '''
         unused vector areas could be set to 
@@ -453,12 +451,6 @@ class extdata:
                 frames.append(self.even.xs(even_packet,level='packet',
                              drop_level=False))
         self.oddeven = pd.concat((frames))
-    @staticmethod
-    def packet_number_from_index(index_entry):
-        '''
-        should be used like df.index.map(packet_number_from_index)        
-        '''
-        return(int(index_entry.strip('packet')))
     def select_packets(self):
         '''
         create chain of dataframes based on assessment of packets - 
@@ -505,12 +497,16 @@ class extdata:
         segregate based on packet number. If two packets numbers are not
         contiguous, record this as well
         '''
-        selected_packets['packet_number']=selected_packets.index.\
-                                        map(extdata.packet_number_from_index)
+        packet_numbers = pd.Series(selected_packets.index.values,
+                                   index=selected_packets.index)
+        #need to do this, because the shift operation cannot be done on an
+        #index, only an a series/frame, etc. (is this really true?)
+        #in order to match the index of the frame, reassign index as well
+        
+        #basically just detect where the packet number changes by more than 1!
         selected_packets['contigous_packets']=\
-                ~(selected_packets['packet_number']!=\
-                (selected_packets['packet_number'].shift().\
-                fillna(selected_packets['packet_number'].iloc[0]-1)+1))
+              ~(packet_numbers!=packet_numbers.shift().\
+              fillna(packet_numbers.iloc[0]-1)+1)
         '''
         where the columns titled 'contiguous' are False is where a break 
         occurs!
