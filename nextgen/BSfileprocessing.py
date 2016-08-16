@@ -653,8 +653,25 @@ class extdata:
         last indices - those indices are INCLUSIVE, so the last index is 
         the last valid packet in that group
         '''
-        self.blocks = selected_packets.groupby('counts').apply(\
+        block_ranges = selected_packets.groupby('counts').apply(\
                                             lambda x:(x.index[0],x.index[-1]))
+        block_ranges.index.name='block'
+        self.blocks=pd.DataFrame({'packets':block_ranges,
+        'start_parity':block_ranges.apply(
+        lambda x:'even' if selected_packets['iseven'].loc[x[0]] else 'odd')})
+        
+    def reset_filter(self,packets):
+        '''
+        takes a list of packets as its input, and then looks at the reset
+        values of the vectors within the packets, and checks, whether they
+        are increasing 'slowly', ie by either 0 or 1. If that is not the case,
+        the packets which do not fulfill the criteria are removed.
+        However, a packet may be PARTIAL
+        So the code looks at the number of vectors which are 'bad'
+        
+        ------- and does what with that info????????
+        
+        '''
 
 '''
 header lengths
