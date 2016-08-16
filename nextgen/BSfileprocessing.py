@@ -10,8 +10,11 @@ class extdata:
     telem_mode={12:'Normal Mode',13:'Burst Science',14:'Extended Mode',
                 15:'MSA Dump'}
     def __init__(self,filename):
+        '''
         self.fgm_data = {'Telemetry Mode':[],'First 1ry HF':[],
                          'First 2ry HF':[],'Reset Count':[]}
+        '''
+        self.fgm_data = {'Telemetry Mode':[],'Reset Count':[]}
         self.dds_data = {'SCET':[],'Header ID':[],'Packet Length':[],
                          'sc ID':[]}
         self.packet_offset = 0
@@ -141,6 +144,8 @@ class extdata:
             print "wrong length:",len(science_header)
             return 0
         status_data = extdata.read_bytes([0,1],science_header)
+        '''
+        #this is only useful for normal science data!
         sumcheck_code_failure =          status_data>>15
         incorrect_vectors_sampled =     (status_data & 0b0010000000000000)>>13
         possible_corrupt_science_data = (status_data & 0b0001000000000000)>>12
@@ -149,17 +154,23 @@ class extdata:
         cal_seq_number =                (status_data & 0b0000000011000000)>>6
         mem_dump_in_progress =          (status_data & 0b0000000000100000)>>5
         code_patch_in_progress =        (status_data & 0b0000000000010000)>>4
-        telemetry_mode =                 status_data & 0b0000000000001111
         packet_start_hf = extdata.read_bytes([2,3],science_header)
         prev_sun_pulse_hf = extdata.read_bytes([4,5],science_header)
         most_recent_sun_pulse_hf = extdata.read_bytes([6,7],science_header)
+        '''
+        telemetry_mode =                 status_data & 0b0000000000001111
+        '''
+        #again, useful for normal science data
+        #if these need to be used, need to include these labels in the
+        #dict creation in __init__!
         first_1ry_hf = extdata.read_bytes([8,9],science_header)
         first_2ry_hf = extdata.read_bytes([10,11],science_header)
+        self.fgm_data['First 1ry HF'].append(first_1ry_hf)
+        self.fgm_data['First 2ry HF'].append(first_2ry_hf)
+        '''
         reset_count = extdata.read_bytes([12,13],science_header)
         tel_mode = extdata.telem_mode[telemetry_mode]
         self.fgm_data['Telemetry Mode'].append(tel_mode)
-        self.fgm_data['First 1ry HF'].append(first_1ry_hf)
-        self.fgm_data['First 2ry HF'].append(first_2ry_hf)
         self.fgm_data['Reset Count'].append(reset_count)
         return 1
         '''
@@ -407,7 +418,10 @@ class extdata:
         '''
         '''
         create 'evenodd' chain of frames,
-        ''' 
+        need to use full_packets list here, since this list contains all the
+        MSA dump packets in the right ORDER, which is crucial, since we are
+        concerned with even and odd packets, whose order matters
+        '''
         even_packets = self.full_packets[0:-1:2]#can't use last packet here!
         odd_packets = self.full_packets[1::2]
         if even_packets.shape[0] != odd_packets.shape[0]:
@@ -424,7 +438,7 @@ class extdata:
         self.evenodd = pd.concat((frames))
         '''
         create 'oddeven' chain of frames,
-        ''' 
+        '''
         even_packets = self.full_packets[1::2]
         odd_packets = self.full_packets[0:-1:2]
         if even_packets.shape[0] != odd_packets.shape[0]:
@@ -439,7 +453,70 @@ class extdata:
                 frames.append(self.even.xs(even_packet,level='packet',
                              drop_level=False))
         self.oddeven = pd.concat((frames))
-                  
+    @staticmethod
+    def packet_number_from_index(index_entry):
+        '''
+        should be used like df.index.map(packet_number_from_index)        
+        '''
+        return(int(index_entry.strip('packet')))
+    def select_packets(self):
+        '''
+        create chain of dataframes based on assessment of packets - 
+        if they are even or odd!
+        -could a corrupt packet be even at the start, and odd at the end,
+        or vice versa? That would defeat this method
+        '''
+        '''
+        select packets based on size ratio
+        if even packet is 1.5 times the size of the odd packet or larger
+        (and vice versa)
+        '''
+        compare_factor = 1.5
+        min_vecs = 10
+        packet_sizes_even = self.even.groupby(level=['packet']).size()
+        packet_sizes_even.name = 'even'
+        packet_sizes_odd = self.odd.groupby(level=['packet']).size()
+        packet_sizes_odd.name = 'odd'
+        self.packet_sizes = pd.concat((packet_sizes_even,packet_sizes_odd),
+                                      axis=1)
+        def iseven_size_comparison(x):
+            even = x['even']
+            odd = x['odd']
+            if even>odd*compare_factor and even>min_vecs:
+                return True
+            elif odd>even*compare_factor and odd>min_vecs:
+                return False
+            else:
+                return -1
+        self.packet_sizes.fillna(0,inplace=True)
+        self.packet_sizes['iseven']=self.packet_sizes[['even','odd']].apply(
+        iseven_size_comparison,axis=1)
+        selected_packets = self.packet_sizes[
+                                self.packet_sizes['iseven']!=-1][['iseven']]          
+        '''
+        start segregating into different chunks by looking at the alternation
+        of even and odd packets. If there is ever an even one next to another
+        even packet, or and odd packet next to another odd packet, the starting
+        packet of such a change will be recorded
+        '''
+        selected_packets['contiguous_parity']=selected_packets['iseven']!= \
+                                        selected_packets['iseven'].shift()
+        '''
+        segregate based on packet number. If two packets numbers are not
+        contiguous, record this as well
+        '''
+        selected_packets['packet_number']=selected_packets.index.\
+                                        map(extdata.packet_number_from_index)
+        selected_packets['contigous_packets']=\
+                ~(selected_packets['packet_number']!=\
+                (selected_packets['packet_number'].shift().\
+                fillna(selected_packets['packet_number'].iloc[0]-1)+1))
+        '''
+        where the columns titled 'contiguous' are False is where a break 
+        occurs!
+        '''
+        print "selected"
+        print selected_packets
 def browse_frame_ipython(frame,window=40):
     frame['reset']=frame['reset'].apply(hex)
     from IPython.utils.coloransi import TermColors as tc
@@ -648,6 +725,7 @@ odd_hex['reset']=odd_hex['reset'].apply(hex_format)
 
 '''
 2 different pathways to choose between at this point
+----------------------------------------------------
 -join up all packets in the two possible ways, ie. even first then odd,
 or odd first then even, and then analyse this further
 create -> two_series
@@ -655,16 +733,22 @@ create 'evenodd' chain of packets with even packet, then odd packet, etc...
 create 'oddeven' chain of packets with odd packet, then even packet, etc...
 analyse -> reset count contiguity
 based on the analysis, define 'blocks' of valid data
-+++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 -or, one could analyse every packet and see if the packet should be even or odd,
 and then proceed from there -> 'combined'
 analyse -> reset count contiguity
         -> even/odd packet size (perhaps relative to other packet)
 pick odd/even packets based on this, and join them up correspondingly,
 this will introduce missing packets at this stage, which will have to be
-taken care of
+taken care of somehow.
+Missing packets - packets that are not considered odd/even, and are therefore
+not included
+If an even packet is selected, but the following odd packet is not, then
+that should mean that the odd packet is not good data, so the half vector at 
+its end should not be usable either??
+What to do with partial packets??
 
-+++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 reset count contiguity analysis
 12-bit reset count (top 12-bits of the 16-bit HF counter)
 Reset count increases every ~5.1522 seconds.
@@ -690,3 +774,6 @@ then go through each row and
 ext.two_series()
 evenodd = ext.evenodd.copy()
 oddeven = ext.oddeven.copy()
+
+ext.select_packets()
+new_packetsizes=ext.packet_sizes.copy()
