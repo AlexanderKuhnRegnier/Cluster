@@ -659,19 +659,11 @@ class extdata:
         'start_parity':block_ranges.apply(
         lambda x:'even' if selected_packets['iseven'].loc[x[0]] else 'odd')})
         
-    def reset_filter(self):
+    def reset_filter(self,dataframe):
         '''
         Looks at the reset values of the vectors within the dataframe, and 
         checks whether they are increasing 'slowly', ie by either 0 or 1. 
         If that is not the case, the vectors quality is set to 'False'.
-        -The input dataframe should contain a contiguous block of vectors
-        packets - (expects columns: 'reset' - and index:'packets','vectors') -
-        which is achieved by utilising the other filtering and segregation
-        functions in this class.
-        --Returns dataframe which has the vector number as its index - this
-        is achieved by dropping the 'packet' multiindex level. The vectors
-        should all be contiguous - this is part of the analysis. The resets
-        should also be monotonically (increasing) by either 0 or 1.
         '''
         '''
         add new 'reset_quality' column to the 'even' and 'odd' dataframes,
@@ -693,25 +685,37 @@ class extdata:
         '''
         rough checks on the input dataframe
         '''
-        frames = [self.even,self.odd]
-        for frame in frames:
-            frame['rdiff_prev'] = frame['reset']-frame['reset'].shift(1)
-            frame['rdiff_next'] = frame['reset'].shift(-1)-frame['reset']
-            frame['reset_quality']=((frame['rdiff_prev']==0) | 
-                                    (frame['rdiff_prev']==1) |
-                                    (frame['rdiff_next']==0) |
-                                    (frame['rdiff_next']==1))
-            '''
-            The following is used in order to isolate valid vector blocks.
-            '''
-            frame['quality_change']=((frame['reset_quality']) != \
-                                    (frame['reset_quality'].shift()))
-            frame['vblock_resets']=frame['quality_change'].cumsum()
-    def vector_analysis(self,dataframe=pd.DataFrame()):
+        if dataframe.index.names != ['packet','vector']:
+            raise Exception("Input Dataframe needs to have a multiindex with"
+                            "level names 'packet' and 'vector'")
+        if 'reset' not in dataframe.columns:
+            raise Exception("Input should contain 'range' column!")
+        dataframe['rdiff'] = dataframe['reset']-dataframe['reset'].shift(1)
+        dataframe['quality_change']=((dataframe['rdiff']!=0) & (dataframe['rdiff']!=1))
+        dataframe['vblock_resets']=dataframe['quality_change'].cumsum()
+        '''
+        Finally, blocks of contiguous packets can be identified from the 
+        'counts' column by grouping the data and getting the first and 
+        last indices - those indices are INCLUSIVE, so the last index is 
+        the last valid packet in that group
+        '''
+        block_ranges = dataframe.groupby('vblock_resets').apply(\
+                                            lambda x:(x.index[0],x.index[-1]))
+        block_ranges.index.name='vblock_resets'
+        return dataframe,block_ranges
+    def vector_analysis(self,dataframe):
         '''
         Analyse the vector numbers for contiguity, in a fashion similar to 
         above, just for vector numbers, not for reset counts.
         Also, 'valid' vector count increases are now +1 only.
+        -The input dataframe should contain a contiguous block of vectors
+        packets - (expects columns: 'reset' - and index:'packets','vectors') -
+        which is achieved by utilising the other filtering and segregation
+        functions in this class.
+        --Returns dataframe which has the vector number as its index - this
+        is achieved by dropping the 'packet' multiindex level. The vectors
+        should all be contiguous - this is part of the analysis. The resets
+        should also be monotonically (increasing) by either 0 or 1.
         '''
         if dataframe.index.names != ['packet','vector']:
             raise Exception("Input Dataframe needs to have a multiindex with"
@@ -723,7 +727,16 @@ class extdata:
         dataframe['contiguousness_change'] = (vdiff!=1)
         dataframe['vblock_vnumbers'] = dataframe['contiguousness_change'].\
                                                                       cumsum()
-        return dataframe
+        '''
+        Finally, blocks of contiguous packets can be identified from the 
+        'counts' column by grouping the data and getting the first and 
+        last indices - those indices are INCLUSIVE, so the last index is 
+        the last valid packet in that group
+        '''
+        block_ranges = dataframe.groupby('vblock_vnumbers').apply(\
+                                            lambda x:(x.index[0],x.index[-1]))
+        block_ranges.index.name='vblock_vnumbers'
+        return dataframe,block_ranges
 '''
 header lengths
 dds - 15
@@ -862,10 +875,6 @@ diff = df['reset'].diff()
 first element of diff will be NaN here
 then go through each row and 
 '''
-ext.reset_filter()
-
-evenr = ext.even.copy()
-oddr = ext.odd.copy()
 
 ext.two_series()
 evenodd = ext.evenodd.copy()
@@ -880,4 +889,6 @@ print ext.blocks
 reset_even = ext.even.copy()
 reset_odd = ext.odd.copy()
 
-rfilter_evenodd = ext.vector_analysis(evenodd)
+vfilter_evenodd,vranges_evenodd = ext.vector_analysis(evenodd)
+rfilter_evenodd,rranges_evenodd = ext.reset_filter(evenodd)
+
