@@ -3,6 +3,123 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 
+def browse_frame_ipython(frame,window=40):
+    frame['reset']=frame['reset'].apply(hex)
+    from IPython.utils.coloransi import TermColors as tc
+    import msvcrt
+    window=int(window)
+    helptext=(tc.Green+
+    "d for 1/2 down"+'\n'+
+    "u for 1/2 up"+'\n'+
+    "spacebar for page down"+'\n'+
+    "p for next packet (444 lines)"+'\n'+
+    "o for previous packet (-444 lines)"+'\n'+
+    "q for quit"+'\n'+
+    "h to print this help text"+tc.Normal)
+    print helptext
+    '''
+    row_data = lambda frame,row:list(frame.index.values[row])+\
+                                        list(frame.values[row])
+    row_str = lambda frame,row:"{0:9s}{1:7d}{2:7d}{3:>10s}{4:7d}{5:7d}{6:7d}{7:7d}".\
+                        format(*row_data(frame,row))
+    headers = ["Packet","Vector","Range","Reset","Sensor","x","y","z"]
+    '''
+    scroll = 0   
+    max_row = frame.shape[0]
+    '''
+    pre-process strings!
+    '''
+    row_strings = []
+    current_rows = 0
+    '''
+    def process_rows(current_rows,rows):
+        new_rows = []
+        for i in range(current_rows,current_rows+rows):
+            if not i<0 and not i>max_row:
+                new_rows.append(row_str(frame,i))
+        return new_rows
+    '''
+    def process_rows(current_rows,rows):
+        if current_rows==0:
+            new = frame[current_rows:current_rows+rows].to_string(sparsify=False,
+                                            header=True,index_names=True,
+                                            col_space=7)
+        else:
+            new = frame[current_rows:current_rows+rows].to_string(sparsify=False,
+                                            header=False,index_names=False,
+                                            col_space=7)
+        return new.split('\n')
+    print "processing:",
+    row_strings+=process_rows(current_rows,1000)
+    current_rows = len(row_strings)
+    #print "rows available:"+tc.Green+str(current_rows)+tc.Normal
+    if window>max_row:
+        print '\n'.join(row_strings[0:max_row])
+    else:
+        print '\n'.join(row_strings[0:window])
+    while 1:
+        char = msvcrt.getch()
+        if char=='u':
+            #os.system('CLS')
+            scroll -= window/2
+            if scroll<0:
+                scroll=0
+            '''
+            if scroll==0:
+                print "{0:>9s}{1:>7s}{2:>7s}{3:>10s}{4:>7s}{5:>7s}{6:>7s}{7:>7s}".format(*headers)
+            '''
+            mini = scroll-20
+            maxi = scroll+window
+            if mini<0:
+                mini = 0
+            if maxi>max_row:
+                maxi = max_row
+            print '\n'.join(row_strings[mini:maxi])
+        elif char=='o':#previous packet
+            os.system('CLS')
+            scroll -= 444
+            if scroll<0:
+                scroll=0
+            '''
+            if scroll==0:
+                print "{0:>9s}{1:>7s}{2:>7s}{3:>10s}{4:>7s}{5:>7s}{6:>7s}{7:>7s}".format(*headers)
+            '''
+            mini = scroll
+            maxi = scroll+window
+            if mini<0:
+                mini = 0
+            if maxi>max_row:
+                maxi = max_row
+            print '\n'.join(row_strings[mini:maxi])
+        elif char=='d':
+            scroll += window/2
+            if scroll>max_row-window:
+                scroll=max_row-window
+            mini = scroll
+            maxi = scroll+window
+            print '\n'.join(row_strings[mini:maxi])
+        elif char=='p':
+            scroll+=444
+            if scroll>max_row-window:
+                scroll=max_row-window
+            mini = scroll
+            maxi = scroll+window
+            print '\n'.join(row_strings[mini:maxi])
+        elif char == ' ':
+            scroll+=window
+            if scroll>max_row-window:
+                scroll=max_row-window
+            print '\n'.join(row_strings[scroll:scroll+window])
+        if current_rows-scroll<1000:
+            #print "processing:",
+            row_strings+=process_rows(current_rows,1000)
+            current_rows = len(row_strings)
+            #print "rows available:"+tc.Green+str(current_rows)+tc.Normal
+        if char == chr(27) or char=='q':
+            break
+        if char == 'h':
+            print helptext
+
 class extdata:
     #packet header ID
     ID={'SC1BS':38,'SC2BS':78,'SC3BS':118,'SC4BS':158,
@@ -497,138 +614,47 @@ class extdata:
         segregate based on packet number. If two packets numbers are not
         contiguous, record this as well
         '''
-        packet_numbers = pd.Series(selected_packets.index.values,
-                                   index=selected_packets.index)
         #need to do this, because the shift operation cannot be done on an
         #index, only an a series/frame, etc. (is this really true?)
         #in order to match the index of the frame, reassign index as well
+        packet_numbers = pd.Series(selected_packets.index.values,
+                                   index=selected_packets.index)
         
         #basically just detect where the packet number changes by more than 1!
-        selected_packets['contigous_packets']=\
+        selected_packets['contiguous_packets']=\
               ~(packet_numbers!=packet_numbers.shift().\
               fillna(packet_numbers.iloc[0]-1)+1)
         '''
         where the columns titled 'contiguous' are False is where a break 
         occurs!
         '''
+        '''
+        combine the two 'contiguous' columns so that if any entry is false,
+        a break can be identified there -> 'contiguous' column
+        this is done with the & operator (bitwise and overloaded for arrays)
+        '''        
+        selected_packets['contiguous']= (selected_packets['contiguous_parity']\
+                                      & selected_packets['contiguous_packets'])
+        '''
+        now invert the truth value of the 'contiguous' columns in order to
+        be able to do a cummulative sum, which increases only when there as a
+        non-contiguous value - so, in the inverted array, that would be 
+        represented by a "True" value
+        '''
+        selected_packets['breaks'] = ~selected_packets['contiguous']
+        selected_packets['counts'] = selected_packets['breaks'].cumsum()
+        '''
         print "selected"
         print selected_packets
-def browse_frame_ipython(frame,window=40):
-    frame['reset']=frame['reset'].apply(hex)
-    from IPython.utils.coloransi import TermColors as tc
-    import msvcrt
-    window=int(window)
-    helptext=(tc.Green+
-    "d for 1/2 down"+'\n'+
-    "u for 1/2 up"+'\n'+
-    "spacebar for page down"+'\n'+
-    "p for next packet (444 lines)"+'\n'+
-    "o for previous packet (-444 lines)"+'\n'+
-    "q for quit"+'\n'+
-    "h to print this help text"+tc.Normal)
-    print helptext
-    '''
-    row_data = lambda frame,row:list(frame.index.values[row])+\
-                                        list(frame.values[row])
-    row_str = lambda frame,row:"{0:9s}{1:7d}{2:7d}{3:>10s}{4:7d}{5:7d}{6:7d}{7:7d}".\
-                        format(*row_data(frame,row))
-    headers = ["Packet","Vector","Range","Reset","Sensor","x","y","z"]
-    '''
-    scroll = 0   
-    max_row = frame.shape[0]
-    '''
-    pre-process strings!
-    '''
-    row_strings = []
-    current_rows = 0
-    '''
-    def process_rows(current_rows,rows):
-        new_rows = []
-        for i in range(current_rows,current_rows+rows):
-            if not i<0 and not i>max_row:
-                new_rows.append(row_str(frame,i))
-        return new_rows
-    '''
-    def process_rows(current_rows,rows):
-        if current_rows==0:
-            new = frame[current_rows:current_rows+rows].to_string(sparsify=False,
-                                            header=True,index_names=True,
-                                            col_space=7)
-        else:
-            new = frame[current_rows:current_rows+rows].to_string(sparsify=False,
-                                            header=False,index_names=False,
-                                            col_space=7)
-        return new.split('\n')
-    print "processing:",
-    row_strings+=process_rows(current_rows,1000)
-    current_rows = len(row_strings)
-    #print "rows available:"+tc.Green+str(current_rows)+tc.Normal
-    if window>max_row:
-        print '\n'.join(row_strings[0:max_row])
-    else:
-        print '\n'.join(row_strings[0:window])
-    while 1:
-        char = msvcrt.getch()
-        if char=='u':
-            #os.system('CLS')
-            scroll -= window/2
-            if scroll<0:
-                scroll=0
-            '''
-            if scroll==0:
-                print "{0:>9s}{1:>7s}{2:>7s}{3:>10s}{4:>7s}{5:>7s}{6:>7s}{7:>7s}".format(*headers)
-            '''
-            mini = scroll-20
-            maxi = scroll+window
-            if mini<0:
-                mini = 0
-            if maxi>max_row:
-                maxi = max_row
-            print '\n'.join(row_strings[mini:maxi])
-        elif char=='o':#previous packet
-            os.system('CLS')
-            scroll -= 444
-            if scroll<0:
-                scroll=0
-            '''
-            if scroll==0:
-                print "{0:>9s}{1:>7s}{2:>7s}{3:>10s}{4:>7s}{5:>7s}{6:>7s}{7:>7s}".format(*headers)
-            '''
-            mini = scroll
-            maxi = scroll+window
-            if mini<0:
-                mini = 0
-            if maxi>max_row:
-                maxi = max_row
-            print '\n'.join(row_strings[mini:maxi])
-        elif char=='d':
-            scroll += window/2
-            if scroll>max_row-window:
-                scroll=max_row-window
-            mini = scroll
-            maxi = scroll+window
-            print '\n'.join(row_strings[mini:maxi])
-        elif char=='p':
-            scroll+=444
-            if scroll>max_row-window:
-                scroll=max_row-window
-            mini = scroll
-            maxi = scroll+window
-            print '\n'.join(row_strings[mini:maxi])
-        elif char == ' ':
-            scroll+=window
-            if scroll>max_row-window:
-                scroll=max_row-window
-            print '\n'.join(row_strings[scroll:scroll+window])
-        if current_rows-scroll<1000:
-            #print "processing:",
-            row_strings+=process_rows(current_rows,1000)
-            current_rows = len(row_strings)
-            #print "rows available:"+tc.Green+str(current_rows)+tc.Normal
-        if char == chr(27) or char=='q':
-            break
-        if char == 'h':
-            print helptext
+        '''
+        '''
+        Finally, blocks of contiguous packets can be identified from the 
+        'counts' column by grouping the data and getting the first and 
+        last indices - those indices are INCLUSIVE, so the last index is 
+        the last valid packet in that group
+        '''
+        self.blocks = selected_packets.groupby('counts').apply(\
+                                            lambda x:(x.index[0],x.index[-1]))
 
 '''
 header lengths
@@ -773,3 +799,6 @@ oddeven = ext.oddeven.copy()
 
 ext.select_packets()
 new_packetsizes=ext.packet_sizes.copy()
+
+print "blocks"
+print ext.blocks
