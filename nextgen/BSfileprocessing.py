@@ -675,7 +675,7 @@ class extdata:
                                   lambda x:'even' if selected_packets[
                                   'iseven'].loc[x[0]] else 'odd')})
         
-    def reset_filter(self,frame):
+    def reset_analysis(self,frame):
         '''
         Looks at the reset values of the vectors within the dataframe, and 
         checks whether they are increasing 'slowly', ie by either 0 or 1. 
@@ -927,7 +927,7 @@ print "blocks"
 print ext.blocks
 
 vfilter_evenodd,vranges_evenodd = ext.vector_analysis(ext.evenodd)
-rfilter_evenodd,rranges_evenodd = ext.reset_filter(ext.evenodd)
+rfilter_evenodd,rranges_evenodd = ext.reset_analysis(ext.evenodd)
 
 print "vector blocks"
 print "vector analysis"
