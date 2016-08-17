@@ -717,9 +717,10 @@ class extdata:
         last indices - those indices are INCLUSIVE, so the last index is 
         the last valid packet in that group
         '''
-        block_ranges = dataframe.groupby('vblock_resets').apply(\
+        block_ranges = pd.DataFrame()
+        block_ranges['blocks'] = dataframe.groupby('vblock_resets').apply(\
                                             lambda x:(x.index[0],x.index[-1]))
-        block_ranges.index.name='vblock_resets'
+        block_ranges.index.name = 'vblock_resets'
         return dataframe,block_ranges
     def vector_analysis(self,frame):
         '''
@@ -752,9 +753,10 @@ class extdata:
         last indices - those indices are INCLUSIVE, so the last index is 
         the last valid packet in that group
         '''
-        block_ranges = dataframe.groupby('vblock_vnumbers').apply(\
+        block_ranges = pd.DataFrame()
+        block_ranges['blocks'] = dataframe.groupby('vblock_vnumbers').apply(\
                                             lambda x:(x.index[0],x.index[-1]))
-        block_ranges.index.name='vblock_vnumbers'
+        block_ranges.index.name = 'vblock_numbers'
         return dataframe,block_ranges
 '''
 header lengths
@@ -934,9 +936,7 @@ print ""
 print "reset analysis"
 print rranges_evenodd
 print ""
-vranges_evenodd = vranges_evenodd.to_frame(name='blocks')
-rranges_evenodd = rranges_evenodd.to_frame(name='blocks')
-min_length = 2  #at this min value of 2, lots of 'coincidental' vblocks are
+min_length = 5  #at a min value of 2, lots of 'coincidental' vblocks are
                 #still observed, so a higher value is recommended
 print "filteredvblocks, min_length="+str(min_length)
 print "vector analysis"
