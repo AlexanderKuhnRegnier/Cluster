@@ -378,6 +378,7 @@ class extdata:
         '''
         packet_mask = self.packet_info['Telemetry Mode'] == 'MSA Dump'
         self.removed_packets = self.packet_info[~packet_mask].index.values
+        self.removed_packets_info = self.packet_info[~packet_mask]
         self.packet_info = self.packet_info[packet_mask]
 
         index_vals = self.even.index.get_level_values('packet').values
@@ -917,6 +918,7 @@ packet_sizes_odd.name = 'odd'
 packet_sizesf = pd.concat((packet_sizes_even,packet_sizes_odd),axis=1)
 packetinfo=ext.packet_info
 removed = ext.removed_packets
+removed_info = ext.removed_packets_info
 
 #hex formatting of reset counts
 
