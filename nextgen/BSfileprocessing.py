@@ -641,8 +641,7 @@ class extdata:
                                    index=selected_packets.index)
         #basically just detect where the packet number changes by more than 1!
         selected_packets['contiguous_packets']=\
-              ~(packet_numbers!=packet_numbers.shift().\
-              fillna(packet_numbers.iloc[0]-1)+1)
+              (packet_numbers==(packet_numbers.shift()+1))
         '''
         where the columns titled 'contiguous' are False is where a break 
         occurs!
@@ -663,10 +662,6 @@ class extdata:
         selected_packets['breaks'] = ~selected_packets['contiguous']
         selected_packets['counts'] = selected_packets['breaks'].cumsum()
         '''
-        print "selected"
-        print selected_packets
-        '''
-        '''
         Finally, blocks of contiguous packets can be identified from the 
         'counts' column by grouping the data and getting the first and 
         last indices - those indices are INCLUSIVE, so the last index is 
@@ -676,10 +671,11 @@ class extdata:
                                             lambda x:(x.index[0],x.index[-1]))
         block_ranges.index.name='block'
         self.blocks=pd.DataFrame({'packets':block_ranges,
-        'start_parity':block_ranges.apply(
-        lambda x:'even' if selected_packets['iseven'].loc[x[0]] else 'odd')})
+                                  'start_parity':block_ranges.apply(
+                                  lambda x:'even' if selected_packets[
+                                  'iseven'].loc[x[0]] else 'odd')})
         
-    def reset_filter(self,dataframe):
+    def reset_filter(self,frame):
         '''
         Looks at the reset values of the vectors within the dataframe, and 
         checks whether they are increasing 'slowly', ie by either 0 or 1. 
@@ -705,6 +701,7 @@ class extdata:
         '''
         rough checks on the input dataframe
         '''
+        dataframe = frame.copy()
         if dataframe.index.names != ['packet','vector']:
             raise Exception("Input Dataframe needs to have a multiindex with"
                             "level names 'packet' and 'vector'")
@@ -724,7 +721,7 @@ class extdata:
                                             lambda x:(x.index[0],x.index[-1]))
         block_ranges.index.name='vblock_resets'
         return dataframe,block_ranges
-    def vector_analysis(self,dataframe):
+    def vector_analysis(self,frame):
         '''
         Analyse the vector numbers for contiguity, in a fashion similar to 
         above, just for vector numbers, not for reset counts.
@@ -738,6 +735,7 @@ class extdata:
         should all be contiguous - this is part of the analysis. The resets
         should also be monotonically (increasing) by either 0 or 1.
         '''
+        dataframe = frame.copy()
         if dataframe.index.names != ['packet','vector']:
             raise Exception("Input Dataframe needs to have a multiindex with"
                             "level names 'packet' and 'vector'")
@@ -919,18 +917,15 @@ even_hex['reset']=even_hex['reset'].apply(hex_format)
 odd_hex = oddf.copy(deep=True)
 odd_hex['reset']=odd_hex['reset'].apply(hex_format)
 #print packet_info.groupby('Telemetry Mode').count()
-'''
+
 ext.select_packets()
 new_packetsizes=ext.packet_sizes.copy()
 
 print "blocks"
 print ext.blocks
 
-reset_even = ext.even.copy()
-reset_odd = ext.odd.copy()
-
-vfilter_evenodd,vranges_evenodd = ext.vector_analysis(evenodd.copy())
-rfilter_evenodd,rranges_evenodd = ext.reset_filter(evenodd.copy())
+vfilter_evenodd,vranges_evenodd = ext.vector_analysis(ext.evenodd)
+rfilter_evenodd,rranges_evenodd = ext.reset_filter(ext.evenodd)
 
 print "vector blocks"
 print "vector analysis"
@@ -941,13 +936,24 @@ print rranges_evenodd
 print ""
 vranges_evenodd = vranges_evenodd.to_frame(name='blocks')
 rranges_evenodd = rranges_evenodd.to_frame(name='blocks')
-min_length = 5
+min_length = 2  #at this min value of 2, lots of 'coincidental' vblocks are
+                #still observed, so a higher value is recommended
 print "filteredvblocks, min_length="+str(min_length)
 print "vector analysis"
-vranges_evenodd['size']=vranges_evenodd['blocks'].apply(lambda x:x[1]-x[0])
+'''
+size calculation is based on the fact that the blocks start and end indices
+are inclusive. They relate to the index of the 'evenodd' or 'oddeven' frame
+passed into the analysis function (the 'vector' level (1) that is)
+For the reset blocks analysis, it may happen that two vectors agree 
+reset-wise, but are actually very far apart in a packet, or even multiple
+packets apart. Simply taking the difference of the indices does not suffice
+in that case, since that would also count all of the vectors that have been
+filtered out in the data filter function. The function below circumvents this
+accurately.
+'''
+vranges_evenodd['size']=vranges_evenodd['blocks'].apply(lambda x:np.sum((ext.evenodd.index.get_level_values(1)>=x[0]) & (ext.evenodd.index.get_level_values(1)<=x[1])))
 print vranges_evenodd[vranges_evenodd['size']>=min_length]
 print ""
 print "reset analysis"
-rranges_evenodd['size']=rranges_evenodd['blocks'].apply(lambda x:x[1]-x[0])
+rranges_evenodd['size']=rranges_evenodd['blocks'].apply(lambda x:np.sum((ext.evenodd.index.get_level_values(1)>=x[0]) & (ext.evenodd.index.get_level_values(1)<=x[1])))
 print rranges_evenodd[rranges_evenodd['size']>=min_length]
-'''
