@@ -946,35 +946,35 @@ accurately.
 '''
 min_length = 5  #at a min value of 2, lots of 'coincidental' vblocks are
                 #still observed, so a higher value is recommended
-print "even_odd filteredvblocks, min_length="+str(min_length)
-print "vector analysis"
+#print "even_odd filteredvblocks, min_length="+str(min_length)
+#print "vector analysis"
 vranges_evenodd['size']=vranges_evenodd['blocks'].apply(
     lambda x:np.sum((ext.evenodd.index.get_level_values(1)>=x[0]) & 
                     (ext.evenodd.index.get_level_values(1)<=x[1])))
 vranges_evenodd = vranges_evenodd[vranges_evenodd['size']>=min_length]
-print vranges_evenodd
-print ""
-print "reset analysis"
+#print vranges_evenodd
+#print ""
+#print "reset analysis"
 rranges_evenodd['size']=rranges_evenodd['blocks'].apply(
     lambda x:np.sum((ext.evenodd.index.get_level_values(1)>=x[0]) & 
                     (ext.evenodd.index.get_level_values(1)<=x[1])))
 rranges_evenodd = rranges_evenodd[rranges_evenodd['size']>=min_length]
-print rranges_evenodd
+#print rranges_evenodd
 
-print "odd_even filteredvblocks, min_length="+str(min_length)
-print "vector analysis"
+#print "odd_even filteredvblocks, min_length="+str(min_length)
+#print "vector analysis"
 vranges_oddeven['size']=vranges_oddeven['blocks'].apply(
     lambda x:np.sum((ext.oddeven.index.get_level_values(1)>=x[0]) & 
                     (ext.oddeven.index.get_level_values(1)<=x[1])))
 vranges_oddeven = vranges_oddeven[vranges_oddeven['size']>=min_length]
-print vranges_oddeven
-print ""
-print "reset analysis"
+#print vranges_oddeven
+#print ""
+#print "reset analysis"
 rranges_oddeven['size']=rranges_oddeven['blocks'].apply(
     lambda x:np.sum((ext.oddeven.index.get_level_values(1)>=x[0]) & 
                     (ext.oddeven.index.get_level_values(1)<=x[1])))
 rranges_oddeven = rranges_oddeven[rranges_oddeven['size']>=min_length]
-print rranges_oddeven
+#print rranges_oddeven
 '''
 the size column really describes the number of vectors, since the start and end
 indices are inclusive
@@ -1029,3 +1029,37 @@ present at least partly within the vblocks ranges)
 '''
 print "Intersections"
 print intersections
+'''
+Having determined the intersections between the different analysis methods,
+the remaining overlaps have to be reduced to the elementary vectors, 
+ie. duplicates removed
+A naive solution would involve simply removing rows that share common values
+across all columns - the problem with this is that some rows could potentially
+contain the same column values, despite being physically different vectors!
+Since valid vector starts and ends within packets are not likely to be aligned,
+one would have to find a way to compare surrounding rows as well.
+'''
+def select_index_level_1(frame,start,end):
+    '''
+    inclusive selection on integer based multiindex level 1
+    '''
+    level_1 = frame.index.get_level_values(1)
+    return frame.iloc[(level_1>=start) & (level_1<=end)]
+
+'''
+look at 2 selections
+'''
+orderings = intersections.index.levels[0]
+orderings_data = {'evenodd':ext.evenodd,'oddeven':ext.oddeven}
+for ordering in orderings:
+    if intersections.xs(ordering).shape[0]>1:
+        print "ordering, looking at first 2"
+        start1,end1 = intersections.xs((ordering,0))['intersections']
+        start2,end2 = intersections.xs((ordering,1))['intersections']
+        data1 = select_index_level_1(orderings_data[ordering],start1,end1)
+        data2 = select_index_level_1(orderings_data[ordering],start2,end2)
+        data1.reset_index(inplace=True)
+        data2.reset_index(inplace=True)
+        data1.columns = [entry+'1' for entry in data1.columns]
+        data2.columns = [entry+'2' for entry in data2.columns]
+        comparison = pd.concat((data1,data2),axis=1)
