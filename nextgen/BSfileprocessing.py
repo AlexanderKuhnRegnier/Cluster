@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import os
+verbose=True
 
 def browse_frame_ipython(frame,window=40):
     frame['reset']=frame['reset'].apply(hex)
@@ -143,6 +144,7 @@ class extdata:
         self.full_packets = np.array([])
         self.evenodd=pd.DataFrame()
         self.oddeven = pd.DataFrame()
+        self.blocks = pd.DataFrame()
         with open(filename,'rb') as f:
             self.data = f.read()
         if not self.data:
@@ -621,7 +623,10 @@ class extdata:
                 return -1
         self.packet_sizes.fillna(0,inplace=True)
         self.packet_sizes['iseven']=self.packet_sizes[['even','odd']].apply(
-        iseven_size_comparison,axis=1)
+                                                iseven_size_comparison,axis=1)
+        if np.all(self.packet_sizes['iseven'].values==-1):
+            print "No extended Mode Data Detected"
+            return None
         selected_packets = self.packet_sizes[
                                 self.packet_sizes['iseven']!=-1][['iseven']]          
         '''
@@ -797,7 +802,7 @@ pd.options.display.max_rows=20
 Year= '2016'
 year='16'
 month = '01'
-day='03'
+day='06'
 sc = '1'
 version = 'B'
 BSfile = RAW+Year+'/'+month+'/'+'C'+sc+'_'+year+month+day+'_'+version+'.BS'
@@ -1101,19 +1106,23 @@ for (i,(start,end)) in zip(range(blocks),boundaries):
                                       names=['blocks','packets','vectors'])
     data.index = multi
     dataframes.append(data)
-
-combined_data = pd.concat((dataframes))
-combined_data.drop_duplicates(inplace=True)
-duplicated_indices = combined_data.index.duplicated()
-if np.sum(duplicated_indices):
-    raise Exception("This should never happen after dropping duplicates!")
-combined_data.sort_index(ascending=True)
-'''
-some rough and ready processing, bear in mind that the data still needs to be
-scaled from engineering units to nT, the range is important for that
-Tim is still working on 'what' the scaling factors should be?
-'''
-combined_data['x'] = combined_data['x'].apply(lambda x: x-65536 if x>32767 else x)
-combined_data['y'] = combined_data['y'].apply(lambda x: x-65536 if x>32767 else x)
-combined_data['z'] = combined_data['z'].apply(lambda x: x-65536 if x>32767 else x)
-combined_data['mag']=np.linalg.norm(combined_data[['x','y','z']],axis=1)
+if dataframes:
+    combined_data = pd.concat((dataframes))
+    combined_data.drop_duplicates(inplace=True)
+    duplicated_indices = combined_data.index.duplicated()
+    if np.sum(duplicated_indices):
+        raise Exception("This should never happen after dropping duplicates!")
+    combined_data['vectors']=combined_data.index.get_level_values('vectors')
+    combined_data.sort_values(['reset','vectors'],ascending=True,inplace=True)
+    print "combined data"
+    print combined_data
+    '''
+    some rough and ready processing, bear in mind that the data still needs to be
+    scaled from engineering units to nT, the range is important for that
+    Tim is still working on 'what' the scaling factors should be?
+    '''
+    combined_data['x'] = combined_data['x'].apply(lambda x: x-65536 if x>32767 else x)
+    combined_data['y'] = combined_data['y'].apply(lambda x: x-65536 if x>32767 else x)
+    combined_data['z'] = combined_data['z'].apply(lambda x: x-65536 if x>32767 else x)
+    combined_data['mag']=np.linalg.norm(combined_data[['x','y','z']],axis=1)
+    combined_data.plot(y=['x','y','z','mag'])
