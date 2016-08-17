@@ -470,8 +470,10 @@ class extdata:
         the evenodd series may contain 1 more vector or the same number of 
         vectors as the oddeven series, depending on the number of packets
         '''
-        even_packets_existing = np.unique(self.even.index.get_level_values('packet').values)
-        odd_packets_existing = np.unique(self.odd.index.get_level_values('packet').values)
+        even_packets_existing = np.unique(self.even.index.get_level_values(
+                                                            'packet').values)
+        odd_packets_existing = np.unique(self.odd.index.get_level_values(
+                                                            'packet').values)
         if (self.full_packets.shape != even_packets_existing.shape) or \
                 (self.full_packets.shape != odd_packets_existing.shape):
             raise Exception("Packet numbers have changed!")
@@ -709,7 +711,8 @@ class extdata:
             raise Exception("Input should contain 'range' column!")
         dataframe.index = dataframe.index.droplevel('packet')
         dataframe['rdiff'] = dataframe['reset']-dataframe['reset'].shift(1)
-        dataframe['quality_change']=((dataframe['rdiff']!=0) & (dataframe['rdiff']!=1))
+        dataframe['quality_change']=((dataframe['rdiff']!=0) & 
+                                        (dataframe['rdiff']!=1))
         dataframe['vblock_resets']=dataframe['quality_change'].cumsum()
         '''
         Finally, blocks of contiguous packets can be identified from the 
@@ -928,18 +931,8 @@ print ext.blocks
 
 vfilter_evenodd,vranges_evenodd = ext.vector_analysis(ext.evenodd)
 rfilter_evenodd,rranges_evenodd = ext.reset_analysis(ext.evenodd)
-
-print "vector blocks"
-print "vector analysis"
-print vranges_evenodd
-print ""
-print "reset analysis"
-print rranges_evenodd
-print ""
-min_length = 5  #at a min value of 2, lots of 'coincidental' vblocks are
-                #still observed, so a higher value is recommended
-print "filteredvblocks, min_length="+str(min_length)
-print "vector analysis"
+vfilter_oddeven,vranges_oddeven = ext.vector_analysis(ext.oddeven)
+rfilter_oddeven,rranges_oddeven = ext.reset_analysis(ext.oddeven)
 '''
 size calculation is based on the fact that the blocks start and end indices
 are inclusive. They relate to the index of the 'evenodd' or 'oddeven' frame
@@ -951,9 +944,34 @@ in that case, since that would also count all of the vectors that have been
 filtered out in the data filter function. The function below circumvents this
 accurately.
 '''
-vranges_evenodd['size']=vranges_evenodd['blocks'].apply(lambda x:np.sum((ext.evenodd.index.get_level_values(1)>=x[0]) & (ext.evenodd.index.get_level_values(1)<=x[1])))
+min_length = 5  #at a min value of 2, lots of 'coincidental' vblocks are
+                #still observed, so a higher value is recommended
+print "even_odd filteredvblocks, min_length="+str(min_length)
+print "vector analysis"
+vranges_evenodd['size']=vranges_evenodd['blocks'].apply(
+    lambda x:np.sum((ext.evenodd.index.get_level_values(1)>=x[0]) & 
+                    (ext.evenodd.index.get_level_values(1)<=x[1])))
 print vranges_evenodd[vranges_evenodd['size']>=min_length]
 print ""
 print "reset analysis"
-rranges_evenodd['size']=rranges_evenodd['blocks'].apply(lambda x:np.sum((ext.evenodd.index.get_level_values(1)>=x[0]) & (ext.evenodd.index.get_level_values(1)<=x[1])))
+rranges_evenodd['size']=rranges_evenodd['blocks'].apply(
+    lambda x:np.sum((ext.evenodd.index.get_level_values(1)>=x[0]) & 
+                    (ext.evenodd.index.get_level_values(1)<=x[1])))
 print rranges_evenodd[rranges_evenodd['size']>=min_length]
+
+print "odd_even filteredvblocks, min_length="+str(min_length)
+print "vector analysis"
+vranges_oddeven['size']=vranges_oddeven['blocks'].apply(
+    lambda x:np.sum((ext.oddeven.index.get_level_values(1)>=x[0]) & 
+                    (ext.oddeven.index.get_level_values(1)<=x[1])))
+print vranges_oddeven[vranges_oddeven['size']>=min_length]
+print ""
+print "reset analysis"
+rranges_oddeven['size']=rranges_oddeven['blocks'].apply(
+    lambda x:np.sum((ext.oddeven.index.get_level_values(1)>=x[0]) & 
+                    (ext.oddeven.index.get_level_values(1)<=x[1])))
+print rranges_oddeven[rranges_oddeven['size']>=min_length]
+'''
+the size column really describes the number of vectors, since the start and end
+indices are inclusive
+'''
