@@ -951,27 +951,81 @@ print "vector analysis"
 vranges_evenodd['size']=vranges_evenodd['blocks'].apply(
     lambda x:np.sum((ext.evenodd.index.get_level_values(1)>=x[0]) & 
                     (ext.evenodd.index.get_level_values(1)<=x[1])))
-print vranges_evenodd[vranges_evenodd['size']>=min_length]
+vranges_evenodd = vranges_evenodd[vranges_evenodd['size']>=min_length]
+print vranges_evenodd
 print ""
 print "reset analysis"
 rranges_evenodd['size']=rranges_evenodd['blocks'].apply(
     lambda x:np.sum((ext.evenodd.index.get_level_values(1)>=x[0]) & 
                     (ext.evenodd.index.get_level_values(1)<=x[1])))
-print rranges_evenodd[rranges_evenodd['size']>=min_length]
+rranges_evenodd = rranges_evenodd[rranges_evenodd['size']>=min_length]
+print rranges_evenodd
 
 print "odd_even filteredvblocks, min_length="+str(min_length)
 print "vector analysis"
 vranges_oddeven['size']=vranges_oddeven['blocks'].apply(
     lambda x:np.sum((ext.oddeven.index.get_level_values(1)>=x[0]) & 
                     (ext.oddeven.index.get_level_values(1)<=x[1])))
-print vranges_oddeven[vranges_oddeven['size']>=min_length]
+vranges_oddeven = vranges_oddeven[vranges_oddeven['size']>=min_length]
+print vranges_oddeven
 print ""
 print "reset analysis"
 rranges_oddeven['size']=rranges_oddeven['blocks'].apply(
     lambda x:np.sum((ext.oddeven.index.get_level_values(1)>=x[0]) & 
                     (ext.oddeven.index.get_level_values(1)<=x[1])))
-print rranges_oddeven[rranges_oddeven['size']>=min_length]
+rranges_oddeven = rranges_oddeven[rranges_oddeven['size']>=min_length]
+print rranges_oddeven
 '''
 the size column really describes the number of vectors, since the start and end
 indices are inclusive
 '''
+'''
+what is left to do (for evenodd and oddeven separately, again) is to find
+the intersection between the results for the vector analysis and the 
+reset analysis. This is to guarantee that only vectors that were read
+sequentially from the data, and also have valid reset count increases are
+included.
+Using sets is a very easy way of doing it, and is actually remarkably fast,
+considering that one has to create the full list of indices first, then
+take the intersection, and then sort the resulting set once again.
+'''
+block_data = [[vranges_evenodd,rranges_evenodd,'evenodd'],
+              [vranges_oddeven,rranges_oddeven,'oddeven']]
+intersections_dict = {'evenodd':[],'oddeven':[]}
+for vranges,rranges,label in block_data:
+    #the indices are INCLUSIVE
+    for v_start,v_end in vranges['blocks']:
+        v_indices = set(np.arange(v_start,v_end+1,1))
+        for r_start,r_end in rranges['blocks']:
+            r_indices = set(np.arange(r_start,r_end+1,1))
+            intersection_ind = list(v_indices.intersection(r_indices))
+            if intersection_ind:
+                intersection_ind.sort()
+                intersections_dict[label].append((intersection_ind[0],
+                                                    intersection_ind[-1]))
+evenodd_intersections = pd.Series(intersections_dict['evenodd'],name='evenodd')
+oddeven_intersections = pd.Series(intersections_dict['oddeven'],name='oddeven')
+evenodd_length = evenodd_intersections.shape[0]
+multiindex_evenodd = pd.MultiIndex.from_arrays((['evenodd']*evenodd_length,
+                                                range(evenodd_length)),
+                                                names=['order','index'])
+oddeven_length = oddeven_intersections.shape[0]
+multiindex_oddeven = pd.MultiIndex.from_arrays((['oddeven']*oddeven_length,
+                                                range(oddeven_length)),
+                                                names=['ordering','index'])
+intersections_evenodd = pd.DataFrame(evenodd_intersections)
+intersections_evenodd.index = multiindex_evenodd
+intersections_oddeven = pd.DataFrame(oddeven_intersections)
+intersections_oddeven.index = multiindex_oddeven
+intersections_evenodd.columns=['intersections']
+intersections_oddeven.columns=['intersections']
+intersections = pd.concat((intersections_evenodd,intersections_oddeven),axis=0)
+intersections['size'] = intersections['intersections'].apply(
+                                                        lambda x:(x[1]-x[0])+1)
+'''
+this way of calculating the size is alright now, since we are sure of the fact
+that there are no gaps between the vectors (since the indices must have been
+present at least partly within the vblocks ranges)
+'''
+print "Intersections"
+print intersections
