@@ -187,9 +187,12 @@ class extdata:
         data_dict['sensor'].append(-1)
         data_dict['range'].append(-1)
         data_dict['reset'].append(-1)
-        
-        df = pd.DataFrame(data_dict,columns = ['range','reset','sensor',
-                                                       'x','y','z'])                                 
+        if len(data_dict['x']) != 445:
+            raise Exception("Read even has not read 444.5 vectors!")
+        data_dict['vector'] = np.arange(1,446,1.) #needs to be float array
+        data_dict['vector'][-1] = 444.5
+        df = pd.DataFrame(data_dict,columns = ['vector','range','reset',
+                                                       'sensor','x','y','z'])                                 
         return df
     def read_odd(self,data):
         data_dict = {'x':[],'y':[],'z':[],'sensor':[],'range':[],'reset':[]}
@@ -222,8 +225,12 @@ class extdata:
             data_dict['sensor'].append(sensor)
             data_dict['range'].append(inst_range)
             data_dict['reset'].append(reset)
-        df = pd.DataFrame(data_dict,columns = ['range','reset','sensor',
-                                                       'x','y','z'])
+        if len(data_dict['x']) != 445:
+            raise Exception("Read even has not read 444.5 vectors!")
+        data_dict['vector'] = np.arange(0,445,1.) #needs to be float array
+        data_dict['vector'][0] = 0.5
+        df = pd.DataFrame(data_dict,columns = ['vector','range','reset',
+                                                       'sensor','x','y','z'])      
         return df
     def read_dds(self,dds_data):
         if len(dds_data) != 15:
@@ -321,7 +328,9 @@ class extdata:
             self.packet_offset+=15
             fgm_data = self.read_fgm_science(self.data[self.packet_offset:
                                                 self.packet_offset+34])
-            self.packet_offset+=34 #needs to be subtracted from packet length!
+            self.packet_offset+=34  #needs to be subtracted from packet length
+                                    #later, since packet lenght includes the
+                                    #fgm header size!
             if not dds_data or not fgm_data:
                 break
             else:
@@ -341,16 +350,13 @@ class extdata:
         if number_of_packets != len(even) or number_of_packets != len(odd):
             raise Exception("Packet number mismatch between header info"
                             " and number of read packets")
-                            
         self.packet_info = pd.DataFrame(self.fgm_data,index=[i for
                                             i in range(1,number_of_packets+1)])
-
         self.even = pd.concat((even))
         self.odd = pd.concat((odd))
         if self.even.shape != self.odd.shape:
             raise Exception("Even and Odd shapes don't mach, should contain"
                             "the same number of vectors at this point!")
-            
         top_level = []
         packet_count = 1
         for packeto,packete in zip(odd,even):
@@ -360,10 +366,9 @@ class extdata:
             length = packete.shape[0]
             top_level.extend([packet_count]*length)
             packet_count += 1    
-        bottom_level=range(1,self.odd.shape[0]+1)            
-            
+        bottom_level=range(0,self.odd.shape[0])            
         multiindex=pd.MultiIndex.from_arrays([top_level,bottom_level],
-                                             names=['packet','vector'])
+                                             names=['packet','index'])
         self.even.index=multiindex
         self.odd.index=multiindex
         '''
@@ -393,7 +398,10 @@ class extdata:
         if not np.all(even_packet_list == odd_packet_list):
             raise Exception("At this point, even and odd frames should contain"
                             " equal number of packets!")
-        self.full_packets = even_packet_list
+        if not self.even.shape==self.odd.shape:
+            raise Exception("Even and Odd frames should contain the same "
+                            "number of vectors before joining them.")
+        self.full_packets = even_packet_list #is the same as odd_packet_list
         for packet,next_packet in zip(self.full_packets[:-1],
                                       self.full_packets[1:]):
             even_half=pd.Series()
@@ -415,33 +423,25 @@ class extdata:
             if not even_half.empty and not odd_half.empty:
                 '''
                 join the vectors, put them into the even dataframe!
-                use odd_vector as 'starting point'
+                use even as 'starting point'
                 '''
-                new = odd_half.copy()
-                new['x'] = even_half['x']
-                new['y'] = even_half['y']
-                if np.any(-1==new.values):
+                index = even_half.name[1]
+                self.even.set_value((packet,index),'range',odd_half['range'])
+                self.even.set_value((packet,index),'reset',odd_half['reset'])
+                self.even.set_value((packet,index),'z',odd_half['z'])
+                self.even.set_value((packet,index),'sensor',odd_half['sensor'])
+                #444.5 vector now contains
+                #full vector!
+                if np.any(-1==self.even.loc[packet,index].values):
+                    print self.even.loc[packet,index]
                     raise Exception("All -1 values should have been filled!")
-                self.even.loc[packet].iloc[-1]=new
                 vector_number = self.odd.loc[next_packet].iloc[0].name
                 odd_half_label = (next_packet,vector_number)
+                #drop the odd half vector from the frame, leaving it with
+                #1 vector less than the even packet
                 self.odd.drop(odd_half_label,axis=0,inplace=True)
-                '''
-                since vector was dropped, we need to shift the vector index
-                backwards by 1, ie subtract 1 to every vector in the index
-                starting from the vector that was removed!
-                '''
-                packetlevel = self.odd.index.get_level_values('packet').values
-                vectorlevel = self.odd.index.get_level_values('vector').values
-                mask = vectorlevel>vector_number
-                modify = vectorlevel[mask] #higher vector numbers
-                nomod = vectorlevel[~mask] #lower vector numbers
-                np.add(modify,-1,modify)
-                vectorlevel = np.append(nomod,modify)
-                new_multiindex = pd.MultiIndex.from_arrays((packetlevel,
-                                                            vectorlevel),
-                                            names = self.odd.index.names)
-                self.odd.index = new_multiindex
+            else:
+                raise Exception("No half vectors could be read!")
         '''
         remove half vector entry from last even packet, since this can
         never be reconstructed
@@ -451,6 +451,87 @@ class extdata:
         self.even.drop(even_drop,inplace=True,axis=0)
         odd_drop = self.odd.iloc[0].name
         self.odd.drop(odd_drop,inplace=True,axis=0)
+    def two_series(self):
+        '''
+        needs to be executed immediately after joining the half vectors!
+        create two chains of frames from the even and odd dataframes
+        'evenodd' chain with even frame, odd frame, ...
+        'oddeven' chain with odd frame, even frame, ...
+        '''
+        '''
+        At this point, the even and odd dataframes contain different numbers
+        of vectors. When they are stitched together into two different series,
+        the evenodd series may contain 1 more vector or the same number of 
+        vectors as the oddeven series, depending on the number of packets
+        '''
+        even_packets_existing = np.unique(self.even.index.get_level_values('packet').values)
+        odd_packets_existing = np.unique(self.odd.index.get_level_values('packet').values)
+        if (self.full_packets.shape != even_packets_existing.shape) or \
+                (self.full_packets.shape != odd_packets_existing.shape):
+            raise Exception("Packet numbers have changed!")
+        '''
+        the two lists above will deviate from the 'full' packet list
+        before any filtering has been done - just a check at this point
+        '''
+        '''
+        create 'evenodd' chain of frames,
+        need to use full_packets list here, since this list contains all the
+        MSA dump packets in the right ORDER, which is crucial, since we are
+        concerned with even and odd packets, whose order matters
+        '''
+        even_packets = self.full_packets[0:-1:2]#can't use last packet here!
+        odd_packets = self.full_packets[1::2]
+        if even_packets.shape[0] != odd_packets.shape[0]:
+            raise Exception("The packet list lengths should be equal "
+                                "at this point!")
+        frames = []
+        for even_packet,odd_packet in zip(even_packets,odd_packets):
+            frames.append(self.even.xs(even_packet,level='packet',
+                         drop_level=False))
+            frames.append(self.odd.xs(odd_packet,level='packet',
+                         drop_level=False))
+        self.evenodd = pd.concat((frames))
+        '''
+        Drop vector columns. Instead, create a vector index, starting from 1,
+        increasing monotoincally, without interruption until the last vector.
+        This is done, since at this point, no filtering has been done,
+        so all of the vectors should be present, and should follow each other.
+        Same is done for the oddeven frame below.
+        '''
+        self.evenodd.drop('vector',axis=1,inplace=True)
+        packetlevel = self.evenodd.index.get_level_values('packet').values
+        vectorlevel = np.arange(1,self.evenodd.shape[0]+1,1)
+        new_multiindex = pd.MultiIndex.from_arrays((packetlevel,
+                                                    vectorlevel),
+                                                    names = ['packet',
+                                                    'vector'])
+        self.evenodd.index = new_multiindex
+        '''
+        create 'oddeven' chain of frames,
+        '''
+        even_packets = self.full_packets[1::2]
+        odd_packets = self.full_packets[0:-1:2]
+        if even_packets.shape[0] != odd_packets.shape[0]:
+            raise Exception("The packet list lengths should be equal "
+                                "at this point!")
+        frames = []
+        for odd_packet,even_packet in zip(odd_packets,even_packets):
+            frames.append(self.odd.xs(odd_packet,level='packet',
+                         drop_level=False))
+            frames.append(self.even.xs(even_packet,level='packet',
+                         drop_level=False))
+        self.oddeven = pd.concat((frames))
+        self.oddeven.drop('vector',axis=1,inplace=True)
+        packetlevel = self.oddeven.index.get_level_values('packet').values
+        vectorlevel = np.arange(1,self.oddeven.shape[0]+1,1)
+        new_multiindex = pd.MultiIndex.from_arrays((packetlevel,
+                                                    vectorlevel),
+                                                    names=['packet','vector'])
+        self.oddeven.index = new_multiindex
+        length_diff = self.evenodd.shape[0]-self.oddeven.shape[0]
+        if length_diff!=0 and length_diff!=1:
+            raise Exception("The length of evenodd and oddeven should differ"
+                            " by 0 or 1!")
     def filter_data(self):
         '''
         unused vector areas could be set to 
@@ -519,55 +600,6 @@ class extdata:
         #####odd#######
         mask = (self.odd['sensor']==0).values
         self.odd = self.odd[mask]       
-    def two_series(self):
-        '''
-        create two chains of frames from the even and odd dataframes
-        'evenodd' chain with even frame, odd frame, ...
-        'oddeven' chain with odd frame, even frame, ...
-        '''
-        even_packets_existing = np.unique(self.even.index.get_level_values('packet').values)
-        odd_packets_existing = np.unique(self.odd.index.get_level_values('packet').values)
-        '''
-        the two lists above will deviate from the 'full' packet list
-        before any filtering has been done
-        '''
-        '''
-        create 'evenodd' chain of frames,
-        need to use full_packets list here, since this list contains all the
-        MSA dump packets in the right ORDER, which is crucial, since we are
-        concerned with even and odd packets, whose order matters
-        '''
-        even_packets = self.full_packets[0:-1:2]#can't use last packet here!
-        odd_packets = self.full_packets[1::2]
-        if even_packets.shape[0] != odd_packets.shape[0]:
-            raise Exception("The packet list lengths should be equal "
-                                "at this point!")
-        frames = []
-        for even_packet,odd_packet in zip(even_packets,odd_packets):
-            if np.any(even_packet == even_packets_existing):
-                frames.append(self.even.xs(even_packet,level='packet',
-                             drop_level=False))
-            if np.any(odd_packet == odd_packets_existing):
-                frames.append(self.odd.xs(odd_packet,level='packet',
-                             drop_level=False))
-        self.evenodd = pd.concat((frames))
-        '''
-        create 'oddeven' chain of frames,
-        '''
-        even_packets = self.full_packets[1::2]
-        odd_packets = self.full_packets[0:-1:2]
-        if even_packets.shape[0] != odd_packets.shape[0]:
-            raise Exception("The packet list lengths should be equal "
-                                "at this point!")
-        frames = []
-        for odd_packet,even_packet in zip(odd_packets,even_packets):
-            if np.any(odd_packet == odd_packets_existing):
-                frames.append(self.odd.xs(odd_packet,level='packet',
-                             drop_level=False))
-            if np.any(even_packet == even_packets_existing):
-                frames.append(self.even.xs(even_packet,level='packet',
-                             drop_level=False))
-        self.oddeven = pd.concat((frames))
     def select_packets(self):
         '''
         create chain of dataframes based on assessment of packets - 
@@ -803,33 +835,8 @@ packet_sizes_oddj = oddj.groupby(level=['packet']).size()
 packet_sizes_oddj.name = 'odd'
 packet_sizesj = pd.concat((packet_sizes_evenj,packet_sizes_oddj),axis=1)
 
-ext.filter_data()
-
-print "After filtering"
-print ext.even.shape,
-print ext.odd.shape
-even = ext.even.copy()
-odd = ext.odd.copy()
-packet_sizes_even = even.groupby(level=['packet']).size()
-packet_sizes_even.name = 'even'
-packet_sizes_odd = odd.groupby(level=['packet']).size()
-packet_sizes_odd.name = 'odd'
-packet_sizes = pd.concat((packet_sizes_even,packet_sizes_odd),axis=1)
-packetinfo=ext.packet_info
-removed = ext.removed_packets
 '''
-hex formatting of reset counts
-'''
-packetinfo_hex = packetinfo.copy(deep=True)
-packetinfo_hex['Reset Count'] = packetinfo_hex['Reset Count'].apply(hex_format)
-even_hex = even.copy(deep=True)
-even_hex['reset']=even_hex['reset'].apply(hex_format)
-odd_hex = odd.copy(deep=True)
-odd_hex['reset']=odd_hex['reset'].apply(hex_format)
-#print packet_info.groupby('Telemetry Mode').count()
-
-'''
-2 different pathways to choose between at this point
+now the packets need to be joined
 ----------------------------------------------------
 -join up all packets in the two possible ways, ie. even first then odd,
 or odd first then even, and then analyse this further
@@ -839,10 +846,12 @@ create 'oddeven' chain of packets with odd packet, then even packet, etc...
 analyse -> reset count contiguity
 based on the analysis, define 'blocks' of valid data
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
--or, one could analyse every packet and see if the packet should be even or odd,
-and then proceed from there -> 'combined'
+-or, one could analyse every packet and see if the packet should be even or odd
+ie. reverse the steps,
 analyse -> reset count contiguity
         -> even/odd packet size (perhaps relative to other packet)
+and then proceed from there -> 'combined'
+
 pick odd/even packets based on this, and join them up correspondingly,
 this will introduce missing packets at this stage, which will have to be
 taken care of somehow.
@@ -852,7 +861,8 @@ If an even packet is selected, but the following odd packet is not, then
 that should mean that the odd packet is not good data, so the half vector at 
 its end should not be usable either??
 What to do with partial packets??
-
+-This method could possibly be used to check whether the other method works
+as intended, but ultimately the first method is the preffered one
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 reset count contiguity analysis
 12-bit reset count (top 12-bits of the 16-bit HF counter)
@@ -880,6 +890,33 @@ then go through each row and
 ext.two_series()
 evenodd = ext.evenodd.copy()
 oddeven = ext.oddeven.copy()
+
+'''
+ext.filter_data()
+
+print "After filtering"
+print ext.even.shape,
+print ext.odd.shape
+even = ext.even.copy()
+odd = ext.odd.copy()
+packet_sizes_even = even.groupby(level=['packet']).size()
+packet_sizes_even.name = 'even'
+packet_sizes_odd = odd.groupby(level=['packet']).size()
+packet_sizes_odd.name = 'odd'
+packet_sizes = pd.concat((packet_sizes_even,packet_sizes_odd),axis=1)
+packetinfo=ext.packet_info
+removed = ext.removed_packets
+
+#hex formatting of reset counts
+
+packetinfo_hex = packetinfo.copy(deep=True)
+packetinfo_hex['Reset Count'] = packetinfo_hex['Reset Count'].apply(hex_format)
+even_hex = even.copy(deep=True)
+even_hex['reset']=even_hex['reset'].apply(hex_format)
+odd_hex = odd.copy(deep=True)
+odd_hex['reset']=odd_hex['reset'].apply(hex_format)
+#print packet_info.groupby('Telemetry Mode').count()
+
 
 ext.select_packets()
 new_packetsizes=ext.packet_sizes.copy()
@@ -911,3 +948,4 @@ print ""
 print "reset analysis"
 rranges_evenodd['size']=rranges_evenodd['blocks'].apply(lambda x:x[1]-x[0])
 print rranges_evenodd[rranges_evenodd['size']>=min_length]
+'''
