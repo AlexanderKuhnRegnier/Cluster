@@ -1104,6 +1104,10 @@ for (i,(start,end)) in zip(range(blocks),boundaries):
 
 combined_data = pd.concat((dataframes))
 combined_data.drop_duplicates(inplace=True)
+duplicated_indices = combined_data.index.duplicated()
+if np.sum(duplicated_indices):
+    raise Exception("This should never happen after dropping duplicates!")
+combined_data.sort_index(ascending=True)
 '''
 some rough and ready processing, bear in mind that the data still needs to be
 scaled from engineering units to nT, the range is important for that
