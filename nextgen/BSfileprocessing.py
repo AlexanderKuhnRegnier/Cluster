@@ -1049,6 +1049,7 @@ def select_index_level_1(frame,start,end):
 '''
 look at 2 selections
 '''
+'''
 orderings = intersections.index.levels[0]
 orderings_data = {'evenodd':ext.evenodd,'oddeven':ext.oddeven}
 for ordering in orderings:
@@ -1063,3 +1064,52 @@ for ordering in orderings:
         data1.columns = [entry+'1' for entry in data1.columns]
         data2.columns = [entry+'2' for entry in data2.columns]
         comparison = pd.concat((data1,data2),axis=1)
+'''
+'''
+Approach problem by shifting vblocks and determining overlap points between
+different vblocks by counting the rows that agree at different shifts
+
+Shift different datasets until they match. At that point, remove all duplicated
+rows from the smaller dataset. 
+The data may overlap at multiple points if the data is weird, so we need a 
+threshold to avoid falling for 'accidental matches' - however rare they might
+be.
+All remaining data is considered 'new' and added the the larger dataset
+++++++++++++++++++
+Actually this is highly superfluous, since we are already filtering the 
+vblocks for a size larger than a certain threshold. Even if the threshold
+were made to be quite small, it would require the resulting vectorblocks
+to consist of vectors which have valid reset counts as a group,
+AND occur contiguously in the Burst Science data file. That, coupled with
+the condition for a duplicated row (ie. all columns must be the same) is 
+probably more than sufficient for isolating duplicated values (that are
+physical, and not just random)
+'''
+orderings_data = {'evenodd':ext.evenodd,'oddeven':ext.oddeven}
+orderings = intersections.index.get_level_values('order')
+blocks = intersections.shape[0] #number of blocks to reduce
+assert blocks == len(orderings),("Different orderings, and number of "
+                                    "intersections should match")
+boundaries = intersections['intersections'].values #array of (start,end)
+dataframes = []
+for (i,(start,end)) in zip(range(blocks),boundaries):
+    data = select_index_level_1(orderings_data[orderings[i]],start,end)
+    packets = data.index.get_level_values(0)
+    vectors = data.index.get_level_values(1)
+    blocks = [i]*len(packets)
+    multi = pd.MultiIndex.from_arrays((blocks,packets,vectors),
+                                      names=['blocks','packets','vectors'])
+    data.index = multi
+    dataframes.append(data)
+
+combined_data = pd.concat((dataframes))
+combined_data.drop_duplicates(inplace=True)
+'''
+some rough and ready processing, bear in mind that the data still needs to be
+scaled from engineering units to nT, the range is important for that
+Tim is still working on 'what' the scaling factors should be?
+'''
+combined_data['x'] = combined_data['x'].apply(lambda x: x-65536 if x>32767 else x)
+combined_data['y'] = combined_data['y'].apply(lambda x: x-65536 if x>32767 else x)
+combined_data['z'] = combined_data['z'].apply(lambda x: x-65536 if x>32767 else x)
+combined_data['mag']=np.linalg.norm(combined_data[['x','y','z']],axis=1)
