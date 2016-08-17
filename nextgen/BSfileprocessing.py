@@ -390,8 +390,9 @@ class extdata:
         for removed in self.removed_packets:
             maski = maski | (index_vals==removed)
         mask = ~maski
-        self.odd = self.odd[mask]        
-
+        self.odd = self.odd[mask]    
+        self.even.columns = ['vector','range','reset','sensor','x','y','z']
+        self.odd.columns = ['vector','range','reset','sensor','x','y','z']
     def join_half_vecs(self):
         even_packet_list =np.unique(self.even.index.get_level_values(0).values)
         odd_packet_list = np.unique(self.odd.index.get_level_values(0).values)
@@ -451,6 +452,11 @@ class extdata:
         self.even.drop(even_drop,inplace=True,axis=0)
         odd_drop = self.odd.iloc[0].name
         self.odd.drop(odd_drop,inplace=True,axis=0)
+        '''
+        Drop 'vector' columns from dataframes
+        '''
+        self.odd.drop('vector',axis=1,inplace=True)
+        self.even.drop('vector',axis=1,inplace=True)
     def two_series(self):
         '''
         needs to be executed immediately after joining the half vectors!
@@ -498,7 +504,6 @@ class extdata:
         so all of the vectors should be present, and should follow each other.
         Same is done for the oddeven frame below.
         '''
-        self.evenodd.drop('vector',axis=1,inplace=True)
         packetlevel = self.evenodd.index.get_level_values('packet').values
         vectorlevel = np.arange(1,self.evenodd.shape[0]+1,1)
         new_multiindex = pd.MultiIndex.from_arrays((packetlevel,
@@ -521,7 +526,6 @@ class extdata:
             frames.append(self.even.xs(even_packet,level='packet',
                          drop_level=False))
         self.oddeven = pd.concat((frames))
-        self.oddeven.drop('vector',axis=1,inplace=True)
         packetlevel = self.oddeven.index.get_level_values('packet').values
         vectorlevel = np.arange(1,self.oddeven.shape[0]+1,1)
         new_multiindex = pd.MultiIndex.from_arrays((packetlevel,
@@ -532,7 +536,11 @@ class extdata:
         if length_diff!=0 and length_diff!=1:
             raise Exception("The length of evenodd and oddeven should differ"
                             " by 0 or 1!")
-    def filter_data(self):
+    def filter_data(self,frame):
+        '''
+        Filters even,odd,evenodd and oddeven frames - these should all be
+        passed into the function separately
+        '''
         '''
         unused vector areas could be set to 
         AAAA5555AAAA5555AAAA ie. 1010 1010 1010 etc....
@@ -555,51 +563,31 @@ class extdata:
                              invalid_magnetic1,invalid_magnetic1])
         invalid_row_data2 = np.array([invalid_range2,invalid_reset2,
                              invalid_sensor2,invalid_magnetic2,
-                             invalid_magnetic2,invalid_magnetic2])
-        #####even######
-        mask = ~(self.even.apply(lambda x:np.all(x==invalid_row_data1),axis=1,
+                             invalid_magnetic2,invalid_magnetic2])   
+        mask = ~(frame.apply(lambda x:np.all(x==invalid_row_data1),axis=1,
                                     raw=True).values)
-        mask = mask | (~self.even.apply(lambda x:np.all(x==invalid_row_data2),
+        mask = mask | (~frame.apply(lambda x:np.all(x==invalid_row_data2),
                                        axis=1,raw=True).values)
-        self.even = self.even[mask]
-        #####odd#######
-        mask = ~(self.odd.apply(lambda x:np.all(x==invalid_row_data1),axis=1,
-                                    raw=True).values)
-        mask = mask | (~self.odd.apply(lambda x:np.all(x==invalid_row_data2),
-                                       axis=1,raw=True).values)
-        self.odd = self.odd[mask]       
-        
+        frame = frame[mask]        
         '''
         filter out entries with all 0's in them
         '''
-        #####even######
-        mask = ~(self.even.apply(lambda x:np.all(x==0),axis=1,
+        mask = ~(frame.apply(lambda x:np.all(x==0),axis=1,
                                     raw=True).values)
-        self.even = self.even[mask]
-        #####odd#######
-        mask = ~(self.odd.apply(lambda x:np.all(x==0),axis=1,
-                                    raw=True).values)
-        self.odd = self.odd[mask]
+        frame = frame[mask]
         '''
         filter out invalid ranges, ie range<2 (range 7 is technically allowed)
         '''        
-        #####even######
-        mask = (self.even['range']>1).values
-        self.even = self.even[mask]
-        #####odd#######
-        mask = (self.odd['range']>1).values
-        self.odd = self.odd[mask]   
+        mask = (frame['range']>1).values
+        frame = frame[mask]
         '''
         filter out the inboard sensor, since this is never used 
         -- is this essential, since it is technically possible to have
         the inboard sensor??
         '''
-        #####even######
-        mask = (self.even['sensor']==0).values
-        self.even = self.even[mask]
-        #####odd#######
-        mask = (self.odd['sensor']==0).values
-        self.odd = self.odd[mask]       
+        mask = (frame['sensor']==0).values
+        frame = frame[mask]   
+        return frame
     def select_packets(self):
         '''
         create chain of dataframes based on assessment of packets - 
@@ -825,7 +813,9 @@ ext.join_half_vecs()
 
 print "joined"
 print ext.even.shape,
-print ext.odd.shape
+print ext.odd.shape,
+print ext.evenodd.shape,
+print ext.oddeven.shape
 
 evenj = ext.even.copy()
 oddj = ext.odd.copy()
@@ -888,22 +878,35 @@ then go through each row and
 '''
 
 ext.two_series()
-evenodd = ext.evenodd.copy()
-oddeven = ext.oddeven.copy()
+evenodd1 = ext.evenodd.copy()
+oddeven1 = ext.oddeven.copy()
 
-'''
-ext.filter_data()
+print "two series"
+print ext.even.shape,
+print ext.odd.shape,
+print ext.evenodd.shape,
+print ext.oddeven.shape
+
+ext.even = ext.filter_data(ext.even)
+ext.odd = ext.filter_data(ext.odd)
+ext.evenodd = ext.filter_data(ext.evenodd)
+ext.oddeven = ext.filter_data(ext.oddeven)
 
 print "After filtering"
 print ext.even.shape,
-print ext.odd.shape
-even = ext.even.copy()
-odd = ext.odd.copy()
-packet_sizes_even = even.groupby(level=['packet']).size()
+print ext.odd.shape,
+print ext.evenodd.shape,
+print ext.oddeven.shape
+
+evenoddf = ext.evenodd.copy()
+oddevenf = ext.oddeven.copy()
+evenf = ext.even.copy()
+oddf = ext.odd.copy()
+packet_sizes_even = evenf.groupby(level=['packet']).size()
 packet_sizes_even.name = 'even'
-packet_sizes_odd = odd.groupby(level=['packet']).size()
+packet_sizes_odd = oddf.groupby(level=['packet']).size()
 packet_sizes_odd.name = 'odd'
-packet_sizes = pd.concat((packet_sizes_even,packet_sizes_odd),axis=1)
+packet_sizesf = pd.concat((packet_sizes_even,packet_sizes_odd),axis=1)
 packetinfo=ext.packet_info
 removed = ext.removed_packets
 
@@ -911,13 +914,12 @@ removed = ext.removed_packets
 
 packetinfo_hex = packetinfo.copy(deep=True)
 packetinfo_hex['Reset Count'] = packetinfo_hex['Reset Count'].apply(hex_format)
-even_hex = even.copy(deep=True)
+even_hex = evenf.copy(deep=True)
 even_hex['reset']=even_hex['reset'].apply(hex_format)
-odd_hex = odd.copy(deep=True)
+odd_hex = oddf.copy(deep=True)
 odd_hex['reset']=odd_hex['reset'].apply(hex_format)
 #print packet_info.groupby('Telemetry Mode').count()
-
-
+'''
 ext.select_packets()
 new_packetsizes=ext.packet_sizes.copy()
 
