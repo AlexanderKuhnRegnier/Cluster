@@ -690,6 +690,7 @@ class extdata:
                             "level names 'packet' and 'vector'")
         if 'reset' not in dataframe.columns:
             raise Exception("Input should contain 'range' column!")
+        dataframe.index = dataframe.index.droplevel('packet')
         dataframe['rdiff'] = dataframe['reset']-dataframe['reset'].shift(1)
         dataframe['quality_change']=((dataframe['rdiff']!=0) & (dataframe['rdiff']!=1))
         dataframe['vblock_resets']=dataframe['quality_change'].cumsum()
@@ -720,7 +721,7 @@ class extdata:
         if dataframe.index.names != ['packet','vector']:
             raise Exception("Input Dataframe needs to have a multiindex with"
                             "level names 'packet' and 'vector'")
-        dataframe.index = dataframe.index.droplevel('packet') 
+        dataframe.index = dataframe.index.droplevel('packet')
         vector_numbers = pd.Series(dataframe.index.values,
                                    index=dataframe.index.values)
         vdiff = vector_numbers-vector_numbers.shift(1)
@@ -889,6 +890,24 @@ print ext.blocks
 reset_even = ext.even.copy()
 reset_odd = ext.odd.copy()
 
-vfilter_evenodd,vranges_evenodd = ext.vector_analysis(evenodd)
-rfilter_evenodd,rranges_evenodd = ext.reset_filter(evenodd)
+vfilter_evenodd,vranges_evenodd = ext.vector_analysis(evenodd.copy())
+rfilter_evenodd,rranges_evenodd = ext.reset_filter(evenodd.copy())
 
+print "vector blocks"
+print "vector analysis"
+print vranges_evenodd
+print ""
+print "reset analysis"
+print rranges_evenodd
+print ""
+vranges_evenodd = vranges_evenodd.to_frame(name='blocks')
+rranges_evenodd = rranges_evenodd.to_frame(name='blocks')
+min_length = 5
+print "filteredvblocks, min_length="+str(min_length)
+print "vector analysis"
+vranges_evenodd['size']=vranges_evenodd['blocks'].apply(lambda x:x[1]-x[0])
+print vranges_evenodd[vranges_evenodd['size']>=min_length]
+print ""
+print "reset analysis"
+rranges_evenodd['size']=rranges_evenodd['blocks'].apply(lambda x:x[1]-x[0])
+print rranges_evenodd[rranges_evenodd['size']>=min_length]
