@@ -56,16 +56,8 @@ class RawDataHeader:
                                 ('sc ID',[]),
                                 ('Packet Length',[]),
                                 ('Groundstation ID',[])])
-        self.packet_offset = 0
         self.data = []
         self.packet_info = pd.DataFrame()
-        self.evenodd = pd.DataFrame()
-        self.oddeven = pd.DataFrame()
-        self.combined = pd.DataFrame()
-        self.full_packets = np.array([])
-        self.evenodd=pd.DataFrame()
-        self.oddeven = pd.DataFrame()
-        self.blocks = pd.DataFrame()
         '''
         Exceptions should probably be handled differently for the final code,
         since these are not really fatal errors, unless previous checking is
@@ -78,6 +70,7 @@ class RawDataHeader:
             raise Exception("Could not open file:"+filepath)
         if not self.data:
             raise Exception("Could not read file:"+filepath)
+        self.__read_headers()
     @staticmethod
     def shift_left(num,left):
         return num<<left
@@ -91,31 +84,31 @@ class RawDataHeader:
             leftshift = (max(indices)-i)*8
             values.append(RawDataHeader.shift_left(ord(line[i]),leftshift))
         return sum(values)
-    def read_dds(self,dds_data):
-        if len(dds_data) != 15:
+    def __read_dds(self,raw_dds):
+        if len(raw_dds) != 15:
             return 0  
         day_indices = [0,1]
-        days = RawDataHeader.read_bytes(day_indices,dds_data)
+        days = RawDataHeader.read_bytes(day_indices,raw_dds)
         ms_indices = [2,3,4,5]
-        ms = RawDataHeader.read_bytes(ms_indices,dds_data)
+        ms = RawDataHeader.read_bytes(ms_indices,raw_dds)
         us_indices = [6,7]
-        us = RawDataHeader.read_bytes(us_indices,dds_data)
+        us = RawDataHeader.read_bytes(us_indices,raw_dds)
         date1=datetime(1958,1,1)
         dt = timedelta(days=days,seconds=0,milliseconds=ms,microseconds=us)
         SCET = date1+dt
         self.dds_data['SCET'].append(SCET)
-        header_ID = ord(dds_data[8])
+        header_ID = ord(raw_dds[8])
         self.dds_data['Header ID'].append(RawDataHeader.Header_ID[header_ID])
-        packet_length = RawDataHeader.read_bytes([9,10,11],dds_data)
+        packet_length = RawDataHeader.read_bytes([9,10,11],raw_dds)
         self.dds_data['Packet Length'].append(packet_length)
         #print "packet_length",packet_length
-        sc_ID = RawDataHeader.read_byte(12,dds_data)>>4  
+        sc_ID = RawDataHeader.read_byte(12,raw_dds)>>4  
         self.dds_data['sc ID'].append(sc_ID)
-        ground_ID = RawDataHeader.read_byte(12,dds_data) & 0b1111
+        ground_ID = RawDataHeader.read_byte(12,raw_dds) & 0b1111
         self.dds_data['Groundstation ID'].append(
-                                              RawDataHeader.groundstation[ground_ID])
+                                        RawDataHeader.groundstation[ground_ID])
         return 1
-    def read_fgm_science(self,science_header):
+    def __read_fgm_science(self,science_header):
         if len(science_header) != 34:
             return 0
         status_data = RawDataHeader.read_bytes([0,1],science_header)
@@ -127,10 +120,11 @@ class RawDataHeader:
         cal_seq_number =                (status_data & 0b0000000011000000)>>6
         mem_dump_in_progress =          (status_data & 0b0000000000100000)>>5
         code_patch_in_progress =        (status_data & 0b0000000000010000)>>4
+        telemetry_mode =                 status_data & 0b0000000000001111
         packet_start_hf = RawDataHeader.read_bytes([2,3],science_header)
         prev_sun_pulse_hf = RawDataHeader.read_bytes([4,5],science_header)
-        most_recent_sun_pulse_hf = RawDataHeader.read_bytes([6,7],science_header)
-        telemetry_mode =                 status_data & 0b0000000000001111
+        most_recent_sun_pulse_hf = RawDataHeader.read_bytes([6,7],
+                                                            science_header)
         tel_mode = RawDataHeader.telem_mode[telemetry_mode]
         self.fgm_data['Telemetry Mode'].append(tel_mode)
         self.fgm_data['Previous Sun Pulse'].append(prev_sun_pulse_hf)
@@ -157,16 +151,17 @@ class RawDataHeader:
         bits 14 - 33 not used
         '''
         return 1
-    def read_data(self):
+    def __read_headers(self):
+        packet_offset = 0
         for i in range(20000):#arbitrary limit to the number of packets
-            dds_data = self.read_dds(self.data[self.packet_offset:
-                                                self.packet_offset+15])
-            self.packet_offset+=15
-            fgm_data = self.read_fgm_science(self.data[self.packet_offset:
-                                                self.packet_offset+34])
-            self.packet_offset+=self.dds_data['Packet Length'][-1]
-            if not dds_data or not fgm_data:
+            dds_result = self.__read_dds(self.data[packet_offset:
+                                                packet_offset+15])
+            packet_offset+=15
+            fgm_result = self.__read_fgm_science(self.data[packet_offset:
+                                                packet_offset+34])
+            if not dds_result or not fgm_result:
                 break
+            packet_offset+=self.dds_data['Packet Length'][-1]
         self.fgm_data.update(self.dds_data) #modifies fgm_data inplace
         number_of_packets = len(self.fgm_data[self.fgm_data.keys()[0]])
         self.packet_info = pd.DataFrame(self.fgm_data,
@@ -190,11 +185,13 @@ class RawDataHeader:
                                         'SCET')+1,'Reset Period (s)',
                                         self.packet_info['SCET'].diff().apply(
                                         lambda x:x/pd.Timedelta(1,'s')))
+        self.packet_info['Reset Period (s)'] = \
+                                    self.packet_info['Reset Period (s)']\
+                                    [self.packet_info['Reset Increment']==1]
 '''
 #Usage example
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20
-raw = RawDataHeader(1,datetime(2016,1,6),'NS',version='b')
-raw.read_data()
+raw = RawDataHeader(1,datetime(2016,1,6),'BS',version='b')
 packet_info =  raw.packet_info
 '''

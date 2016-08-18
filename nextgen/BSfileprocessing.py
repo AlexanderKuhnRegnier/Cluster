@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
+import RawData
 verbose=True
-
 def browse_frame_ipython(frame,window=40):
     frame['reset']=frame['reset'].apply(hex)
     from IPython.utils.coloransi import TermColors as tc
@@ -121,55 +121,25 @@ def browse_frame_ipython(frame,window=40):
         if char == 'h':
             print helptext
 
-class extdata:
-    #packet header ID
-    ID={'SC1BS':38,'SC2BS':78,'SC3BS':118,'SC4BS':158,
-        'SC1NS':31,'SC2NS':71,'SC3NS':111,'SC4NS':151}
-    telem_mode={12:'Normal Mode',13:'Burst Science',14:'Extended Mode',
-                15:'MSA Dump'}
-    def __init__(self,filename):
-        '''
-        self.fgm_data = {'Telemetry Mode':[],'First 1ry HF':[],
-                         'First 2ry HF':[],'Reset Count':[]}
-        '''
-        self.fgm_data = {'Telemetry Mode':[],'Reset Count':[]}
-        self.dds_data = {'SCET':[],'Header ID':[],'Packet Length':[],
-                         'sc ID':[]}
-        self.packet_offset = 0
-        self.data = []
-        self.packet_info = pd.DataFrame()
+class ExtData(RawData.RawDataHeader):
+    def __init__(self,sc,dt,mode,version='B',dir='Z:/data/raw/'):
+        RawData.RawDataHeader.__init__(self,sc,dt,mode,version,dir)
         self.evenodd = pd.DataFrame()
         self.oddeven = pd.DataFrame()
         self.combined = pd.DataFrame()
         self.full_packets = np.array([])
-        self.evenodd=pd.DataFrame()
-        self.oddeven = pd.DataFrame()
-        self.blocks = pd.DataFrame()
-        with open(filename,'rb') as f:
-            self.data = f.read()
-        if not self.data:
-            raise Exception("Could not read file:"+filename)
-    
-    @staticmethod
-    def shift_left(num,left):
-        return num<<left
-    @staticmethod
-    def read_byte(index,data):
-        return ord(data[index])                
-    @staticmethod
-    def read_bytes(indices,line):
-        values=[]
-        for i in indices:
-            leftshift = (max(indices)-i)*8
-            values.append(extdata.shift_left(ord(line[i]),leftshift))
-        return sum(values)
+        self.blocks = pd.DataFrame()    
     def read_even(self,data):
         data_dict = {'x':[],'y':[],'z':[],'sensor':[],'range':[],'reset':[]}
         for offset in range(0,444*8,8):
-            data_dict['x'].append(extdata.read_bytes([offset,offset+1],data))
-            data_dict['y'].append(extdata.read_bytes([offset+2,offset+3],data))
-            data_dict['z'].append(extdata.read_bytes([offset+4,offset+5],data))
-            last_bytes = extdata.read_bytes([offset+6,offset+7],data)
+            data_dict['x'].append(RawData.RawDataHeader.read_bytes(
+                                                    [offset,offset+1],data))
+            data_dict['y'].append(RawData.RawDataHeader.read_bytes(
+                                                    [offset+2,offset+3],data))
+            data_dict['z'].append(RawData.RawDataHeader.read_bytes(
+                                                    [offset+4,offset+5],data))
+            last_bytes = RawData.RawDataHeader.read_bytes(
+                                                    [offset+6,offset+7],data)
             sensor = last_bytes>>15
             inst_range = (last_bytes>>12) & 0b0111
             reset = last_bytes & (0b111111111111)
@@ -180,8 +150,10 @@ class extdata:
         Read 1/2 vetor at end of even packet!
         '''
         offset = 444*8
-        data_dict['x'].append(extdata.read_bytes([offset,offset+1],data))
-        data_dict['y'].append(extdata.read_bytes([offset+2,offset+3],data))
+        data_dict['x'].append(RawData.RawDataHeader.read_bytes(
+                                                    [offset,offset+1],data))
+        data_dict['y'].append(RawData.RawDataHeader.read_bytes(
+                                                    [offset+2,offset+3],data))
         '''
         fill missing half vector with -1
         '''   
@@ -201,8 +173,8 @@ class extdata:
         '''
         get 1/2 vector at the start of the odd packet!
         '''
-        data_dict['z'].append(extdata.read_bytes([0,1],data))
-        last_bytes = extdata.read_bytes([2,3],data)
+        data_dict['z'].append(RawData.RawDataHeader.read_bytes([0,1],data))
+        last_bytes = RawData.RawDataHeader.read_bytes([2,3],data)
         sensor = last_bytes>>15
         inst_range = (last_bytes>>12) & 0b0111
         reset = last_bytes & (0b111111111111)
@@ -217,10 +189,14 @@ class extdata:
         
         for offset in range(4,(444*8)+4,8):
             #print "offset",offset
-            data_dict['x'].append(extdata.read_bytes([offset,offset+1],data))
-            data_dict['y'].append(extdata.read_bytes([offset+2,offset+3],data))
-            data_dict['z'].append(extdata.read_bytes([offset+4,offset+5],data))
-            last_bytes = extdata.read_bytes([offset+6,offset+7],data)
+            data_dict['x'].append(RawData.RawDataHeader.read_bytes(
+                                                    [offset,offset+1],data))
+            data_dict['y'].append(RawData.RawDataHeader.read_bytes(
+                                                    [offset+2,offset+3],data))
+            data_dict['z'].append(RawData.RawDataHeader.read_bytes(
+                                                    [offset+4,offset+5],data))
+            last_bytes = RawData.RawDataHeader.read_bytes(
+                                                    [offset+6,offset+7],data)
             sensor = last_bytes>>15
             inst_range = (last_bytes>>12) & 0b0111
             reset = last_bytes & (0b111111111111)
@@ -234,134 +210,37 @@ class extdata:
         df = pd.DataFrame(data_dict,columns = ['vector','range','reset',
                                                        'sensor','x','y','z'])      
         return df
-    def read_dds(self,dds_data):
-        if len(dds_data) != 15:
-            print "wrong length:",len(dds_data)
-            return 0  
-        day_indices = [0,1]
-        days = extdata.read_bytes(day_indices,dds_data)
-        ms_indices = [2,3,4,5]
-        ms = extdata.read_bytes(ms_indices,dds_data)
-        us_indices = [6,7]
-        us = extdata.read_bytes(us_indices,dds_data)
-        '''
-        print days,(days/365)+1958
-        print 'ms,      s,    mins,hours'
-        print ms,ms/1000, (ms/1000)/60,((ms/1000)/60)/60
-        '''
-        date1=datetime(1958,1,1)
-        dt = timedelta(days=days,seconds=0,milliseconds=ms,microseconds=us)
-        SCET = date1+dt
-        self.dds_data['SCET'].append(SCET)
-        header_ID = ord(dds_data[8])
-        self.dds_data['Header ID'].append(header_ID)
-        '''
-        compare with ext.data.ID dictionary!!!
-        -also based on sc_ID below
-        '''
-        packet_length = extdata.read_bytes([9,10,11],dds_data)
-        self.dds_data['Packet Length'].append(packet_length)
-        #print "packet_length",packet_length
-        sc_ID = extdata.read_byte(12,dds_data)>>4  
-        self.dds_data['sc ID'].append(sc_ID)
-        return 1
-    def read_fgm_science(self,science_header):
-        if len(science_header) != 34:
-            print "wrong length:",len(science_header)
-            return 0
-        status_data = extdata.read_bytes([0,1],science_header)
-        '''
-        #this is only useful for normal science data!
-        sumcheck_code_failure =          status_data>>15
-        incorrect_vectors_sampled =     (status_data & 0b0010000000000000)>>13
-        possible_corrupt_science_data = (status_data & 0b0001000000000000)>>12
-        dpu_test_sequence_number =      (status_data & 0b0000111000000000)>>9
-        msa_data_filtered =             (status_data & 0b0000000100000000)>>8
-        cal_seq_number =                (status_data & 0b0000000011000000)>>6
-        mem_dump_in_progress =          (status_data & 0b0000000000100000)>>5
-        code_patch_in_progress =        (status_data & 0b0000000000010000)>>4
-        packet_start_hf = extdata.read_bytes([2,3],science_header)
-        prev_sun_pulse_hf = extdata.read_bytes([4,5],science_header)
-        most_recent_sun_pulse_hf = extdata.read_bytes([6,7],science_header)
-        '''
-        telemetry_mode =                 status_data & 0b0000000000001111
-        '''
-        #again, useful for normal science data
-        #if these need to be used, need to include these labels in the
-        #dict creation in __init__!
-        first_1ry_hf = extdata.read_bytes([8,9],science_header)
-        first_2ry_hf = extdata.read_bytes([10,11],science_header)
-        self.fgm_data['First 1ry HF'].append(first_1ry_hf)
-        self.fgm_data['First 2ry HF'].append(first_2ry_hf)
-        '''
-        reset_count = extdata.read_bytes([12,13],science_header)
-        tel_mode = extdata.telem_mode[telemetry_mode]
-        self.fgm_data['Telemetry Mode'].append(tel_mode)
-        self.fgm_data['Reset Count'].append(reset_count)
-        '''
-        bits 14 - 33 not used
-        '''
-        #print "fgm science"
-        '''
-        print sumcheck_code_failure
-        print incorrect_vectors_sampled
-        print possible_corrupt_science_data
-        print dpu_test_sequence_number
-        print msa_data_filtered
-        print cal_seq_number
-        print mem_dump_in_progress
-        print code_patch_in_progress
-        
-        print telemetry_mode,extdata.telem_mode[telemetry_mode]
-        print packet_start_hf
-        print prev_sun_pulse_hf
-        print most_recent_sun_pulse_hf
-        print first_1ry_hf
-        print first_2ry_hf
-        print reset_count
-        '''
-        return 1
     def read_data(self):
+        '''
+        filter non MSA Dump Packets out of the packets list
+        '''
+        packet_mask = self.packet_info['Telemetry Mode'] == 'MSA Dump'
+        self.removed_packets = self.packet_info[~packet_mask].index.values
+        self.removed_packets_info = self.packet_info[~packet_mask]
+        self.packet_info = self.packet_info[packet_mask]
         even = []
         odd = []
-        for i in range(20000):#arbitrary limit to the number of packets
-            dds_data = self.read_dds(self.data[self.packet_offset:
-                                                self.packet_offset+15])
-            self.packet_offset+=15
-            fgm_data = self.read_fgm_science(self.data[self.packet_offset:
-                                                self.packet_offset+34])
-            self.packet_offset+=34  #needs to be subtracted from packet length
-                                    #later, since packet lenght includes the
-                                    #fgm header size!
-            if not dds_data or not fgm_data:
-                break
-            else:
-                #print "reading data"
-                vector_data_length = self.dds_data['Packet Length'][-1]-34
-                even.append(self.read_even(self.data[self.packet_offset:
-                                        self.packet_offset+vector_data_length]))
-                odd.append(self.read_odd(self.data[self.packet_offset:
-                                        self.packet_offset+vector_data_length]))
-                self.packet_offset+=vector_data_length
-        '''
-        changes fgm data dict inplace - acceptable?
-        '''
-        self.fgm_data.update(self.dds_data)
-        number_of_packets = len(self.fgm_data[self.fgm_data.keys()[0]])
-        
-        if number_of_packets != len(even) or number_of_packets != len(odd):
-            raise Exception("Packet number mismatch between header info"
-                            " and number of read packets")
-        self.packet_info = pd.DataFrame(self.fgm_data,index=[i for
-                                            i in range(1,number_of_packets+1)])
+        packets = self.packet_info.index.values
+        packet_offset = 0
+        for packet,row in self.packet_info.iterrows():
+            packet_offset += 49 #skip headers (already read)
+            packet_length = self.dds_data['Packet Length'][-1]
+            if packet_length != 3596: #maybe log this / exception?
+                print ("Warning, packet length not as expected:"+
+                        str(packet_length))
+            vector_data_length = packet_length-34
+            even.append(self.read_even(self.data[packet_offset:
+                                    packet_offset+vector_data_length]))
+            odd.append(self.read_odd(self.data[packet_offset:
+                                    packet_offset+vector_data_length]))
+            packet_offset+=vector_data_length
         self.even = pd.concat((even))
         self.odd = pd.concat((odd))
         if self.even.shape != self.odd.shape:
             raise Exception("Even and Odd shapes don't mach, should contain"
                             "the same number of vectors at this point!")
         top_level = []
-        packet_count = 1
-        for packeto,packete in zip(odd,even):
+        for packet_count,packeto,packete in zip(packets,odd,even):
             if packete.shape != packeto.shape:
                 raise Exception("Unequal number of vectors in packet nr:"+
                                     str(packet_count))
@@ -373,27 +252,6 @@ class extdata:
                                              names=['packet','index'])
         self.even.index=multiindex
         self.odd.index=multiindex
-        '''
-        filter out non-MSA dump data
-        '''
-        packet_mask = self.packet_info['Telemetry Mode'] == 'MSA Dump'
-        self.removed_packets = self.packet_info[~packet_mask].index.values
-        self.removed_packets_info = self.packet_info[~packet_mask]
-        self.packet_info = self.packet_info[packet_mask]
-
-        index_vals = self.even.index.get_level_values('packet').values
-        maski = np.array([False]*index_vals.shape[0],dtype=bool)        
-        for removed in self.removed_packets:
-            maski = maski | (index_vals==removed)
-        mask = ~maski
-        self.even = self.even[mask]
-
-        index_vals = self.odd.index.get_level_values('packet').values
-        maski = np.array([False]*index_vals.shape[0],dtype=bool)        
-        for removed in self.removed_packets:
-            maski = maski | (index_vals==removed)
-        mask = ~maski
-        self.odd = self.odd[mask]    
         self.even.columns = ['vector','range','reset','sensor','x','y','z']
         self.odd.columns = ['vector','range','reset','sensor','x','y','z']
     def join_half_vecs(self):
@@ -800,15 +658,7 @@ hex_format = lambda i:'{:x}'.format(i).upper()
 RAW = 'Z:/data/raw/' #cluster alsvid server
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20
-Year= '2016'
-year='16'
-month = '01'
-day='06'
-sc = '1'
-version = 'B'
-BSfile = RAW+Year+'/'+month+'/'+'C'+sc+'_'+year+month+day+'_'+version+'.BS'
-print BSfile
-ext = extdata(BSfile)
+ext = ExtData(1,datetime(2016,1,6),'BS',dir=RAW)
 ext.read_data()
 
 print "Before filtering (even),(odd)"
