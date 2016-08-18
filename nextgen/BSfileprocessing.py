@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import RawData
+import ext_mode_times as emt
 verbose=True
 def browse_frame_ipython(frame,window=40):
     frame['reset']=frame['reset'].apply(hex)
@@ -658,7 +659,8 @@ hex_format = lambda i:'{:x}'.format(i).upper()
 RAW = 'Z:/data/raw/' #cluster alsvid server
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20
-ext = ExtData(1,datetime(2016,1,6),'BS',dir=RAW)
+dump_date = datetime(2016,1,6)
+ext = ExtData(1,dump_date,'BS',dir=RAW)
 ext.read_data()
 
 print "Before filtering (even),(odd)"
@@ -969,12 +971,87 @@ if dataframes:
     print "combined data"
     print combined_data
     '''
-    some rough and ready processing, bear in mind that the data still needs to be
-    scaled from engineering units to nT, the range is important for that
+    some rough and ready processing, bear in mind that the data still needs to 
+    be scaled from engineering units to nT, the range is important for that
     Tim is still working on 'what' the scaling factors should be?
     '''
-    combined_data['x'] = combined_data['x'].apply(lambda x: x-65536 if x>32767 else x)
-    combined_data['y'] = combined_data['y'].apply(lambda x: x-65536 if x>32767 else x)
-    combined_data['z'] = combined_data['z'].apply(lambda x: x-65536 if x>32767 else x)
+    combined_data['x'] = combined_data['x'].apply(
+                                        lambda x: x-65536 if x>32767 else x)
+    combined_data['y'] = combined_data['y'].apply(
+                                        lambda x: x-65536 if x>32767 else x)
+    combined_data['z'] = combined_data['z'].apply(
+                                        lambda x: x-65536 if x>32767 else x)
+    combined_data[['x','y','z']]=combined_data.apply(
+                            lambda x: x[['x','y','z']]*(x['range']**2),axis=1)
+    combined_data[['x','y','z']]=combined_data[['x','y','z']].div(
+                                            combined_data[['x','y','z']].max())
     combined_data['mag']=np.linalg.norm(combined_data[['x','y','z']],axis=1)
     combined_data.plot(y=['x','y','z','mag'])
+else:
+    raise Exception("No data found!")
+    
+'''
+Now, need to look at timing!!
+Spin periods at around 3.9 to 4.3 seconds
+Reset pulse every ~5.152220 seconds, 'more' accurate value can be achieved by 
+comparing NS packet SCET times, but for ext mode, the HF clock is more 
+important (used to ascertain spin periods, for example), 
+which should be stable at 4096 Hz.
+Reset count wraps around every 93.8 Hours or so, which should be much much 
+longer than one extended mode period should ever be.
+HF clock count,however, rolls overs every 65536/4096 seconds = 16.0 seconds
+
+Last NS time can be regarded as the packet HF count and corresponding packet
+SCET time of the last Normal Science packet before extended mode.
+Can determine the time of the first Normal Science vector by looking at the
+SCET time and the HF clock count of the first NS packet after ext mode,
+and then using the 1st 1ry vector HF count in the FGM science header to
+extrapolate back towards the first vector.
+
+Based on the reset count of the NS packets before and after ext mode (only one
+should be needed in practice) it can be determined whether the reset counter
+should wrap around or not (assuming extended modes are not longer than a
+couple of days)
+
+The time between the vectors will stay constant throughout extended mode -
+the average spin period during that time, which should ideally be 
+calculated from the HF clock counts for the most recent sun pulses recorded
+in the NS packets either side of ext mode.
+
+                |last NS| ext mode |first NS|
+                   |                 | 
+reset----+----+----+---.............-+----+----+----+----+----+----+
+
+spin ---+---+---+---+--.............+---+---+---+---+---+---+---+---+---+---+
+                |   |               | 
+      most recent  extrapolated    most recent
+There are n resets between the last NS and first NS packets, ie. reset count
+increases by n
+But there are NOT integer spins between two two packets
+
+Eg.
+++++++++++++++
+~10 hour Ext mode
+reset period = 5.15222
+spin period = 0x445B Hf clock counts (determined from surrounding data) ~ 4.26 s
+last NS packet:
+    packet reset count = 5000
+    most recent sun pulse HF count: 0x523B
+first NS packet:
+    packet reset count = 11987
+    most recent sun pulse HF count: 0x12AF
+    
+between these two sun pulse counts, an integer number of spin must have
+occurred, but the HF clock counter wraps around every 16 seconds!
+
+Get the time between the two packets from the packet reset counts ->
+(11987 - 5000)*5.15222 = 35998.56114 s = 9.9996 hours
+We can convet this to HF clock counts -> time*4096 = 147450106.42944 HF counts
+Taking the remainder -> 147450106.42944%(2**16)
+
+We know the most recent sun pulse HF counter value for both packets.
+We also know the one before that (is that accurate/useful for error checking?)
+
+Knowing this, we know wh
+++++++++++++++
+'''
