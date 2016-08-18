@@ -1,7 +1,7 @@
 import os
 import datetime
 
-def getscchfile(sc,dt,dir):
+def get_scch_file(sc,dt,dir):
     Year=str(dt.year)
     month=dt.month
     day=dt.day
@@ -21,27 +21,23 @@ def getscchfile(sc,dt,dir):
             return filepath
     return 0        
         
-def getscchfiles(sc,start_date=datetime.datetime(9999,1,1),end_date=datetime.datetime(9999,1,1)):
-    if end_date == datetime.datetime(9999,1,1):    
+def getscchfiles(sc,start_date=0,end_date=0,dir='Z:/data/raw/'):
+    if not end_date and start_date:    
         dates = [start_date]
     elif (end_date-start_date).days>0:
         dates = [start_date + datetime.timedelta(days=i) 
                 for i in range(0,((end_date-start_date).days+1))]
     else:
         raise Exception("Enter valid dates")
-    dir = 'Z:/data/raw/'
     file_list = []    
     for date in dates:
-        file = getscchfile(sc,date,dir)
+        file = get_scch_file(sc,date,dir)
         if file:
             file_list.append(file)
+        else: #log this/exception?
+            print "No commanding found for:",date
     return file_list
             
-'''
-Testing
-'''
-
-'''
-#print getscchfile(1,2016,1,1,dir)
-print getscchfiles(1,datetime(2016,1,1),datetime(2016,1,10))
+'''         
+print getscchfiles(1,datetime.datetime(2016,5,1))
 '''

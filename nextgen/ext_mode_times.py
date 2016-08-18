@@ -8,11 +8,11 @@ EXTMODE_INITIATE = ["SFGMJ059","SFGMJ064","SFGMSEXT","SFGMM002"]
 EXTMODE_TERMINATE = ["SFGMJ065","SFGMJ050"]
 EXTMODE_COMMANDS = EXTMODE_INITIATE+EXTMODE_TERMINATE
 
-def getcommands(sc,start_date,end_date):
+def getcommands(sc,start_date,end_date,dir):
     extmode_commanding_list = []
     extmode_commanding=np.zeros((0,3))
     #print extmode_commanding
-    scch_files = getscchfiles(sc,start_date,end_date)
+    scch_files = getscchfiles(sc,start_date,end_date,dir=dir)
     #print scch_files
     prev_short_line = ''        
     for file in scch_files:
@@ -82,20 +82,9 @@ def eliminate_adjacent_identical(extmode_commanding):
         return np.delete(extmode_commanding,delete_list,0)    
     else:
         return []
-        
-def calculate_end_times(results):
-    results_end_date = np.array([]).reshape(-1,4)
-    for i in xrange(len(results)):
-        results_end_date = np.vstack((results_end_date,
-                            np.array([
-                            results[i,0],
-                            results[i,0]+results[i,1]*np.timedelta64(1,'us'),
-                            results[i,2],
-                            results[i,3]])))
-    return results_end_date
-
-def find_overlap_data(sc,start_date,end_date):
-    extmode_commanding_list=getcommands(sc,start_date,end_date)
+    
+def ext_commands(sc,start_date,end_date,dir='Z:/data/raw/'):
+    extmode_commanding_list=getcommands(sc,start_date,end_date,dir)
     '''
     print "original"
     print extmode_commanding_list
@@ -152,7 +141,9 @@ def find_overlap_data(sc,start_date,end_date):
                             ext_commanding.apply(start_end,axis=1)),axis=1)
     ext_commanding =ext_commanding[['Start','End','Duration (s)','Spacecraft']]
     return ext_commanding[ext_commanding['End'].notnull()]
+
 '''
-ext_commanding = find_overlap_data(1,datetime(2016,1,1),datetime(2016,4,20))
+ext_commanding = ext_commands(1,datetime(2015,1,1),datetime(2015,4,20),
+                                   dir='Z:/data/raw/')
 print ext_commanding
 '''
