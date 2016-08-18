@@ -83,8 +83,20 @@ def eliminate_adjacent_identical(extmode_commanding):
     else:
         return []
     
-def ext_commands(sc,start_date,end_date,dir='Z:/data/raw/'):
-    extmode_commanding_list=getcommands(sc,start_date,end_date,dir)
+def ext_commands(sc,start_date,end_date=0,dir='Z:/data/raw/'):
+    '''
+    Gets extended mode start and end times. Automatically applies a 
+    'padding' of start and end dates, expanding them by 6 days, so that
+    extended modes that run over midnight are also captured, and to account
+    for the fact that the start time of extended mode is still unknown!
+    '''
+    days_pad = 5
+    start = start_date - pd.Timedelta(days_pad,unit='d')
+    if not end_date:
+        end = start_date+pd.Timedelta(1,unit='d')
+    else:
+        end = end_date+pd.Timedelta(1,unit='d')
+    extmode_commanding_list=getcommands(sc,start,end,dir)
     '''
     print "original"
     print extmode_commanding_list
@@ -110,40 +122,50 @@ def ext_commands(sc,start_date,end_date,dir='Z:/data/raw/'):
     extmode_commanding_list=templist
     ext_commanding = {'Date':[],'Spacecraft':[],'Command':[]}
     for a in extmode_commanding_list:
-        if a != []:
+        if len(a):
             ext_commanding['Date'].extend(a[:,0])
             ext_commanding['Command'].extend(a[:,1])
             ext_commanding['Spacecraft'].extend(a[:,2])
     ext_commanding = pd.DataFrame(ext_commanding)
-    ext_commanding.drop_duplicates(inplace=True)
-    ext_commanding[['Spacecraft']]=ext_commanding[['Spacecraft']].apply(
-                                                    pd.to_numeric)
-    ext_commanding['Date']=ext_commanding['Date'].apply(pd.to_datetime)
-    ext_commanding['Previous Date']=ext_commanding['Date'].shift()
-    ext_commanding['Previous Command']=ext_commanding['Command'].shift()
-    ext_commanding['Duration (s)']=ext_commanding['Date'].diff().apply(
-                                                lambda x:x/pd.Timedelta(1,'s'))
-    def validity(row):
-        if row['Previous Command']=='INITIATE' and row['Command']=='TERMINATE'\
-        and row['Duration (s)']>0:
-            return True
-        else:
-            return False        
-    ext_commanding['Valid'] = ext_commanding.apply(validity,axis=1)
-    def start_end(row):
-        if row['Valid']:
-            return pd.Series((row['Previous Date'],row['Date']),
-                             index=['Start','End'])
-        else:
-            return pd.Series()
-    ext_commanding = ext_commanding.iloc[1:]
-    ext_commanding = pd.concat((ext_commanding,
-                            ext_commanding.apply(start_end,axis=1)),axis=1)
-    ext_commanding =ext_commanding[['Start','End','Duration (s)','Spacecraft']]
-    return ext_commanding[ext_commanding['End'].notnull()]
-
+    if not ext_commanding.empty:
+        ext_commanding.drop_duplicates(inplace=True)
+        ext_commanding[['Spacecraft']]=ext_commanding[['Spacecraft']].apply(
+                                                        pd.to_numeric)
+        ext_commanding['Date']=ext_commanding['Date'].apply(pd.to_datetime)
+        ext_commanding['Previous Date']=ext_commanding['Date'].shift()
+        ext_commanding['Previous Command']=ext_commanding['Command'].shift()
+        ext_commanding['Duration (s)']=ext_commanding['Date'].diff().apply(
+                                                    lambda x:x/pd.Timedelta(1,'s'))
+        def validity(row):
+            if row['Previous Command']=='INITIATE' and row['Command']=='TERMINATE'\
+            and row['Duration (s)']>0:
+                return True
+            else:
+                return False
+        ext_commanding['Valid'] = ext_commanding.apply(validity,axis=1)
+        def start_end(row):
+            if row['Valid']:
+                return pd.Series((row['Previous Date'],row['Date']),
+                                 index=['Start','End'])
+            else:
+                return pd.Series()
+        ext_commanding = ext_commanding.iloc[1:]
+        ext_commanding = pd.concat((ext_commanding,
+                                ext_commanding.apply(start_end,axis=1)),axis=1)
+        if 'Start' in ext_commanding.columns:
+            ext_commanding =ext_commanding[['Start','End','Duration (s)','Spacecraft']]
+            return ext_commanding[ext_commanding['End'].notnull()]
+    return pd.DataFrame()
 '''
-ext_commanding = ext_commands(1,datetime(2015,1,1),datetime(2015,4,20),
-                                   dir='Z:/data/raw/')
+RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'
+#RAW = 'Z:/data/raw/'
+for i in range(1,31):
+    ext_commanding = ext_commands(1,datetime(2016,1,i),
+                                       dir=RAW)
+    if not ext_commanding.empty:
+        print ext_commanding
+    
+ext_commanding = ext_commands(1,datetime(2016,1,1),datetime(2016,1,30),
+                                   dir=RAW)
 print ext_commanding
 '''
