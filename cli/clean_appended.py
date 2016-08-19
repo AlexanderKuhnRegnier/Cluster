@@ -1,3 +1,7 @@
+LOG = '/home/ahk114/logs/date_range_stage3/'
+APPENDED_EXT = 'ext_appended.log'
+APPENDED_EXT_GSE = 'ext_gse_appended.log'
+
 def drop_duplicates(filepath):
     '''
     Reads the file at filepath and removes duplicates from the entries,
@@ -44,8 +48,8 @@ def unique_fileset(filepath):
 def main():
     import math,datetime
     not_processed = []
-    log_dir = '/home/ahk114/logs/date_range_stage3/'
-    log_appended_files = ('ext_appended.log','ext_gse_appended.log')
+    log_dir = LOG
+    log_appended_files = (APPENDED_EXT,APPENDED_EXT_GSE)
     for log_file in log_appended_files:
         time = datetime.datetime.now()
         time_str = time.strftime('%Y-%m-%d %H:%M:%S ')
@@ -61,15 +65,16 @@ def main():
             print "Time (s) Completion"
             for count,filepath in enumerate(files):
                 if count%increment_every==0:
-                    print format((datetime.datetime.now()-start).seconds,'04d')+\
-                                                                            ' s  ',
+                    print format((datetime.datetime.now()-start).seconds,
+                                                                 '04d')+' s  ',
                     print "|"+"-"*counter+"|".rjust(s-counter)
                     counter+=1
                 try:
                     drop_duplicates(filepath)
                 except IOError:
                     not_processed.append(time_str+filepath+'\n')
-            print "Number of files not processed (/total files):",str(len(not_processed))+\
+            number_processed = len(files)-len(not_processed)
+            print "Number of files processed (/total files):",str(number_processed)+\
                     "/"+str(len(files))
     error_file = log_dir+'not_cleaned.log'
     with open(error_file,'ab') as f:

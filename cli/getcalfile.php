@@ -1,11 +1,6 @@
 <?php
 #, /* */AKR comments
 
-/*
-Delete the following line for deployment or figure out why permission to normal session folder are denied
-*/
-#session_destroy();
-#require 'meta_file_functions.php';
 require_once '/home/ahk114/Cluster/processing/meta_file_functions.php';
 if (!(defined('RAW')))
 {
@@ -13,7 +8,6 @@ if (!(defined('RAW')))
 	define('RAW',"/cluster/data/raw/");
 	echo "raw set now".PHP_EOL;
 }
-#if (!(defined('EXT'))){define('EXT','/home/ahk114/extended/');}
 if (!(defined('EXT')))
 {
 	echo "EXT not defined".PHP_EOL;
@@ -28,7 +22,6 @@ function calfile_array($Year,$month,$day,$sc,$calibration_dir)
 	if ($calibration_dir==CAACAL)
 	{
 		$cmd = 'find '.$calibration_dir.' -name "C'.$sc.'_CC_FGM_CALF__'.$Year.$month.$day.'_*'.'"';
-		#$cmd = 'find '.$calibration_dir.' -name "C'.$sc.'_CC_FGM_CALF__'.$Year.$month.'*'.'"'; #this would be for a whole month -testing
 	}
 	elseif ($calibration_dir==DAILYCAL)
 	{
@@ -78,12 +71,12 @@ function calfile_select($calfiles)
 	
 	if (count($calfiles) > 1)
 	{
-		echo "Multiple versions, calfile count:".count($calfiles).PHP_EOL;
+		#echo "Multiple versions, calfile count:".count($calfiles).PHP_EOL;
 		foreach ($calfiles as $calfile)
 		{
 			$versions[] = substr($calfile,strpos($calfile,"_V")+2,2);
 		}
-		echo "Versions array".PHP_EOL;
+		#echo "Versions array".PHP_EOL;
 		var_dump($versions); 					#sort this array to get highest version, then use the index to get highest calfile
 		arsort($versions);
 		$keys = array_keys($versions);
@@ -109,7 +102,7 @@ function getcalfile($sc,$filepicked,$calibration_dir)
 	
 	$block = substr($filepicked,strlen($filepicked)-1,1);
 	$meta_file = substr($filepicked,0,strlen($filepicked)-2).'META';
-	echo "Meta File:".$meta_file.PHP_EOL;
+	#echo "Meta File:".$meta_file.PHP_EOL;
 	if (!(file_exists($meta_file))){echo "getcalfile, meta file not found!".PHP_EOL; return 0;}
 	if (!(filesize($meta_file))){echo "getcafile, Meta file empty!".PHP_EOL; return 0;}
 	$extmodeentry_unix = read_meta($meta_file,"ExtendedModeEntry_Unix",$block);
@@ -175,7 +168,7 @@ function getcalfile($sc,$filepicked,$calibration_dir)
 					if ($calfile = calfile_select($calfiles))
 					{
 						echo "Days looked back:".$days_count.PHP_EOL;
-						echo "Calibration file selected:".$calfile.PHP_EOL;	
+						#echo "Calibration file selected:".$calfile.PHP_EOL;	
 						return $calfile;
 					}
 					else

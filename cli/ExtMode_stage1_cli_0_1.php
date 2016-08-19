@@ -654,10 +654,10 @@ $base         = "C" . $sc . "_" . $shortyear . $month . $day . "_" . $version;
 $datafilename = RAW . $year . "/" . $month . "/" . $base . ".BS";
 
 if ( !file_exists( $datafilename ) )
-	exit(1);#return code for invalid file!
-
+	exit(-1);#return code for invalid file!
+echo "Reading from BS file:".$datafilename.PHP_EOL;
 $metafilename = EXT . $year . '/' . $month . '/' . $base . ".META";
-
+echo "Writing to META file:".$metafilename.PHP_EOL;
 if ( !is_dir( EXT . $year ) )
 	mkdir( EXT . $year, 0750 );
 
@@ -1116,5 +1116,5 @@ if ( count( $outputdata ) != 0 )
 }
 
 write_meta( $metafilename, "NumberOfBlocks", $extblockcount );
-exit(0);
+exit(1);
 ?>

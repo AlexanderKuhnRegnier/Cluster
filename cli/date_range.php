@@ -18,8 +18,10 @@ $shortopts .= "y:";
 $shortopts .= "s:";
 $shortopts .= "n:";
 $shortopts .= "v:"; #version
+$shortopts .= "c";
 
-$options = getopt($shortopts);
+$longopts = array("clean");
+$options = getopt($shortopts,$longopts);
 
 if (array_key_exists("y",$options)){$year  = $options["y"];}
 else {exit("Please select a Year!".PHP_EOL);}
@@ -33,7 +35,7 @@ if (array_key_exists("v",$options))
 	$versions = array();
 	for ($i=0; $i<strlen($options["v"]);$i+=1)
 	{
-		$versions[] = $options["v"][$i];
+		$versions[] = strtoupper($options["v"][$i]);
 	}
 }
 else
@@ -100,7 +102,9 @@ echo "Year:       ".$year.PHP_EOL;
 echo "Month:      ".$month_name.PHP_EOL;
 echo "Day:        ".$day.PHP_EOL;
 echo "Spacecraft: ".$sc.PHP_EOL;
-echo "Versions:".var_dump($versions);
+echo "Versions:".PHP_EOL;
+echo var_dump($versions);
+echo PHP_EOL;
 if ($number > 1){echo "Processing: ".$number." days".PHP_EOL;}
 else{echo "Processing: ".$number." day".PHP_EOL;}
 
@@ -112,7 +116,7 @@ while (file_exists($filename))
 {
 	$counter+=1;
 	$nr = sprintf('%03d',$counter);
-	$filename = LOG.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.sprintf('%06.2f',($number/365.25)).'-years'.'__'.$nr.'.log';			
+	$filename = LOG.'sc-'.$sc.'_'.'start_date-'.$year.'_'.$month.'_'.$day.'_duration_'.$number.'-days_'.sprintf('%06.2f',($number/365.25)).'-years'.'__'.$nr.'.log';			
 }
 echo "Logfile:".$filename.PHP_EOL;
 
@@ -120,6 +124,13 @@ echo "Logfile:".$filename.PHP_EOL;
 $pad_days = 5;
 $time_unix=$initial_unix-$pad_days*86400;
 #for stage1, start at a prior date always, since this is needed to get correct info in some cases.
+$logfile = fopen($filename,'a');
+if (!$logfile)
+{
+	exit('Unable to open log file!'.PHP_EOL);
+}
+fwrite($logfile,PHP_EOL.'STARTING STAGE 1 PROCESSING'.PHP_EOL.PHP_EOL);
+fclose($logfile);
 for ($i=0; $i<($number+$pad_days); $i+=1)
 {
 	echo "Input date: ".date("Y/m/d",$time_unix).PHP_EOL;
@@ -134,7 +145,7 @@ for ($i=0; $i<($number+$pad_days); $i+=1)
 		$output = array();
 		$return = null;
 		exec($cmd,$output,$return);
-		if ($return==0)
+		if ($return==1)
 		{
 			$filtered_output = array();
 			foreach($output as $value)
@@ -169,7 +180,16 @@ for ($i=0; $i<($number+$pad_days); $i+=1)
 		}
 		else
 		{
-			echo "No BS file found for version (or other error):".$version.PHP_EOL;
+			echo "Error:".$return;
+			echo "Version:".$version.PHP_EOL;
+			$logfile = fopen($filename,'a');
+			if (!$logfile)
+			{
+				exit('Unable to open log file!'.PHP_EOL);
+			}
+			fwrite($logfile,"Error for command:".$cmd.PHP_EOL);
+			fwrite($logfile,$return.PHP_EOL);
+			fclose($logfile);	
 		}
 	}
 }
@@ -177,6 +197,14 @@ echo PHP_EOL;
 
 ######################Stage 2 Processing####################
 $time_unix=$initial_unix; #here just start from the intended date
+$logfile = fopen($filename,'a');
+if (!$logfile)
+{
+	exit('Unable to open log file!'.PHP_EOL);
+}
+fwrite($logfile,'-------------------------------------------------------------------------------------------------');
+fwrite($logfile,PHP_EOL.'STARTING STAGE 2 PROCESSING'.PHP_EOL.PHP_EOL);
+fclose($logfile);
 for ($i=0; $i<($number); $i+=1)
 {
 	echo "Input date: ".date("Y/m/d",$time_unix).PHP_EOL;
@@ -191,7 +219,7 @@ for ($i=0; $i<($number); $i+=1)
 		$output = array();
 		$return = null;
 		exec($cmd,$output,$return);
-		if ($return==0)
+		if ($return==1)
 		{
 			$filtered_output = array();
 			foreach($output as $value)
@@ -219,6 +247,7 @@ for ($i=0; $i<($number); $i+=1)
 				{
 					exit('Unable to open log file!'.PHP_EOL);
 				}
+				fwrite($logfile,PHP_EOL.'Stage 2'.PHP_EOL);
 				fwrite($logfile,$stringout.PHP_EOL.PHP_EOL);
 				fclose($logfile);
 			}
@@ -226,7 +255,16 @@ for ($i=0; $i<($number); $i+=1)
 		}
 		else
 		{
-			echo "No META file found for version (or other error):".$version.PHP_EOL;
+			echo "Error:".$return;
+			echo "Version:".$version.PHP_EOL;
+			$logfile = fopen($filename,'a');
+			if (!$logfile)
+			{
+				exit('Unable to open log file!'.PHP_EOL);
+			}
+			fwrite($logfile,"Error for command:".$cmd.PHP_EOL);
+			fwrite($logfile,$return.PHP_EOL);
+			fclose($logfile);	
 		}
 	}
 }
@@ -234,6 +272,14 @@ echo PHP_EOL;
 
 ######################Stage 3 Processing####################
 $time_unix=$initial_unix; #here just start from the intended date
+$logfile = fopen($filename,'a');
+if (!$logfile)
+{
+	exit('Unable to open log file!'.PHP_EOL);
+}
+fwrite($logfile,'-------------------------------------------------------------------------------------------------');
+fwrite($logfile,PHP_EOL.'STARTING STAGE 3 PROCESSING'.PHP_EOL.PHP_EOL);
+fclose($logfile);
 for ($i=0; $i<($number); $i+=1)
 {
 	echo "Input date: ".date("Y/m/d",$time_unix).PHP_EOL;
@@ -273,9 +319,44 @@ for ($i=0; $i<($number); $i+=1)
 		{
 			exit('Unable to open log file!'.PHP_EOL);
 		}
-		fwrite($logfile,$stringout.PHP_EOL.PHP_EOL);
+		fwrite($logfile,$stringout.PHP_EOL);
 		fclose($logfile);
+	}
+	if ($return != 1)
+	{
+		echo "Error:".$return;
+		$logfile = fopen($filename,'a');
+		if (!$logfile)
+		{
+			exit('Unable to open log file!'.PHP_EOL);
+		}
+		fwrite($logfile,"Error for command:".$cmd.PHP_EOL);
+		fwrite($logfile,$return.PHP_EOL);
+		fclose($logfile);		
 	}
 }
 echo PHP_EOL;
+
+if ((array_key_exists("c",$options)) || (array_key_exists("clean",$options)))
+{
+	echo "Cleaning appended files!".PHP_EOL;
+	$output=null;
+	exec("python clean_appended.py",$output);
+	$stringout = implode(PHP_EOL,$output);
+	echo $stringout.PHP_EOL;
+	$logfile = fopen($filename,'a');
+	if (!$logfile)
+	{
+		exit('Unable to open log file!'.PHP_EOL);
+	}
+	fwrite($logfile,PHP_EOL.'Cleaning Appended Files'.PHP_EOL);
+	fwrite($logfile,$stringout.PHP_EOL.PHP_EOL);
+	fclose($logfile);	
+}
+else
+{
+	echo "To clean files which have been appended to, run the following command:".PHP_EOL;
+	echo "python clean_appended.py".PHP_EOL;
+}
+
 ?>

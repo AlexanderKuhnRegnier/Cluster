@@ -197,8 +197,8 @@ $filename = EXT . sprintf( "%4d/%02d/C%d_%02d%02d%02d_%s", $year, $month, $sc, $
 debug( $filename );
 
 if ( !file_exists( $filename . ".META" ) )
-	exit(1);
-
+	exit(-1);
+echo "Reading from (and writing to) META file:".$filename.PHP_EOL;
 $numberofblocks = 0 + read_meta( $filename . ".META", "NumberOfBlocks" );
 
 debug( "Number of blocks : " . $numberofblocks );
@@ -423,5 +423,5 @@ for ( $n = 0; $n < $numberofblocks; $n++ )
 		}
 	}
 }
-exit(0); #all is well
+exit(1); #all is well
 ?>

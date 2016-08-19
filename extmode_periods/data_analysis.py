@@ -23,7 +23,7 @@ PLOT_VERBOSE=False
 
 pickledir = 'Y:/overlap_stats/'
 imagedir=pickledir+'images/'
-refdirahk114 = 'Y:/reference/'
+refdirahk114 = 'Y:/data/referencecaa/'
 refdirahk114caa = 'Y:/data/referencecaa/'
 refdir = 'Z:/data/reference/'
 caadir = 'Z:/caa/ic_archive/'
