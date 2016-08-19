@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 import RawData
 import ext_mode_times as emt
+from frame_hex_format import hexify
 verbose=True
 def browse_frame_ipython(frame,window=40):
     frame['reset']=frame['reset'].apply(hex)
@@ -654,7 +655,6 @@ Only putting the joing half-vector into the even dataframe - is that wise,
 or could it introduce some errors, if there are missing packets or otherwise
 corrupted data?
 '''
-hex_format = lambda i:'{:x}'.format(i).upper()
 RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
 #RAW = 'Z:/data/raw/' #cluster alsvid server
 pd.options.display.expand_frame_repr=False
@@ -775,11 +775,11 @@ removed_info = ext.removed_packets_info
 #hex formatting of reset counts
 
 packetinfo_hex = packetinfo.copy(deep=True)
-packetinfo_hex['Reset Count'] = packetinfo_hex['Reset Count'].apply(hex_format)
+hexify(packetinfo_hex,columns=['Reset Count'],inplace=True)
 even_hex = evenf.copy(deep=True)
-even_hex['reset']=even_hex['reset'].apply(hex_format)
+hexify(even_hex,columns=['reset'],inplace=True)
 odd_hex = oddf.copy(deep=True)
-odd_hex['reset']=odd_hex['reset'].apply(hex_format)
+hexify(odd_hex,columns=['reset'],inplace=True)
 #print packet_info.groupby('Telemetry Mode').count()
 
 ext.select_packets()
