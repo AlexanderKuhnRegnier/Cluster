@@ -2,7 +2,7 @@
 session_destroy();
 #ini_set('session.save_path',getcwd(). '/'. 'session/'); 
 #session_start();
-define('LOG','/home/ahk114/logs/date_range_stage3/');
+define('LOG','/home/ahk114/logs/date_range/');
 
 echo PHP_EOL;
 
@@ -109,6 +109,12 @@ if ($number > 1){echo "Processing: ".$number." days".PHP_EOL;}
 else{echo "Processing: ".$number." day".PHP_EOL;}
 
 $initial_unix = mktime(0,0,0,$month,$day,$year);
+$created_dir=False;
+if (!is_dir(LOG))
+{
+	mkdir(LOG,0750,true);
+	$created_dir=True;
+}
 $counter=0;
 $nr = sprintf('%03d',$counter);
 $filename = LOG.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.sprintf('%06.3f',($number/365.25)).'-years'.'__'.$nr.'.log';			
@@ -119,7 +125,16 @@ while (file_exists($filename))
 	$filename = LOG.'sc-'.$sc.'_'.'start_date-'.$year.'_'.$month.'_'.$day.'_duration_'.$number.'-days_'.sprintf('%06.2f',($number/365.25)).'-years'.'__'.$nr.'.log';			
 }
 echo "Logfile:".$filename.PHP_EOL;
-
+if ($created_dir)
+{
+	$logfile = fopen($filename,'a');
+	if (!$logfile)
+	{
+		exit('Unable to open log file!'.PHP_EOL);
+	}
+	fwrite($logfile,PHP_EOL."Created logfile directory:".LOG.PHP_EOL);
+	fclose($logfile);	
+}
 ######################Stage 1 Processing####################
 $pad_days = 5;
 $time_unix=$initial_unix-$pad_days*86400;
@@ -139,7 +154,7 @@ for ($i=0; $i<($number+$pad_days); $i+=1)
 	$day=   date("d",$time_unix);
 	foreach ($versions as $version)
 	{
-		$option_string = ' '.$sc.' '.$year.' '.$month.' '.$day.' '.$version; #Y is just a dummy version here
+		$option_string = ' '.$sc.' '.$year.' '.$month.' '.$day.' '.$version; 
 		$cmd = "php ExtMode_stage1_cli_0_1.php ".$option_string;		
 		echo "Executing: ".$cmd.PHP_EOL;
 		$output = array();
@@ -165,7 +180,6 @@ for ($i=0; $i<($number+$pad_days); $i+=1)
 			echo $stringout.PHP_EOL;
 			echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 			*/
-			$time_unix = $time_unix + 86400;
 			if (count($filtered_output)>0)
 			{
 				$logfile = fopen($filename,'a');
@@ -176,7 +190,7 @@ for ($i=0; $i<($number+$pad_days); $i+=1)
 				fwrite($logfile,$stringout.PHP_EOL.PHP_EOL);
 				fclose($logfile);
 			}
-			continue 2;
+			break 1; #still needs to increment time_unix
 		}
 		else
 		{
@@ -188,10 +202,15 @@ for ($i=0; $i<($number+$pad_days); $i+=1)
 				exit('Unable to open log file!'.PHP_EOL);
 			}
 			fwrite($logfile,"Error for command:".$cmd.PHP_EOL);
+			if ($return==255)
+			{
+				$return='Unable to open file'.PHP_EOL;
+			}
 			fwrite($logfile,$return.PHP_EOL);
 			fclose($logfile);	
 		}
 	}
+	$time_unix = $time_unix + 86400;
 }
 echo PHP_EOL;
 
@@ -239,7 +258,6 @@ for ($i=0; $i<($number); $i+=1)
 			echo $stringout.PHP_EOL;
 			echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 			*/
-			$time_unix = $time_unix + 86400;
 			if (count($filtered_output)>0)
 			{
 				$logfile = fopen($filename,'a');
@@ -251,7 +269,7 @@ for ($i=0; $i<($number); $i+=1)
 				fwrite($logfile,$stringout.PHP_EOL.PHP_EOL);
 				fclose($logfile);
 			}
-			continue 2;
+			break 1;
 		}
 		else
 		{
@@ -263,10 +281,15 @@ for ($i=0; $i<($number); $i+=1)
 				exit('Unable to open log file!'.PHP_EOL);
 			}
 			fwrite($logfile,"Error for command:".$cmd.PHP_EOL);
+			if ($return==255)
+			{
+				$return='Unable to open file'.PHP_EOL;
+			}
 			fwrite($logfile,$return.PHP_EOL);
 			fclose($logfile);	
 		}
 	}
+	$time_unix = $time_unix + 86400;
 }
 echo PHP_EOL;
 

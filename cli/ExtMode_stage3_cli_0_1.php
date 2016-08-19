@@ -51,8 +51,13 @@ define( "RESET_PERIOD", 5.152221 );
 define( "SPIN_PERIOD", 4 );
 define( "RESETPERIOD", 5.152 );
 define( "PREREAD", 32768 );
-define( "APPENDED",'/home/ahk114/logs/date_range_stage3/');	#log file that shows which files were appended to in this processing.
+define( "APPENDED",'/home/ahk114/logs/date_range/');		#log file that shows which files were appended to in this processing.
 															#Those files may potentially contain duplicate entries!
+if (!is_dir(APPENDED))
+{
+	mkdir(APPENDED,0750,true);
+	echo "Created appended log file directory:".APPENDED.PHP_EOL;
+}													
 $ext_appended = APPENDED.'ext_appended.log';
 $ext_gse_appended = APPENDED.'ext_gse_appended.log';
 $verbose = FALSE;
@@ -363,7 +368,7 @@ function getcal($sc,$filepicked)
 			|| (!(isset($r7gainy)))
 			|| (!(isset($r7gainz))))
 		{	#if these are not set, then assume that no range7 info was there, and fill it in with unit values
-		
+			echo "No range 7 information found, applying unit gains and 0 offset!".PHP_EOL;
 			$r7offsetx = 0;
 			$r7offsety = 0;
 			$r7offsetz = 0;

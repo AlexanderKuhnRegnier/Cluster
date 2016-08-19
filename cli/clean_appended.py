@@ -74,13 +74,14 @@ def main():
                 except IOError:
                     not_processed.append(time_str+filepath+'\n')
             number_processed = len(files)-len(not_processed)
-            print "Number of files processed (/total files):",str(number_processed)+\
-                    "/"+str(len(files))
+            print "Number of files processed (/total files):",\
+                                str(number_processed)+"/"+str(len(files))
     error_file = log_dir+'not_cleaned.log'
     with open(error_file,'ab') as f:
         f.writelines(not_processed)
     print "To remove the appended.log files, execute the following:"
-    print "rm {0} ; rm {1} ;".format(*[log_dir+log_file for log_file in log_appended_files])
+    print "rm {0} ; rm {1} ;".format(*[log_dir+log_file for log_file in 
+                                                        log_appended_files])
     
 if __name__ == "__main__":
     main()
