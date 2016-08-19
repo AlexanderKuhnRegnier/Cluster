@@ -1068,9 +1068,13 @@ Taking the remainder -> 147450106.42944%(2**16)=59642.42943999171
                      -> round(59642.42943999171) = 59642 )
 Taking the difference of the SCET times of the NS packets at 0xE2AC and 0x1279
 yields: 63027.118545 s - 20 s shorter than reset count difference value,
-                         but still longer than the SCCH time estimate, since
+                         but still longer than the SCCH time estimate - since
                          3-4 packets were skipped (see above).
-
+                        
+                         *Discrepancy to the reset count difference time is 
+                         3.9997 reset periods, so exactly 4 - what went wrong
+                         here?
+                         
 We know the most recent sun pulse HF counter value for both packets.
 We also know the one before that (is that accurate/useful for error checking?)
 
