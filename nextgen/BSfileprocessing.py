@@ -655,8 +655,8 @@ or could it introduce some errors, if there are missing packets or otherwise
 corrupted data?
 '''
 hex_format = lambda i:'{:x}'.format(i).upper()
-#RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-RAW = 'Z:/data/raw/' #cluster alsvid server
+RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+#RAW = 'Z:/data/raw/' #cluster alsvid server
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20
 dump_date = datetime(2016,1,6)
@@ -1029,29 +1029,61 @@ There are n resets between the last NS and first NS packets, ie. reset count
 increases by n
 But there are NOT integer spins between two two packets
 
-Eg.
-++++++++++++++
-~10 hour Ext mode
-reset period = 5.15222
-spin period = 0x445B Hf clock counts (determined from surrounding data) ~ 4.26 s
+Example - ExtMode on 4th January 2016, Dump on 6th Jan
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Approx. Duration from SCCH - 4:59:54 to 22:30:00 = 63006 s - 17.502 hours
+reset period (from NS on 4th) = 5.1522208 s +- 5.45e-06 s
+spin period (from NS on 4th) =  4.2606671 s +- 1.22e-04 s
+(could be improved by taking MSA dump data on that day as well)
 last NS packet:
-    packet reset count = 5000
-    most recent sun pulse HF count: 0x523B
+    packet reset count = 0xE2AC
+    most recent sun pulse HF count: 0x5BF4
 first NS packet:
-    packet reset count = 11987
-    most recent sun pulse HF count: 0x12AF
+    packet reset count = 0x1279 (could be 0x1276, but that value is not
+        read correctly by the header reading module (reset count shown as 0),
+        and it is marked as corrupt in the header, plus an anomalous packet
+        afterwards...)
+    most recent sun pulse HF count (for 0x1279 packet): 0xAE13
     
+last EXT Mode Reset (top 12 bits): 295 (0x127) (+0x1000 or 4096, wraps-around)
+                                    = 0x1127 or 4391
+first EXT Mode Reset (top 12 bits):3626(0xE2A)
+
 between these two sun pulse counts, an integer number of spin must have
 occurred, but the HF clock counter wraps around every 16 seconds!
 
-Get the time between the two packets from the packet reset counts ->
-(11987 - 5000)*5.15222 = 35998.56114 s = 9.9996 hours
-We can convet this to HF clock counts -> time*4096 = 147450106.42944 HF counts
-Taking the remainder -> 147450106.42944%(2**16)
+Get the time between the two packets from the packet reset counts (be wary of
+wrap-around)-> (0x1279(+0x10000 since wrapped around) - 0xE2AC) = 12237(0x2FCD)
+                *5.1522208 = 63047.7259 s = 17.513 hours
+            That is slightly longer than the estimate from the SCCH file,
+            however, note that some corrupt normal science packets were
+            'skipped', which is questionable. If 3 packets were ignored at the
+            start of NS, then that equates to around 0.0043 hours, or almost
+            half the discrepancy. If we include time delays at the end and the
+            start for some other reason, then the disparity becomes even
+            smaller. It seems that NS packets in the viccinity of ext mode
+            are faulty, which can extend to several packets around the border.
+(We can convet this to HF clock counts -> time*4096 = 147450106.42944 HF counts
+Taking the remainder -> 147450106.42944%(2**16)=59642.42943999171
+                     -> round(59642.42943999171) = 59642 )
+Taking the difference of the SCET times of the NS packets at 0xE2AC and 0x1279
+yields: 63027.118545 s - 20 s shorter than reset count difference value,
+                         but still longer than the SCCH time estimate, since
+                         3-4 packets were skipped (see above).
 
 We know the most recent sun pulse HF counter value for both packets.
 We also know the one before that (is that accurate/useful for error checking?)
 
-Knowing this, we know wh
-++++++++++++++
+s x spin_period = time_difference(between most recent sun pulse for NS packets)
+s is the number of spins in ext mode, needs to be integer.
+
+time_difference = reset_time_diff + (dt1-dt2),
+    where dt1 is the time difference between the last NS reset and its most
+    recent sun pulse and similarly for dt2 (first NS packet)
+
+dt1 = 34866-23540 = 11326 -> /4096. -> 2.76513671875 s
+dt2 = 47677-44563 = 3114  -> /4096. -> 0.76025390625 s
+dt1-dt2 = 2.0048828125 s - of course, this is vanishingly small compared to
+            the reset_time_diff
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 '''

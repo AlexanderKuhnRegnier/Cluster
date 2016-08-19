@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 from collections import OrderedDict as orddict
@@ -125,7 +124,11 @@ class RawDataHeader:
         prev_sun_pulse_hf = RawDataHeader.read_bytes([4,5],science_header)
         most_recent_sun_pulse_hf = RawDataHeader.read_bytes([6,7],
                                                             science_header)
-        tel_mode = RawDataHeader.telem_mode[telemetry_mode]
+        try:
+            tel_mode = RawDataHeader.telem_mode[telemetry_mode]
+        except KeyError: #should probably log this
+            print "Undesired telemetry_mode:",telemetry_mode
+            tel_mode = str(telemetry_mode)
         self.fgm_data['Telemetry Mode'].append(tel_mode)
         self.fgm_data['Previous Sun Pulse'].append(prev_sun_pulse_hf)
         self.fgm_data['Most Recent Sun Pulse'].append(most_recent_sun_pulse_hf)
@@ -187,6 +190,9 @@ class RawDataHeader:
                                         lambda x:x/pd.Timedelta(1,'s')))
         self.packet_info['Reset Period (s)'] = \
                                     self.packet_info['Reset Period (s)']\
+                                    [self.packet_info['Reset Increment']==1]
+        self.packet_info['Spin Period (s)'] = \
+                                    self.packet_info['Spin Period (s)']\
                                     [self.packet_info['Reset Increment']==1]
 '''
 #Usage example
