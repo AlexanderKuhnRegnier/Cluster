@@ -112,12 +112,11 @@ def getcaafile(sc,Year,month,day,directory):
         need to check whether one of our files is in a previous folder!
         '''        
         dir = directory[:-8]
-        prev_month = current_date-timedelta(days=5)
+        prev_month = current_date-timedelta(days=10)
         prev_directory = dir+str(prev_month.year)+'/'\
                         +format(prev_month.month,'02d')+'/'
-        found = [s for s in os.listdir(prev_directory) if 'SPIN' in s 
-                                    and 'C'+sc in s 
-                                    and 'cef.gz' in s
+        found = [s for s in os.listdir(prev_directory) if '_CP_FGM_SPIN__' in s 
+                                    and 'C'+sc in s
                                     and pd.Timestamp(s[32:40])>=current_date]
         if len(found)>1:
             found = caa_version_filter(found,prev_directory)
