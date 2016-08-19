@@ -2,6 +2,8 @@
 session_destroy();
 #ini_set('session.save_path',getcwd(). '/'. 'session/'); 
 #session_start();
+define('LOG','/home/ahk114/logs/date_range_stage3/');
+
 echo PHP_EOL;
 
 $day = null;
@@ -15,6 +17,7 @@ $shortopts .= "m:";
 $shortopts .= "y:";
 $shortopts .= "s:";
 $shortopts .= "n:";
+$shortopts .= "v:"; #version
 
 $options = getopt($shortopts);
 
@@ -25,6 +28,19 @@ else {exit("Please select a Month!".PHP_EOL);}
 if (array_key_exists("d",$options)){$day   = $options["d"];}
 else {exit("Please select a Day!".PHP_EOL);}
 
+if (array_key_exists("v",$options))
+{
+	$versions = array();
+	for ($i=0; $i<strlen($options["v"]);$i+=1)
+	{
+		$versions[] = $options["v"][$i];
+	}
+}
+else
+{
+	echo "Setting default versions numbers to BKA".PHP_EOL;
+	$versions=array('B','K','A');
+}
 #verification of input parameters, php automatically converts between string and int
 if (array_key_exists("s",$options))
 {
@@ -83,44 +99,158 @@ echo "Start Date: ".PHP_EOL;
 echo "Year:       ".$year.PHP_EOL;
 echo "Month:      ".$month_name.PHP_EOL;
 echo "Day:        ".$day.PHP_EOL;
-
 echo "Spacecraft: ".$sc.PHP_EOL;
+echo "Versions:".var_dump($versions);
 if ($number > 1){echo "Processing: ".$number." days".PHP_EOL;}
 else{echo "Processing: ".$number." day".PHP_EOL;}
 
 $initial_unix = mktime(0,0,0,$month,$day,$year);
-$time_unix=$initial_unix;
-
-$time_unix=$initial_unix;
-#start at the earliest date always, so here start at $initial_unix
-
 $counter=0;
 $nr = sprintf('%03d',$counter);
-$filename = '/home/ahk114/logs/date_range_stage3/'.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.sprintf('%06.3f',($number/365.25)).'-years'.'__'.$nr.'.log';			
+$filename = LOG.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.sprintf('%06.3f',($number/365.25)).'-years'.'__'.$nr.'.log';			
 while (file_exists($filename))
 {
 	$counter+=1;
 	$nr = sprintf('%03d',$counter);
-	$filename = '/home/ahk114/logs/date_range_stage3/'.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.sprintf('%06.3f',($number/365.25)).'-years'.'__'.$nr.'.log';			
+	$filename = LOG.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.sprintf('%06.2f',($number/365.25)).'-years'.'__'.$nr.'.log';			
 }
 echo "Logfile:".$filename.PHP_EOL;
 
-for ($i=0; $i<abs($number); $i+=1)
+######################Stage 1 Processing####################
+$pad_days = 5;
+$time_unix=$initial_unix-$pad_days*86400;
+#for stage1, start at a prior date always, since this is needed to get correct info in some cases.
+for ($i=0; $i<($number+$pad_days); $i+=1)
 {
 	echo "Input date: ".date("Y/m/d",$time_unix).PHP_EOL;
 	$year=  date("Y",$time_unix);
 	$month= date("m",$time_unix);
 	$day=   date("d",$time_unix);
-	$option_string = ' '.$sc.' '.$year.' '.$month.' '.$day.' '.'Y'; #Y is just a dummy version here
-	$cmd = "php ExtMode_stage3_cli_0_1.php ".$option_string;
-	#$cmd = "php stage1.php".$option_string." | php stage2.php";		
+	foreach ($versions as $version)
+	{
+		$option_string = ' '.$sc.' '.$year.' '.$month.' '.$day.' '.$version; #Y is just a dummy version here
+		$cmd = "php ExtMode_stage1_cli_0_1.php ".$option_string;		
+		echo "Executing: ".$cmd.PHP_EOL;
+		$output = array();
+		$return = null;
+		exec($cmd,$output,$return);
+		if ($return==0)
+		{
+			$filtered_output = array();
+			foreach($output as $value)
+			{
+				if(strpos($value,'Warning: Unknown:') !== false || strlen($value)<1) #bodge to get rid of warning messages in log
+				{
+					continue;
+				}
+				else
+				{
+					$filtered_output[]=$value;
+				}
+			}
+			$stringout = implode(PHP_EOL,$filtered_output);
+			/*
+			echo "Processing output".PHP_EOL."++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
+			echo $stringout.PHP_EOL;
+			echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
+			*/
+			$time_unix = $time_unix + 86400;
+			if (count($filtered_output)>0)
+			{
+				$logfile = fopen($filename,'a');
+				if (!$logfile)
+				{
+					exit('Unable to open log file!'.PHP_EOL);
+				}
+				fwrite($logfile,$stringout.PHP_EOL.PHP_EOL);
+				fclose($logfile);
+			}
+			continue 2;
+		}
+		else
+		{
+			echo "No BS file found for version (or other error):".$version.PHP_EOL;
+		}
+	}
+}
+echo PHP_EOL;
+
+######################Stage 2 Processing####################
+$time_unix=$initial_unix; #here just start from the intended date
+for ($i=0; $i<($number); $i+=1)
+{
+	echo "Input date: ".date("Y/m/d",$time_unix).PHP_EOL;
+	$year=  date("Y",$time_unix);
+	$month= date("m",$time_unix);
+	$day=   date("d",$time_unix);
+	foreach ($versions as $version)
+	{
+		$option_string = ' '.$sc.' '.$year.' '.$month.' '.$day.' '.$version;
+		$cmd = "php ExtMode_stage2_cli_0_1.php ".$option_string;		
+		echo "Executing: ".$cmd.PHP_EOL;
+		$output = array();
+		$return = null;
+		exec($cmd,$output,$return);
+		if ($return==0)
+		{
+			$filtered_output = array();
+			foreach($output as $value)
+			{
+				if(strpos($value,'Warning: Unknown:') !== false || strlen($value)<1) #bodge to get rid of warning messages in log
+				{
+					continue;
+				}
+				else
+				{
+					$filtered_output[]=$value;
+				}
+			}
+			$stringout = implode(PHP_EOL,$filtered_output);
+			/*
+			echo "Processing output".PHP_EOL."++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
+			echo $stringout.PHP_EOL;
+			echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
+			*/
+			$time_unix = $time_unix + 86400;
+			if (count($filtered_output)>0)
+			{
+				$logfile = fopen($filename,'a');
+				if (!$logfile)
+				{
+					exit('Unable to open log file!'.PHP_EOL);
+				}
+				fwrite($logfile,$stringout.PHP_EOL.PHP_EOL);
+				fclose($logfile);
+			}
+			continue 2;
+		}
+		else
+		{
+			echo "No META file found for version (or other error):".$version.PHP_EOL;
+		}
+	}
+}
+echo PHP_EOL;
+
+######################Stage 3 Processing####################
+$time_unix=$initial_unix; #here just start from the intended date
+for ($i=0; $i<($number); $i+=1)
+{
+	echo "Input date: ".date("Y/m/d",$time_unix).PHP_EOL;
+	$year=  date("Y",$time_unix);
+	$month= date("m",$time_unix);
+	$day=   date("d",$time_unix);
+
+	$option_string = ' '.$sc.' '.$year.' '.$month.' '.$day.' '.'Y';#Y is just dummy version
+	$cmd = "php ExtMode_stage3_cli_0_1.php ".$option_string;		
 	echo "Executing: ".$cmd.PHP_EOL;
 	$output = array();
-	exec($cmd,$output);
+	$return = null;
+	exec($cmd,$output,$return);
 	$filtered_output = array();
 	foreach($output as $value)
 	{
-		if(strpos($value,'Warning: Unknown:') !== false || strlen($value)<1)
+		if(strpos($value,'Warning: Unknown:') !== false || strlen($value)<1) #bodge to get rid of warning messages in log
 		{
 			continue;
 		}
@@ -130,11 +260,11 @@ for ($i=0; $i<abs($number); $i+=1)
 		}
 	}
 	$stringout = implode(PHP_EOL,$filtered_output);
-	
+	/*
 	echo "Processing output".PHP_EOL."++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
 	echo $stringout.PHP_EOL;
 	echo "++++++++++++++++++++++++++++++++++++++++++++++++++++".PHP_EOL;
-	
+	*/
 	$time_unix = $time_unix + 86400;
 	if (count($filtered_output)>0)
 	{
@@ -148,5 +278,4 @@ for ($i=0; $i<abs($number); $i+=1)
 	}
 }
 echo PHP_EOL;
-#session_destroy();
 ?>
