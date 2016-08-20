@@ -144,7 +144,7 @@ if (!$logfile)
 {
 	exit('Unable to open log file!'.PHP_EOL);
 }
-fwrite($logfile,PHP_EOL.'STARTING STAGE 1 PROCESSING'.PHP_EOL.PHP_EOL);
+fwrite($logfile,'STARTING STAGE 1 PROCESSING'.PHP_EOL.PHP_EOL);
 fclose($logfile);
 for ($i=0; $i<($number+$pad_days); $i+=1)
 {
@@ -265,7 +265,6 @@ for ($i=0; $i<($number); $i+=1)
 				{
 					exit('Unable to open log file!'.PHP_EOL);
 				}
-				fwrite($logfile,PHP_EOL.'Stage 2'.PHP_EOL);
 				fwrite($logfile,$stringout.PHP_EOL.PHP_EOL);
 				fclose($logfile);
 			}

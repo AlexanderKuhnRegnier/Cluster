@@ -1,4 +1,4 @@
-LOG = '/home/ahk114/logs/date_range_stage3/'
+LOG = '/home/ahk114/logs/date_range/'
 APPENDED_EXT = 'ext_appended.log'
 APPENDED_EXT_GSE = 'ext_gse_appended.log'
 
