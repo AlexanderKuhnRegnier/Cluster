@@ -19,16 +19,81 @@ $shortopts .= "s:";
 $shortopts .= "n:";
 $shortopts .= "v:"; #version
 $shortopts .= "c";
-
-$longopts = array("clean");
+$shortopts .= "h"; #display help text
+$longopts = array("clean","version:","day:","month:","year:","days:","spacecraft:","help");
 $options = getopt($shortopts,$longopts);
 
-if (array_key_exists("y",$options)){$year  = $options["y"];}
-else {exit("Please select a Year!".PHP_EOL);}
-if (array_key_exists("m",$options)){$month = $options["m"];}
-else {exit("Please select a Month!".PHP_EOL);}
-if (array_key_exists("d",$options)){$day   = $options["d"];}
-else {exit("Please select a Day!".PHP_EOL);}
+function display_help()
+{
+	$helptext = array(
+	"\nRequired Switches\n" => "",
+	"-y   --year" => "The start year",
+	"-m   --month" => "The start month (numeric only)",
+	"-d   --day" => "The start day (numeric only)",
+	"\nOptional\n" => "",
+	"-s   --spacecraft" => "The spacecraft (1|2|3|4) [default: 1].",
+	"-n   --days" => "The number of days to process [default: 1].",
+	"-v   --version" => "The burst science file version(s) to consider.".
+						"Given as a string of letters such as ‘BK’. In that case, ".
+						"version ‘B’ files will be considered first, ".
+						"before moving on to version ‘K’ files. ".
+						"Default behaviour considers version B, ".
+						"then K and then A. [default: BKA].",
+	"-c  --clean" => "Clean files that have been appended to ".
+						"during the course of stage 3 processing ".
+						"by removing duplicated entries.",
+	"-h  --help" => "Display this help text. Also shown automatically when a required argument is omitted."
+	);
+	echo "Extended Mode Processing Wrapper Script".PHP_EOL;
+	echo "\nUsage Example:".PHP_EOL;
+	echo "php date_range.php -y 2016 -m 1 -d 1 -n 10 -s 3 -v KB --clean".PHP_EOL;
+	foreach ($helptext as $key=>$value)
+	{
+		$wrapped = wordwrap($value,60,PHP_EOL.str_repeat(' ',25),TRUE);
+		echo sprintf(str_repeat(' ',5)."%-20s%s",$key,$wrapped).PHP_EOL;
+	}
+	exit(0);
+}
+if ((array_key_exists("h",$options)) || (array_key_exists("help",$options)))
+{
+	display_help();
+}
+if (array_key_exists("y",$options))
+{
+	$year  = $options["y"];
+}
+elseif (array_key_exists("year",$options))
+{
+	$year  = $options["year"];
+}
+else 
+{
+	display_help();
+}
+if (array_key_exists("m",$options))
+{
+	$month = $options["m"];
+}
+elseif (array_key_exists("month",$options))
+{
+	$month = $options["month"];
+}
+else 
+{
+	display_help();
+}
+if (array_key_exists("d",$options))
+{
+	$day   = $options["d"];
+}
+elseif(array_key_exists("day",$options))
+{
+	$day = $options["day"];
+}
+else 
+{
+	display_help();
+}
 
 if (array_key_exists("v",$options))
 {
@@ -37,6 +102,14 @@ if (array_key_exists("v",$options))
 	{
 		$versions[] = strtoupper($options["v"][$i]);
 	}
+}
+elseif (array_key_exists("version",$options))
+{
+	$versions = array();
+	for ($i=0; $i<strlen($options["version"]);$i+=1)
+	{
+		$versions[] = strtoupper($options["version"][$i]);
+	}	
 }
 else
 {
@@ -50,6 +123,16 @@ if (array_key_exists("s",$options))
 	#echo "Spacecraft number given: ".$sc.PHP_EOL;
 	if ($sc > 4 || $sc < 1)
 	{
+		exit("Invalid Spacecraft!".PHP_EOL);
+	}
+}
+elseif (array_key_exists("spacecraft",$options))
+{
+	$sc = sprintf('%1d',$options["spacecraft"]);
+	#echo "Spacecraft number given: ".$sc.PHP_EOL;
+	if ($sc > 4 || $sc < 1)
+	{
+		display_help();
 		exit("Invalid Spacecraft!".PHP_EOL);
 	}
 }
@@ -70,10 +153,10 @@ if ($year < 2000)
 }
 if ($year > date("Y") || $year < 2000)
 {
-	exit("Invalid Year!".PHP_EOL);
+	exit("Year needs to be between 2000 and today's date!".PHP_EOL);
 }
 #beware of lacking support for calendars, but seems to be working (24/06/2016)
-if ($options["d"] > cal_days_in_month(CAL_GREGORIAN,$month,$year) || $options["d"] < 1)
+if ($day > cal_days_in_month(CAL_GREGORIAN,$month,$year) || $day < 1)
 {
 	exit("Number of days is invalid!".PHP_EOL);
 }
@@ -91,9 +174,15 @@ if (array_key_exists("n",$options))
 	#echo "Number input: ".$number.PHP_EOL;
 	if (!($number == $options["n"])) {exit("Please enter a valid number of days!".PHP_EOL);}
 }
+elseif (array_key_exists("days",$options))
+{
+	$number = (int)($options["days"]);
+	#echo "Number input: ".$number.PHP_EOL;
+	if (!($number == $options["days"])) {exit("Please enter a valid number of days!".PHP_EOL);}
+}
 else
 {
-	echo "processing 1 day".PHP_EOL;
+	echo "Processing 1 day".PHP_EOL;
 	$number = 1;
 }
 
@@ -102,11 +191,12 @@ echo "Year:       ".$year.PHP_EOL;
 echo "Month:      ".$month_name.PHP_EOL;
 echo "Day:        ".$day.PHP_EOL;
 echo "Spacecraft: ".$sc.PHP_EOL;
-echo "Versions:".PHP_EOL;
-echo var_dump($versions);
+echo "Versions:   ";
+echo implode(" then ",$versions);
 echo PHP_EOL;
 if ($number > 1){echo "Processing: ".$number." days".PHP_EOL;}
 else{echo "Processing: ".$number." day".PHP_EOL;}
+
 
 $initial_unix = mktime(0,0,0,$month,$day,$year);
 $created_dir=False;
@@ -117,7 +207,7 @@ if (!is_dir(LOG))
 }
 $counter=0;
 $nr = sprintf('%03d',$counter);
-$filename = LOG.'sc-'.$sc.'_'.'start_date-'.$year.$month.$day.'_duration_'.$number.'-days_'.sprintf('%06.3f',($number/365.25)).'-years'.'__'.$nr.'.log';			
+$filename = LOG.'sc-'.$sc.'_'.'start_date-'.$year.'_'.$month.'_'.$day.'_duration_'.$number.'-days_'.sprintf('%06.2f',($number/365.25)).'-years'.'__'.$nr.'.log';			
 while (file_exists($filename))
 {
 	$counter+=1;
@@ -380,5 +470,5 @@ else
 	echo "To clean files which have been appended to, run the following command:".PHP_EOL;
 	echo "python clean_appended.py".PHP_EOL;
 }
-
+echo "Logfile: ".$filename.PHP_EOL;
 ?>
