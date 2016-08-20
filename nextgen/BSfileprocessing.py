@@ -1089,5 +1089,37 @@ dt1 = 34866-23540 = 11326 -> /4096. -> 2.76513671875 s
 dt2 = 47677-44563 = 3114  -> /4096. -> 0.76025390625 s
 dt1-dt2 = 2.0048828125 s - of course, this is vanishingly small compared to
             the reset_time_diff
+            
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Originally, the spin period was to be estimated using the time difference 
+between NS packets at the border of extended mode (thus the calculations
+in the example above). However, since it seems to be the case that some NS
+packets at the border to extended mode can be corrupt, a more robust way of
+estimating the spin period would probably be to average the spin periods
+obtained from looking at the sun pulse HF clock times in the NS and BS packets
+on the day of extended mode as well as one the days surrounding extended mode.
+(Probably 1 day before, 1 day after).
+
+In order to ascertain when the extended mode occurred the commanding history
+can be used as a rough indicator, although when NS packets are available, 
+matching their reset count to the reset counts observed in the Extended Mode
+packets will always yield better accuracy, especially during convoluted time
+periods. The NS packet which has a reset count that is lower than the low
+
+
+--The feasability of a wrap-around of the reset counter shall be assessed very
+crudely using the reset counts of all extended mode vectors. If there are valid
+vectors with reset counts above 3000, (so that the real reset count is
+3000*16) then any disjoint group with a mean reset count under 1000 shall
+have their reset counts increased by 4096. 1000*16 reset counts takes 
+approx. 23 hours to complete, so this should be valid for pretty much any
+situation. 
+The alternative is to rely on the most recent spacecraft command history
+or matching of the lowest reset in the extended mode vectors. But in the case
+where the reset counter wraps around, this would give a very inaccurate 
+value if we were to naively assume that extended mode started at a reset count
+of 0. So here, we would have to look at any disparity in the reset counts
+across the extended mode vectors again, just as above - unless we want to 
+rely solely on the commanding.
 '''
