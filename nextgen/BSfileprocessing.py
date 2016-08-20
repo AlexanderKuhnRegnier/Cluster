@@ -803,7 +803,7 @@ in that case, since that would also count all of the vectors that have been
 filtered out in the data filter function. The function below circumvents this
 accurately.
 '''
-min_length = 5  #at a min value of 2, lots of 'coincidental' vblocks are
+min_length = 10 #at a min value of 2, lots of 'coincidental' vblocks are
                 #still observed, so a higher value is recommended
 #print "even_odd filteredvblocks, min_length="+str(min_length)
 #print "vector analysis"
@@ -886,7 +886,17 @@ this way of calculating the size is alright now, since we are sure of the fact
 that there are no gaps between the vectors (since the indices must have been
 present at least partly within the vblocks ranges)
 '''
-print "Intersections"
+'''
+Now sort the intersections by size, and rename the block numbers (which is 
+just the index) accordingly, so that the lowest index number corresponds to
+the largest block!
+'''
+intersections.sort_values('size',ascending=False,inplace=True)
+level0 = intersections.index.get_level_values(0)
+level1 = range(1,intersections.shape[0]+1)
+intersections.index = pd.MultiIndex.from_arrays((level0,level1),
+                                                names=['order','block'])
+print "Sorted Intersections"
 print intersections
 '''
 Having determined the intersections between the different analysis methods,
@@ -946,28 +956,99 @@ physical, and not just random)
 '''
 orderings_data = {'evenodd':ext.evenodd,'oddeven':ext.oddeven}
 orderings = intersections.index.get_level_values('order')
-blocks = intersections.shape[0] #number of blocks to reduce
-assert blocks == len(orderings),("Different orderings, and number of "
-                                    "intersections should match")
+blocks = intersections.index.get_level_values('block').values
 boundaries = intersections['intersections'].values #array of (start,end)
 dataframes = []
-for (i,(start,end)) in zip(range(blocks),boundaries):
-    data = select_index_level_1(orderings_data[orderings[i]],start,end)
+for (ordering,block,(start,end)) in zip(orderings,blocks,boundaries):
+    data = select_index_level_1(orderings_data[ordering],start,end)
     packets = data.index.get_level_values(0)
     vectors = data.index.get_level_values(1)
-    blocks = [i]*len(packets)
-    multi = pd.MultiIndex.from_arrays((blocks,packets,vectors),
-                                      names=['blocks','packets','vectors'])
+    blockslevel = [block]*len(packets)
+    multi = pd.MultiIndex.from_arrays((blockslevel,packets,vectors),
+                                      names=['block','packet','vector'])
     data.index = multi
     dataframes.append(data)
 if dataframes:
-    combined_data = pd.concat((dataframes))
-    combined_data.drop_duplicates(inplace=True)
+    raw_combined_data = pd.concat((dataframes))
+    raw_combined_data['block'] = raw_combined_data.index.get_level_values(
+                                                                    'block')
+    '''
+    Data which stems from incomplete half vector information that has not
+    been filtered out before will have to be removed here. The only parts of
+    a vector that are not filtered beforehand this stage are the 
+    magnetic field values (x,y,z). If an invalid value sneeks in there while
+    reading the raw data, it remains undetected. One observed example of this
+    was a repeat copy of a vector, where the packet data started of with 0s in
+    such a way that the x-component was exactly 0. So this will be filtered
+    out here. Other cases may or may not be filtered out this way, but
+    if the is a problem that occurs at the start/end of packet blocks, then
+    the reset duplicate removal method described below should deal with that,
+    given that there are multiple copies of the data. Values that are 
+    exactly 0.0 may actually occur, so opting to rely on the reset filtering
+    alone is much better than filtering out those values.
+    '''
+    '''
+    This naive way of dropping duplicates should be refined, even though in
+    most cases, it will not make much difference, apart from slowing down
+    program execution. If this turns out to be a significant issue, 
+    the naive duplicate dropping can always be reinstated.
+    #combined_data.drop_duplicates(inplace=True)
+    '''
+    '''
+    More refined duplicate dropping will take into consideration the origin
+    of the vectors. By grouping together vectors that share the same reset
+    count, and opting to keep only those vectors from the block which has
+    more vectors at that reset in it, will allow for partial vectors to 
+    be recovered, if possible. That means that if for some reason, the 
+    first copy of the data (in the BS file) should not include a vector,
+    due to a corrupted packet, or missing half-vector, or a similar reason,
+    if the data is present again in a second copy, that second copy should be
+    preferred if there are more vectors present. Of course, such an
+    'extra' vector that may be present in a repeat copy would be included
+    with the naive duplicate removal - however, the only way of knowing the
+    order in which the vectors were measured is to look at the vector number
+    in the dataframe index - since this reflects the order in which they were
+    read from the raw data file. If one were to 'cherrypick' an additional
+    vector from a repeat copy, while discarding the remaining vectors from the
+    repeat copy only to combine this additional vector with the other vectors
+    from the original copy, that ordering would be lost, since the vector
+    numbers will not form a neat series anymore. Rather, that additional 
+    vector from the second repeat copy will always be placed last, since
+    the dataframe is sorted by reset first and then by the vector value.
+    This situation (or something similar, with other configurations of 
+    repeat copies) is probably very unlikely, but accounting for it anyway
+    is not a big problem. 
+    The size of the blocks involved will determine which vectors are to be 
+    kept when the number of vectors for one particular reset are identical.
+    '''
+    filtered = []
+    for key,data in raw_combined_data.groupby('reset'):
+        data_blocks = np.unique(data.index.get_level_values('block'))
+        nr_of_blocks = data_blocks.shape[0]
+        if nr_of_blocks>1:
+            '''
+            as discussed above, take the vectors from the block which has 
+            the most vectors at the selected reset count. If all the blocks
+            have the same number of vectors, take the block with the lowest
+            number (recall that the blocks were sorted by size earlier on
+            and relabelled so that the lowest block-number corresponds to
+            the largest block!)
+            '''
+            data_block_sizes = data.groupby('block').size().to_frame(
+                                                                name='size')
+            data_block_sizes['block'] = data_block_sizes.index.values
+            data_block_sizes.sort_values(by=['size','block'],
+                                         ascending=[False,True])
+            filtered.append(data.xs(data_block_sizes['block'].iloc[0],
+                                    level='block',drop_level=False))
+        else:
+            filtered.append(data)
+    combined_data = pd.concat((filtered))  
     duplicated_indices = combined_data.index.duplicated()
     if np.sum(duplicated_indices):
         raise Exception("This should never happen after dropping duplicates!")
-    combined_data['vectors']=combined_data.index.get_level_values('vectors')
-    combined_data.sort_values(['reset','vectors'],ascending=True,inplace=True)
+    combined_data['vector']=combined_data.index.get_level_values('vector')
+    combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
     print "combined data"
     print combined_data
     '''
