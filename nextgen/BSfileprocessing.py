@@ -1167,6 +1167,11 @@ yields: 63027.118545 s - 20 s shorter than reset count difference value,
                          *Discrepancy to the reset count difference time is 
                          3.9997 reset periods, so exactly 4 - what went wrong
                          here?
+Looking at the FULL caa file, the last vector before ext mode occurred at
+04:59:53.5,
+and the first vector after ext mode at
+22:30:20.6. 
+20.6 seconds is 4*5.15, - 4 reset periods - same discrepancy as above!
                          
 We know the most recent sun pulse HF counter value for both packets.
 We also know the one before that (is that accurate/useful for error checking?)
@@ -1239,17 +1244,29 @@ combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
 rough_processing(combined_data,title='after')
 
 '''
-Get an average spin time from packets around the extended mode time
+Get an average spin time and reset time from packets 
+around the extended mode time
 '''
 
-ext_date = None #tbd
+ext_date = datetime(2016,1,4) #tbd
 day_delta = pd.Timedelta('1 day')
 dates=[ext_date-day_delta, ext_date, ext_date+day_delta]
 modes= ['NS','BS']
 spin_periods = []
+reset_periods = []
 for date in dates:
     for mode in modes:
-        spin_periods.append(RawData.RawDataHeader(sc,date,mode,
-                                dir=RAW).packet_info['Spin Period (s)'].mean())
+        packetdata = RawData.RawDataHeader(sc,date,mode,dir=RAW).packet_info
+        spin_periods.append(packetdata['Spin Period (s)'].mean())
+        reset_periods.append(packetdata['Reset Period (s)'].mean())
                             
 spin_period = np.mean(spin_periods)
+reset_period = np.mean(reset_periods)
+print "spin period:",spin_period
+print "reset period:",reset_period
+
+import cPickle as pickle
+pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+picklefile = pickledir+'extdata.pickle'
+with open(picklefile,'wb') as f:
+    pickle.dump(combined_data,f,protocol=2)
