@@ -1,38 +1,23 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-def extrapolate_timing(spin_period=False,reset_period=False,time=False,
-                       spins=False,resets=False,first_diff_HF=False,
-                       first_diff_time=False,initial_reset=False
-                       ):
+import RawData
+from datetime import datetime
+from numba import jit
+
+@jit
+def extrapolate_timing(spin_period,reset_period,time,
+                       first_diff_HF,initial_reset):
     '''
-    All args as kwargs, just to be extra explicit
     Times in seconds, unless otherwise stated. HF clock freq is 4096 Hz.
     The first difference refers to the time between the most recent sun pulse
     and the packet time for a certain (usually NS) packet before the extended
     mode starts.
     '''
-    if time:
-        time=time
-    elif spins:
-        time=spins*spin_period
-    elif resets:
-        time=resets*spin_period
-    else:
-        raise Exception("Need to provide either time, spins or resets!")
-    if first_diff_time:
-        first_diff_time=first_diff_time
-    elif first_diff_HF:
-        if first_diff_HF<0:
-            first_diff_HF += 2**16
-        first_diff_time = first_diff_HF/4096.
-    else:
-        raise Exception("Need a first diff, either first_diff_time or "
-                        "first_diff_HF!")
-    if not spin_period or not reset_period:
-        raise Exception("Need both spin_period and reset_period in seconds!")
-    if not initial_reset:
-        raise Exception("Need initial reset counter value!")
+    if first_diff_HF<0:
+        first_diff_HF += 2**16
+    first_diff_time = first_diff_HF/4096.
+
     '''
     The index of the timing extrapolation is going to be a spin, so every
     spin period for the time period specified. Using the first difference 
@@ -58,32 +43,83 @@ def extrapolate_timing(spin_period=False,reset_period=False,time=False,
     '''
     but in extended, mode, only the top 12 bits of the reset counter is 
     registered, so this measure only increases every 16 reset counts.
-    '''
-    resets = pd.DataFrame({'time':reset_times,
-                           'real':reset_counter})
-    resets['real'] = resets['real'].apply(lambda x:x+2**16 if x<0 else x)
-    resets['seen'] = resets['real'].apply(lambda x:x>>4)
-    spins = pd.DataFrame({'time':spin_times})
-    spins['reset'] = spins['time'].apply(lambda x:max(resets[resets['time']<=x]['seen']))
-    spins.index.name='vector'
-    return spins    
-    
-spin = 4.260667134634775
-reset = 5.152220843827191
-spins = 14787
-first_diff_HF = (58195-40172)
+    '''    
+    if reset_counter[0]<0:
+        reset_counter[0]+=2**16
+    #seen_resets = reset_counter>>4
+    spin_resets = np.empty(np.shape(spin_times),dtype=np.int64)
+    i=0
+    index = 0
+    for spin_time in spin_times:
+        if spin_time>reset_times[i+1]:
+            i+=1
+        spin_resets[index]=reset_counter[i]
+        index+=1
+    seen_spin_resets = spin_resets>>4
+    return spin_times,spin_resets,seen_spin_resets,reset_times,reset_counter
+            
+'''
+ext_date = datetime(2016,1,4) #tbd
+sc = 1
+RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+day_delta = pd.Timedelta('1 day')
+dates=[ext_date-day_delta, ext_date, ext_date+day_delta]
+modes= ['NS','BS']
+spin_periods = []
+reset_periods = []
+for date in dates:
+    for mode in modes:
+        packetdata = RawData.RawDataHeader(sc,date,mode,dir=RAW).packet_info
+        spin_periods.append(packetdata['Spin Period (s)'].mean())
+        reset_periods.append(packetdata['Reset Period (s)'].mean())
+                            
+spin_period = np.mean(spin_periods)
+reset_period = np.mean(reset_periods)
+print "spin period:",spin_period
+print "reset period:",reset_period    
+'''  
+spin_period = 4.2607927059690756
+reset_period = 5.1522209199771503 
+
+spin = spin_period
+reset = reset_period
+spins = 10000
+first_diff_HF = (34866-23540)
 initial_reset = 58028
-spins = extrapolate_timing(spin_period=spin,reset_period=reset,spins=spins,
+time = spins*spin
+
+spins = extrapolate_timing(spin_period=spin,reset_period=reset,time=time,
                    first_diff_HF=first_diff_HF,initial_reset=initial_reset)
-                   
-#spins.plot(x='time',y='reset',title='observed reset with time')
+
+
+f = plt.figure() 
+#ax = f.add_subplot(111)           
+plt.plot(spins[0],spins[2],c='b',label='simulated')
+
+plt.scatter(spins[0],spins[1]/16.,c='g',label='real spin resets',s=100)
+plt.scatter(spins[3],spins[4]/16.,c='k',label='actual resets',s=100)
 #plt.figure()
-#spins.groupby('reset').size().plot(title='number of vectors at reset')
-print spins.groupby('reset').size().mean()
-print spins.groupby('reset').size().std()
+#spins.groupby('reset').size().plot(title='number of vectors at reset',c='b')
+#print spins.groupby('reset').size().mean()
+#print spins.groupby('reset').size().std()
+
 
 '''
 aim for
 mean: 19.304177545691907
 std:  0.8797850538542629
 '''
+
+import cPickle as pickle
+pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+picklefile = pickledir+'extdata.pickle'
+with open(picklefile,'rb') as f:
+    combined_data = pickle.load(f)
+
+combined_data['time'] = spin_period*np.arange(0,combined_data.shape[0],1)
+
+plt.plot(combined_data['time']+2*spin_period,combined_data['reset'],c='r',
+         label='real, time+2 spins')
+plt.title('seen reset')
+plt.legend()
+plt.show()
