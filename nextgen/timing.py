@@ -77,6 +77,7 @@ def target_func(offset,spin_period,reset_period,real_resets,first_diff_HF,
     diffs = simulated_resets - real_resets
     diffs_2 = np.square(diffs)
     diffs_2_sum = np.sum(diffs_2)
+    
     if show:
         plt.figure()
         plt.plot(range(min_length),simulated_resets,c='r',label='simulated')
@@ -84,9 +85,63 @@ def target_func(offset,spin_period,reset_period,real_resets,first_diff_HF,
         plt.legend(loc='best')
         plt.title(str(offset)+'  '+format(diffs_2_sum,'.3e'))
         plt.show() 
-    
     return diffs_2_sum
+ 
+def target_func_spin(spin_period,offset,reset_period,real_resets,first_diff_HF,
+                initial_reset,time,show):
+    offset = int(round(offset))
+    simulated_resets = extrapolate_timing(spin_period,reset_period,time,
+                                          first_diff_HF,initial_reset)[2]
+    if offset>0:
+        simulated_resets = simulated_resets[offset:]
+    else:
+        offset = abs(offset)
+        real_resets = real_resets[offset:]
+    min_length = np.min((simulated_resets.shape[0],real_resets.shape[0]))
+    if min_length<100:
+        return np.inf
+    simulated_resets = simulated_resets[:min_length]
+    real_resets = real_resets[:min_length]
+    diffs = simulated_resets - real_resets
+    diffs_2 = np.square(diffs)
+    diffs_2_sum = np.sum(diffs_2)
     
+    if show:
+        plt.figure()
+        plt.plot(range(min_length),simulated_resets,c='r',label='simulated')
+        plt.plot(range(min_length),real_resets,c='g',label='real')
+        plt.legend(loc='best')
+        plt.title(str(offset)+'  '+format(diffs_2_sum,'.3e'))
+        plt.show() 
+    return diffs_2_sum   
+    
+def target_func_reset(reset_period,spin_period,offset,real_resets,first_diff_HF,
+                initial_reset,time,show):
+    offset = int(round(offset))
+    simulated_resets = extrapolate_timing(spin_period,reset_period,time,
+                                          first_diff_HF,initial_reset)[2]
+    if offset>0:
+        simulated_resets = simulated_resets[offset:]
+    else:
+        offset = abs(offset)
+        real_resets = real_resets[offset:]
+    min_length = np.min((simulated_resets.shape[0],real_resets.shape[0]))
+    if min_length<100:
+        return np.inf
+    simulated_resets = simulated_resets[:min_length]
+    real_resets = real_resets[:min_length]
+    diffs = simulated_resets - real_resets
+    diffs_2 = np.square(diffs)
+    diffs_2_sum = np.sum(diffs_2)
+    
+    if show:
+        plt.figure()
+        plt.plot(range(min_length),simulated_resets,c='r',label='simulated')
+        plt.plot(range(min_length),real_resets,c='g',label='real')
+        plt.legend(loc='best')
+        plt.title(str(offset)+'  '+format(diffs_2_sum,'.3e'))
+        plt.show() 
+    return diffs_2_sum 
 '''
 ext_date = datetime(2016,1,4) #tbd
 sc = 1
@@ -164,36 +219,83 @@ result = minimize(target_func,1000,method='Nelder-Mead',tol=1e-10,
                   args=(spin_period,reset_period,combined_data['reset'][:],
                         first_diff_HF,initial_reset,time,False))
 '''                        
-clip=11000
-results = []
-offsets = np.arange(-100,combined_data.shape[0],1)
-step = int(round(offsets.shape[0]/100))
-offsets = offsets[::step]
-for offset in offsets:
-    results.append(target_func(offset,spin_period,reset_period,combined_data['reset'][clip:],
-                              first_diff_HF,initial_reset,time,False))
-'''                            
-fig,axes = plt.subplots(1,2)
-axes[0].plot(offsets,results)
-axes[0].set_title('before')
-'''
-'''
-now exand around the minimum, +- step
-'''
+def find_offset(spin_period,reset_period,combined_data,first_diff_HF,
+                initial_reset,time):
+    results = []
+    offsets = np.arange(-100,combined_data.shape[0],1)
+    step = int(round(offsets.shape[0]/100))
+    offsets = offsets[::step]
+    for offset in offsets:
+        results.append(target_func(offset,spin_period,reset_period,combined_data['reset'],
+                                  first_diff_HF,initial_reset,time,False))
+    '''                          
+    fig,axes = plt.subplots(1,2)
+    axes[0].plot(offsets,results)
+    axes[0].set_title('before')
+    '''
+    '''
+    now exand around the minimum, +- step
+    '''
+    minimum_index = np.where(results==np.min(results))
+    min_offset = offsets[minimum_index]
+    offsets = np.arange(-step,step,1)+min_offset
+    results = []
+    for offset in offsets:
+        results.append(target_func(offset,spin_period,reset_period,combined_data['reset'],
+                                  first_diff_HF,initial_reset,time,False))                          
+    minimum_index = np.where(results==np.min(results))
+    min_offset = offsets[minimum_index]
+    '''
+    axes[1].plot(offsets,results)                              
+    axes[1].set_title('after')
+    axes[1].scatter(min_offset,np.min(results))
+    '''
+    return min_offset
+    
+min_offset = find_offset(spin_period,reset_period,combined_data,first_diff_HF,
+                initial_reset,time)[0]
+                
+result = minimize(target_func_spin,4,method='Nelder-Mead',tol=1e-10,
+                  args=(min_offset,reset_period,combined_data['reset'].values,first_diff_HF,
+                initial_reset,time,False),bounds=(3.8,4.4))
+print "Spin Optimisation"
+print result 
+best_spin = result.x[0]
+print target_func_spin(best_spin,min_offset,reset_period,combined_data['reset'].values,
+                       first_diff_HF,initial_reset,time,False)
+print "before:",spin_period,"value:",     
+print target_func_spin(spin_period,min_offset,reset_period,combined_data['reset'].values,
+                       first_diff_HF,initial_reset,time,False)
+                       
 
-minimum_index = np.where(results==np.min(results))
-min_offset = offsets[minimum_index]
-offsets = np.arange(-step,step,1)+min_offset
-results = []
-for offset in offsets:
-    results.append(target_func(offset,spin_period,reset_period,combined_data['reset'][clip:],
-                              first_diff_HF,initial_reset,time,False))
-                              
-minimum_index = np.where(results==np.min(results))
-min_offset = offsets[minimum_index]
+result = minimize(target_func_reset,5.1522,method='Nelder-Mead',tol=1e-16,
+                  args=(best_spin,min_offset,combined_data['reset'].values,
+                        first_diff_HF,initial_reset,time,False),bounds=(5.151,5.154))
+print "\nReset Optimisation"
+print result 
+
+print "before:",reset_period,"value:",     
+print target_func_reset(reset_period,best_spin,min_offset,combined_data['reset'].values,
+                        first_diff_HF,initial_reset,time,False)
+                        
+                        
+print "\nOnly Reset no Spin Optimisation"
 '''
-axes[1].plot(offsets,results)                              
-axes[1].set_title('after')
-axes[1].scatter(min_offset,np.min(results))
+This and the reset optimisation above are pretty much just for reference,
+since we are only interested in the spin period, since that is what will
+give the vectors their time-stamp in the end. Plus, the reset period
+is bound to not vary very much anyway - so it is more likely that the 
+spin period has changed slightly, as opposed to the reset, even though
+both are theoretically possible, the former is more important in this case.
+The end time of the extended mode interval will also have to be considered
+here, since the vectors obviously cannot overlap!!
 '''
-print min_offset
+result = minimize(target_func_reset,5.1522,method='Nelder-Mead',tol=1e-16,
+                  args=(spin_period,min_offset,combined_data['reset'].values,
+                        first_diff_HF,initial_reset,time,False),bounds=(5.151,5.154))
+
+print result 
+
+print "before:",reset_period,"value:",     
+print target_func_reset(reset_period,spin_period,min_offset,combined_data['reset'].values,
+                        first_diff_HF,initial_reset,time,False)
