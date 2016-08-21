@@ -665,7 +665,8 @@ RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20
 dump_date = datetime(2016,1,6)
-ext = ExtData(1,dump_date,'BS',dir=RAW)
+sc = 1
+ext = ExtData(sc,dump_date,'BS',dir=RAW)
 ext.read_data()
 
 print "Before filtering (even),(odd)"
@@ -1236,3 +1237,19 @@ if max(mean_resets)>3000:
     
 combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
 rough_processing(combined_data,title='after')
+
+'''
+Get an average spin time from packets around the extended mode time
+'''
+
+ext_date = None #tbd
+day_delta = pd.Timedelta('1 day')
+dates=[ext_date-day_delta, ext_date, ext_date+day_delta]
+modes= ['NS','BS']
+spin_periods = []
+for date in dates:
+    for mode in modes:
+        spin_periods.append(RawData.RawDataHeader(sc,date,mode,
+                                dir=RAW).packet_info['Spin Period (s)'].mean())
+                            
+spin_period = np.mean(spin_periods)
