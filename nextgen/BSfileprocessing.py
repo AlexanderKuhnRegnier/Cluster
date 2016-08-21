@@ -5,6 +5,11 @@ import os
 import RawData
 import ext_mode_times as emt
 from frame_hex_format import hexify
+'''
+#Use this to suppress performance warn messages!
+import warnings
+warnings.simplefilter(action='ignore',category='PerformanceWarning')
+'''
 verbose=True
 def browse_frame_ipython(frame,window=40):
     frame['reset']=frame['reset'].apply(hex)
@@ -968,94 +973,99 @@ for (ordering,block,(start,end)) in zip(orderings,blocks,boundaries):
                                       names=['block','packet','vector'])
     data.index = multi
     dataframes.append(data)
-if dataframes:
-    raw_combined_data = pd.concat((dataframes))
-    raw_combined_data['block'] = raw_combined_data.index.get_level_values(
-                                                                    'block')
-    '''
-    Data which stems from incomplete half vector information that has not
-    been filtered out before will have to be removed here. The only parts of
-    a vector that are not filtered beforehand this stage are the 
-    magnetic field values (x,y,z). If an invalid value sneeks in there while
-    reading the raw data, it remains undetected. One observed example of this
-    was a repeat copy of a vector, where the packet data started of with 0s in
-    such a way that the x-component was exactly 0. So this will be filtered
-    out here. Other cases may or may not be filtered out this way, but
-    if the is a problem that occurs at the start/end of packet blocks, then
-    the reset duplicate removal method described below should deal with that,
-    given that there are multiple copies of the data. Values that are 
-    exactly 0.0 may actually occur, so opting to rely on the reset filtering
-    alone is much better than filtering out those values.
-    '''
-    '''
-    This naive way of dropping duplicates should be refined, even though in
-    most cases, it will not make much difference, apart from slowing down
-    program execution. If this turns out to be a significant issue, 
-    the naive duplicate dropping can always be reinstated.
-    #combined_data.drop_duplicates(inplace=True)
-    '''
-    '''
-    More refined duplicate dropping will take into consideration the origin
-    of the vectors. By grouping together vectors that share the same reset
-    count, and opting to keep only those vectors from the block which has
-    more vectors at that reset in it, will allow for partial vectors to 
-    be recovered, if possible. That means that if for some reason, the 
-    first copy of the data (in the BS file) should not include a vector,
-    due to a corrupted packet, or missing half-vector, or a similar reason,
-    if the data is present again in a second copy, that second copy should be
-    preferred if there are more vectors present. Of course, such an
-    'extra' vector that may be present in a repeat copy would be included
-    with the naive duplicate removal - however, the only way of knowing the
-    order in which the vectors were measured is to look at the vector number
-    in the dataframe index - since this reflects the order in which they were
-    read from the raw data file. If one were to 'cherrypick' an additional
-    vector from a repeat copy, while discarding the remaining vectors from the
-    repeat copy only to combine this additional vector with the other vectors
-    from the original copy, that ordering would be lost, since the vector
-    numbers will not form a neat series anymore. Rather, that additional 
-    vector from the second repeat copy will always be placed last, since
-    the dataframe is sorted by reset first and then by the vector value.
-    This situation (or something similar, with other configurations of 
-    repeat copies) is probably very unlikely, but accounting for it anyway
-    is not a big problem. 
-    The size of the blocks involved will determine which vectors are to be 
-    kept when the number of vectors for one particular reset are identical.
-    '''
-    filtered = []
-    for key,data in raw_combined_data.groupby('reset'):
-        data_blocks = np.unique(data.index.get_level_values('block'))
-        nr_of_blocks = data_blocks.shape[0]
-        if nr_of_blocks>1:
-            '''
-            as discussed above, take the vectors from the block which has 
-            the most vectors at the selected reset count. If all the blocks
-            have the same number of vectors, take the block with the lowest
-            number (recall that the blocks were sorted by size earlier on
-            and relabelled so that the lowest block-number corresponds to
-            the largest block!)
-            '''
-            data_block_sizes = data.groupby('block').size().to_frame(
-                                                                name='size')
-            data_block_sizes['block'] = data_block_sizes.index.values
-            data_block_sizes.sort_values(by=['size','block'],
-                                         ascending=[False,True])
-            filtered.append(data.xs(data_block_sizes['block'].iloc[0],
-                                    level='block',drop_level=False))
-        else:
-            filtered.append(data)
-    combined_data = pd.concat((filtered))  
-    duplicated_indices = combined_data.index.duplicated()
-    if np.sum(duplicated_indices):
-        raise Exception("This should never happen after dropping duplicates!")
-    combined_data['vector']=combined_data.index.get_level_values('vector')
-    combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
-    print "combined data"
-    print combined_data
+if not dataframes:
+    raise Exception("No data found!")
+    
+raw_combined_data = pd.concat((dataframes))
+raw_combined_data['block'] = raw_combined_data.index.get_level_values(
+                                                                'block')
+'''
+Data which stems from incomplete half vector information that has not
+been filtered out before will have to be removed here. The only parts of
+a vector that are not filtered beforehand this stage are the 
+magnetic field values (x,y,z). If an invalid value sneeks in there while
+reading the raw data, it remains undetected. One observed example of this
+was a repeat copy of a vector, where the packet data started of with 0s in
+such a way that the x-component was exactly 0. So this will be filtered
+out here. Other cases may or may not be filtered out this way, but
+if the is a problem that occurs at the start/end of packet blocks, then
+the reset duplicate removal method described below should deal with that,
+given that there are multiple copies of the data. Values that are 
+exactly 0.0 may actually occur, so opting to rely on the reset filtering
+alone is much better than filtering out those values.
+'''
+'''
+This naive way of dropping duplicates should be refined, even though in
+most cases, it will not make much difference, apart from slowing down
+program execution. If this turns out to be a significant issue, 
+the naive duplicate dropping can always be reinstated.
+#combined_data.drop_duplicates(inplace=True)
+'''
+'''
+More refined duplicate dropping will take into consideration the origin
+of the vectors. By grouping together vectors that share the same reset
+count, and opting to keep only those vectors from the block which has
+more vectors at that reset in it, will allow for partial vectors to 
+be recovered, if possible. That means that if for some reason, the 
+first copy of the data (in the BS file) should not include a vector,
+due to a corrupted packet, or missing half-vector, or a similar reason,
+if the data is present again in a second copy, that second copy should be
+preferred if there are more vectors present. Of course, such an
+'extra' vector that may be present in a repeat copy would be included
+with the naive duplicate removal - however, the only way of knowing the
+order in which the vectors were measured is to look at the vector number
+in the dataframe index - since this reflects the order in which they were
+read from the raw data file. If one were to 'cherrypick' an additional
+vector from a repeat copy, while discarding the remaining vectors from the
+repeat copy only to combine this additional vector with the other vectors
+from the original copy, that ordering would be lost, since the vector
+numbers will not form a neat series anymore. Rather, that additional 
+vector from the second repeat copy will always be placed last, since
+the dataframe is sorted by reset first and then by the vector value.
+This situation (or something similar, with other configurations of 
+repeat copies) is probably very unlikely, but accounting for it anyway
+is not a big problem. 
+The size of the blocks involved will determine which vectors are to be 
+kept when the number of vectors for one particular reset are identical.
+'''
+filtered = []
+for key,data in raw_combined_data.groupby('reset'):
+    data_blocks = np.unique(data.index.get_level_values('block'))
+    nr_of_blocks = data_blocks.shape[0]
+    if nr_of_blocks>1:
+        '''
+        as discussed above, take the vectors from the block which has 
+        the most vectors at the selected reset count. If all the blocks
+        have the same number of vectors, take the block with the lowest
+        number (recall that the blocks were sorted by size earlier on
+        and relabelled so that the lowest block-number corresponds to
+        the largest block!)
+        '''
+        data_block_sizes = data.groupby('block').size().to_frame(
+                                                            name='size')
+        data_block_sizes['block'] = data_block_sizes.index.values
+        data_block_sizes.sort_values(by=['size','block'],
+                                     ascending=[False,True])
+        filtered.append(data.xs(data_block_sizes['block'].iloc[0],
+                                level='block',drop_level=False))
+    else:
+        filtered.append(data)
+combined_data = pd.concat((filtered))  
+duplicated_indices = combined_data.index.duplicated()
+if np.sum(duplicated_indices):
+    raise Exception("This should never happen after dropping duplicates!")
+combined_data['vector']=combined_data.index.get_level_values('vector')
+combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
+print "combined data"
+print combined_data
+def rough_processing(combined_data,title=False,copy=True):
     '''
     some rough and ready processing, bear in mind that the data still needs to 
     be scaled from engineering units to nT, the range is important for that
     Tim is still working on 'what' the scaling factors should be?
     '''
+    if copy:
+        combined_data = combined_data.copy()
     combined_data['x'] = combined_data['x'].apply(
                                         lambda x: x-65536 if x>32767 else x)
     combined_data['y'] = combined_data['y'].apply(
@@ -1065,12 +1075,13 @@ if dataframes:
     combined_data[['x','y','z']]=combined_data.apply(
                             lambda x: x[['x','y','z']]*(x['range']**2),axis=1)
     combined_data[['x','y','z']]=combined_data[['x','y','z']].div(
-                                            combined_data[['x','y','z']].max())
+                                np.max(np.abs(combined_data[['x','y','z']])))
     combined_data['mag']=np.linalg.norm(combined_data[['x','y','z']],axis=1)
-    combined_data.plot(y=['x','y','z','mag'])
-else:
-    raise Exception("No data found!")
-    
+    if title:
+        combined_data.plot(y=['x','y','z','mag'],title=title)
+    else:
+        combined_data.plot(y=['x','y','z','mag'])
+rough_processing(combined_data,title='before')
 '''
 Now, need to look at timing!!
 Spin periods at around 3.9 to 4.3 seconds
@@ -1204,3 +1215,24 @@ of 0. So here, we would have to look at any disparity in the reset counts
 across the extended mode vectors again, just as above - unless we want to 
 rely solely on the commanding.
 '''
+'''
+reset wrap around analysis and if needed, adjustment
+'''
+blockgroups = combined_data.groupby('block')
+mean_resets = blockgroups['reset'].mean()
+if max(mean_resets)>3000:
+    '''
+    Reset counter overflow 'might' have occurred here, so any blocks containing
+    a vector with a reset counter value (top 12 bits) under 1050 
+    (roughly 24 hours) will have their reset counter values increased by
+    4096.
+    '''
+    min_resets = blockgroups['reset'].min()
+    increase_blocks = min_resets[min_resets<1050].index.get_level_values(
+                                                                'block').values
+    increase_mask = np.in1d(combined_data.index.get_level_values(
+                            'block').values,increase_blocks)
+    combined_data.ix[increase_mask,'reset'] += 4096
+    
+combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
+rough_processing(combined_data,title='after')
