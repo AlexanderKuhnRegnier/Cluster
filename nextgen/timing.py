@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import RawData
 from datetime import datetime
 from numba import jit
+from scipy.optimize import minimize
 
 @jit
 def extrapolate_timing(spin_period,reset_period,time,
@@ -57,7 +58,35 @@ def extrapolate_timing(spin_period,reset_period,time,
         index+=1
     seen_spin_resets = spin_resets>>4
     return spin_times,spin_resets,seen_spin_resets,reset_times,reset_counter
-            
+
+def target_func(offset,spin_period,reset_period,real_resets,first_diff_HF,
+                initial_reset,time,show):
+    offset = int(round(offset))
+    simulated_resets = extrapolate_timing(spin_period,reset_period,time,
+                                          first_diff_HF,initial_reset)[2]
+    if offset>0:
+        simulated_resets = simulated_resets[offset:]
+    else:
+        offset = abs(offset)
+        real_resets = real_resets[offset:]
+    min_length = np.min((simulated_resets.shape[0],real_resets.shape[0]))
+    if min_length<100:
+        return np.inf
+    simulated_resets = simulated_resets[:min_length]
+    real_resets = real_resets[:min_length]
+    diffs = simulated_resets - real_resets
+    diffs_2 = np.square(diffs)
+    diffs_2_sum = np.sum(diffs_2)
+    if show:
+        plt.figure()
+        plt.plot(range(min_length),simulated_resets,c='r',label='simulated')
+        plt.plot(range(min_length),real_resets,c='g',label='real')
+        plt.legend(loc='best')
+        plt.title(str(offset)+'  '+format(diffs_2_sum,'.3e'))
+        plt.show() 
+    
+    return diffs_2_sum
+    
 '''
 ext_date = datetime(2016,1,4) #tbd
 sc = 1
@@ -75,34 +104,36 @@ for date in dates:
                             
 spin_period = np.mean(spin_periods)
 reset_period = np.mean(reset_periods)
-print "spin period:",spin_period
-print "reset period:",reset_period    
-'''  
-spin_period = 4.2607927059690756
+print "spin period:",spin_period,np.std(spin_periods)
+print "reset period:",reset_period,np.std(reset_periods)
+'''
+
+spin_period = 4.2607927059690756 + 0.00082 #adjustment based on
+                                                          #graphical analysis
 reset_period = 5.1522209199771503 
 
 spin = spin_period
 reset = reset_period
-spins = 10000
+spins = 15000
 first_diff_HF = (34866-23540)
 initial_reset = 58028
 time = spins*spin
-
+'''
 spins = extrapolate_timing(spin_period=spin,reset_period=reset,time=time,
                    first_diff_HF=first_diff_HF,initial_reset=initial_reset)
-
 
 f = plt.figure() 
 #ax = f.add_subplot(111)           
 plt.plot(spins[0],spins[2],c='b',label='simulated')
+plt.scatter(spins[0],spins[2],c='b',label='simulated',s=30)
 
-plt.scatter(spins[0],spins[1]/16.,c='g',label='real spin resets',s=100)
-plt.scatter(spins[3],spins[4]/16.,c='k',label='actual resets',s=100)
+plt.scatter(spins[0],spins[1]/16.,c='g',label='spin resets',s=100)
+plt.scatter(spins[3],spins[4]/16.,c='k',label='simulated resets',s=100)
 #plt.figure()
 #spins.groupby('reset').size().plot(title='number of vectors at reset',c='b')
 #print spins.groupby('reset').size().mean()
 #print spins.groupby('reset').size().std()
-
+'''
 
 '''
 aim for
@@ -116,10 +147,53 @@ picklefile = pickledir+'extdata.pickle'
 with open(picklefile,'rb') as f:
     combined_data = pickle.load(f)
 
+'''
 combined_data['time'] = spin_period*np.arange(0,combined_data.shape[0],1)
 
 plt.plot(combined_data['time']+2*spin_period,combined_data['reset'],c='r',
          label='real, time+2 spins')
+plt.scatter(combined_data['time']+2*spin_period,combined_data['reset'],c='r',
+         label='real, time+2 spins',s=30)
 plt.title('seen reset')
 plt.legend()
 plt.show()
+'''
+'''
+#kind of unreliable
+result = minimize(target_func,1000,method='Nelder-Mead',tol=1e-10,
+                  args=(spin_period,reset_period,combined_data['reset'][:],
+                        first_diff_HF,initial_reset,time,False))
+'''                        
+clip=11000
+results = []
+offsets = np.arange(-100,combined_data.shape[0],1)
+step = int(round(offsets.shape[0]/100))
+offsets = offsets[::step]
+for offset in offsets:
+    results.append(target_func(offset,spin_period,reset_period,combined_data['reset'][clip:],
+                              first_diff_HF,initial_reset,time,False))
+'''                            
+fig,axes = plt.subplots(1,2)
+axes[0].plot(offsets,results)
+axes[0].set_title('before')
+'''
+'''
+now exand around the minimum, +- step
+'''
+
+minimum_index = np.where(results==np.min(results))
+min_offset = offsets[minimum_index]
+offsets = np.arange(-step,step,1)+min_offset
+results = []
+for offset in offsets:
+    results.append(target_func(offset,spin_period,reset_period,combined_data['reset'][clip:],
+                              first_diff_HF,initial_reset,time,False))
+                              
+minimum_index = np.where(results==np.min(results))
+min_offset = offsets[minimum_index]
+'''
+axes[1].plot(offsets,results)                              
+axes[1].set_title('after')
+axes[1].scatter(min_offset,np.min(results))
+'''
+print min_offset
