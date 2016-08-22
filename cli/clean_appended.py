@@ -1,4 +1,3 @@
-LOG = '/home/ahk114/logs/date_range/'
 APPENDED_EXT = 'ext_appended.log'
 APPENDED_EXT_GSE = 'ext_gse_appended.log'
 
@@ -45,10 +44,9 @@ def unique_fileset(filepath):
         return False
     return set([line.split(' ')[-1].rstrip() for line in lines])
     
-def main():
+def main(log_dir):
     import math,datetime
     not_processed = []
-    log_dir = LOG
     log_appended_files = (APPENDED_EXT,APPENDED_EXT_GSE)
     for log_file in log_appended_files:
         time = datetime.datetime.now()
@@ -84,4 +82,13 @@ def main():
                                                         log_appended_files])
     
 if __name__ == "__main__":
-    main()
+    import sys
+    if len(sys.argv)==1:
+        LOG = '/home/ahk114/logs/date_range/'
+    elif len(sys.argv)==2:
+        LOG = sys.argv[1]
+    else:
+        raise Exception("Too many arguments, only LOG directory")
+    if LOG[-1]!='/':
+        LOG = LOG+'/'
+    main(LOG)

@@ -44,22 +44,40 @@ define('CAACAL','/cluster/caa/calibration/'); #caa calibration files directory
 define('DAILYCAL','/cluster/operations/calibration/daily/');#dailycalfile dir
 define( "RAW", "/cluster/data/raw/" );			#where raw data files reside
 define( "EXTMODECOMMAND", "SFGMJ059 SFGMJ064 SFGMSEXT SFGMM002" );
-define( "EXT", '/home/ahk114/data/extended/');	#where the output from stage1 and 2 are put
-define ("PROC", '/home/ahk114/data/referencecaa/');#where the final output from this stage is put
+
 define( "COORD", 1 );
 define( "RESET_PERIOD", 5.152221 );
 define( "SPIN_PERIOD", 4 );
 define( "RESETPERIOD", 5.152 );
 define( "PREREAD", 32768 );
+
+if ( PHP_SAPI != "cli" )
+	exit( "THIS SHOULD ONLY BE RUN USING THE PHP CLI\r\n" );
+
+if ( $argc != 9 )
+	exit( "NEEDS 8 parameters : stage3_cli.php <sc> <year> <month> <day> <vers> <LOG> <EXT> <OUT>\r\n" );
+
+define('APPENDED',$argv[6]);
+echo "Appended file log dir:".APPENDED.PHP_EOL;
+$ext_appended = APPENDED.'ext_appended.log';
+$ext_gse_appended = APPENDED.'ext_gse_appended.log';
+#echo $ext_gse_appended.PHP_EOL;
+
+#define( "EXT", '/home/ahk114/data/extended/');	#where the output from stage1 and 2 are put
+#define ("PROC", '/home/ahk114/data/referencecaa/');#where the final output from this stage is put
+define("EXT",$argv[7]);
+define("PROC",$argv[8]);
+/*
 define( "APPENDED",'/home/ahk114/logs/date_range/');		#log file that shows which files were appended to in this processing.
 															#Those files may potentially contain duplicate entries!
+													
 if (!is_dir(APPENDED))
 {
 	mkdir(APPENDED,0750,true);
 	echo "Created appended log file directory:".APPENDED.PHP_EOL;
-}													
-$ext_appended = APPENDED.'ext_appended.log';
-$ext_gse_appended = APPENDED.'ext_gse_appended.log';
+}	
+*/
+												
 $verbose = FALSE;
 require_once 'getcalfile.php';	#needed to put this after constant definitions, otherwise the if loops in 
 								#getfile.php complained about the constants being undefined!
@@ -478,12 +496,6 @@ function spinrate( $year, $month, $day, $sc, $version )
 
 
 // Code to minimally deal with parameter passing
-
-if ( PHP_SAPI != "cli" )
-	exit( "THIS SHOULD ONLY BE RUN USING THE PHP CLI\r\n" );
-
-if ( $argc != 6 )
-	exit( "NEEDS 5 parameters : stage3_cli.php <sc> <year> <month> <day> <vers>\r\n" );
 
 $year = $argv[ 2 ];
 if ( $year < 2000 )

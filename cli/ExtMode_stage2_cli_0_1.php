@@ -30,8 +30,15 @@ define( "EXTMODECOMMAND_INITIATE", "SFGMJ059 SFGMJ064 SFGMSEXT" );
 define( "EXTMODECOMMAND_TERMINATE", "SFGMJ065 SFGMJ050" );
 define( "INITIATE", 1 );
 define( "TERMINATE", 2 );
+
+if ( PHP_SAPI != "cli" )
+	exit( "THIS SHOULD ONLY BE RUN USING THE PHP CLI\r\n" );
+
+if ( $argc != 7 )
+	exit( "NEEDS 6 parameters : stage2_cli.php <sc> <year> <month> <day> <vers> <ext>\r\n" );
+
 define( "RAW", "/cluster/data/raw/" );
-define( "EXT", '/home/ahk114/data/extended/' );
+define( "EXT", $argv[6] );
 
 // ========== FUNCTIONS ==========
 
@@ -163,12 +170,6 @@ function debug( $message )
 
 // ========== END OF FUNCTIONS ==========
 
-
-if ( PHP_SAPI != "cli" )
-	exit( "THIS SHOULD ONLY BE RUN USING THE PHP CLI\r\n" );
-
-if ( $argc != 6 )
-	exit( "NEEDS 5 parameters : stage2_cli.php <sc> <year> <month> <day> <vers>\r\n" );
 
 $year = $argv[ 2 ];
 if ( $year < 2000 )

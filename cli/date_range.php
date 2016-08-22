@@ -2,7 +2,6 @@
 session_destroy();
 #ini_set('session.save_path',getcwd(). '/'. 'session/'); 
 #session_start();
-define('LOG','/home/ahk114/logs/date_range/');
 
 echo PHP_EOL;
 
@@ -18,9 +17,13 @@ $shortopts .= "y:";
 $shortopts .= "s:";
 $shortopts .= "n:";
 $shortopts .= "v:"; #version
+$shortopts .= "l:"; #log file directory
+$shortopts .= "o:";
+$shortopts .= "e:";
 $shortopts .= "c";
 $shortopts .= "h"; #display help text
-$longopts = array("clean","version:","day:","month:","year:","days:","spacecraft:","help");
+$longopts = array("clean","version:","day:","month:","year:","days:",
+					"spacecraft:","log:","out:","ext:","help");
 $options = getopt($shortopts,$longopts);
 
 function display_help()
@@ -39,10 +42,17 @@ function display_help()
 						"before moving on to version ‘K’ files. ".
 						"Default behaviour considers version B, ".
 						"then K and then A. [default: BKA].",
-	"-c  --clean" => "Clean files that have been appended to ".
+	"-c   --clean" => "Clean files that have been appended to ".
 						"during the course of stage 3 processing ".
 						"by removing duplicated entries.",
-	"-h  --help" => "Display this help text. Also shown automatically when a required argument is omitted."
+	"-l   --log" => "Directory to place logfiles into. If not given, ".
+					"they are placed in the current working directory.".
+					" If the given directory does not exist, it will be created.",
+	"-e   --ext" => "Directory where En, META and EXT files are placed. ".
+					"[default: /home/ahk114/data/extended/]",
+    "-o   --out" => "Directory where the final .EXT.GSE files are placed. ".
+					"[default: /home/ahk114/data/referencecaa/]",
+	"-h   --help" => "Display this help text. Also shown automatically when a required argument is omitted."
 	);
 	echo "Extended Mode Processing Wrapper Script".PHP_EOL;
 	echo "\nUsage Example:".PHP_EOL;
@@ -52,12 +62,52 @@ function display_help()
 		$wrapped = wordwrap($value,60,PHP_EOL.str_repeat(' ',25),TRUE);
 		echo sprintf(str_repeat(' ',5)."%-20s%s",$key,$wrapped).PHP_EOL;
 	}
+	echo "Long opts need a space between switch and argument.".PHP_EOL;
 	exit(0);
 }
 if ((array_key_exists("h",$options)) || (array_key_exists("help",$options)))
 {
 	display_help();
 }
+
+$ext = '/home/ahk114/data/extended/';
+if (array_key_exists("e",$options))
+{
+	$ext = $options["e"];
+	if ($ext[strlen($ext)-1] != '/')
+	{
+		$ext .= '/';
+	}
+}
+elseif (array_key_exists("ext",$options))
+{
+	$ext = $options["ext"];
+	if ($ext[strlen($ext)-1] != '/')
+	{
+		$ext .= '/';
+	}
+}
+define('EXT',$ext);
+
+$out = '/home/ahk114/data/referencecaa/';
+if (array_key_exists("o",$options))
+{
+	$out = $options["o"];
+	if ($out[strlen($out)-1] != '/')
+	{
+		$out .= '/';
+	}
+}
+elseif (array_key_exists("out",$options))
+{
+	$out = $options["out"];
+	if ($out[strlen($out)-1] != '/')
+	{
+		$out .= '/';
+	}
+}
+define('OUT',$out);
+
 if (array_key_exists("y",$options))
 {
 	$year  = $options["y"];
@@ -200,6 +250,25 @@ else{echo "Processing: ".$number." day".PHP_EOL;}
 
 $initial_unix = mktime(0,0,0,$month,$day,$year);
 $created_dir=False;
+
+$log = '';
+if (array_key_exists("l",$options))
+{
+	$log = $options["l"];
+	if ($log[strlen($log)-1] != '/')
+	{
+		$log .= '/';
+	}
+}
+elseif (array_key_exists("log",$options))
+{
+	$log = $options["log"];
+	if ($log[strlen($log)-1] != '/')
+	{
+		$log .= '/';
+	}
+}
+define('LOG',$log);
 if (!is_dir(LOG))
 {
 	mkdir(LOG,0750,true);
@@ -226,6 +295,7 @@ if ($created_dir)
 	fclose($logfile);	
 }
 ######################Stage 1 Processing####################
+
 $pad_days = 5;
 $time_unix=$initial_unix-$pad_days*86400;
 #for stage1, start at a prior date always, since this is needed to get correct info in some cases.
@@ -244,7 +314,7 @@ for ($i=0; $i<($number+$pad_days); $i+=1)
 	$day=   date("d",$time_unix);
 	foreach ($versions as $version)
 	{
-		$option_string = ' '.$sc.' '.$year.' '.$month.' '.$day.' '.$version; 
+		$option_string = ' '.$sc.' '.$year.' '.$month.' '.$day.' '.$version.' '.EXT; 
 		$cmd = "php ExtMode_stage1_cli_0_1.php ".$option_string;		
 		echo "Executing: ".$cmd.PHP_EOL;
 		$output = array();
@@ -322,7 +392,7 @@ for ($i=0; $i<($number); $i+=1)
 	$day=   date("d",$time_unix);
 	foreach ($versions as $version)
 	{
-		$option_string = ' '.$sc.' '.$year.' '.$month.' '.$day.' '.$version;
+		$option_string = ' '.$sc.' '.$year.' '.$month.' '.$day.' '.$version.' '.EXT;
 		$cmd = "php ExtMode_stage2_cli_0_1.php ".$option_string;		
 		echo "Executing: ".$cmd.PHP_EOL;
 		$output = array();
@@ -398,8 +468,7 @@ for ($i=0; $i<($number); $i+=1)
 	$year=  date("Y",$time_unix);
 	$month= date("m",$time_unix);
 	$day=   date("d",$time_unix);
-
-	$option_string = ' '.$sc.' '.$year.' '.$month.' '.$day.' '.'Y';#Y is just dummy version
+	$option_string = ' '.$sc.' '.$year.' '.$month.' '.$day.' '.'Y'.' '.LOG.' '.EXT.' '.OUT;#Y is just dummy version, LOG is logfile directory
 	$cmd = "php ExtMode_stage3_cli_0_1.php ".$option_string;		
 	echo "Executing: ".$cmd.PHP_EOL;
 	$output = array();
@@ -453,7 +522,7 @@ if ((array_key_exists("c",$options)) || (array_key_exists("clean",$options)))
 {
 	echo "Cleaning appended files!".PHP_EOL;
 	$output=null;
-	exec("python clean_appended.py",$output);
+	exec("python clean_appended.py ".LOG,$output);
 	$stringout = implode(PHP_EOL,$output);
 	echo $stringout.PHP_EOL;
 	$logfile = fopen($filename,'a');
@@ -468,7 +537,7 @@ if ((array_key_exists("c",$options)) || (array_key_exists("clean",$options)))
 else
 {
 	echo "To clean files which have been appended to, run the following command:".PHP_EOL;
-	echo "python clean_appended.py".PHP_EOL;
+	echo "python clean_appended.py ".LOG.PHP_EOL;
 }
 echo "Logfile: ".$filename.PHP_EOL;
 ?>

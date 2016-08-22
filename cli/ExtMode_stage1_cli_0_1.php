@@ -28,7 +28,13 @@
 
 require_once( "meta_file_functions.php" );
 
-define( "EXT", '/home/ahk114/data/extended/');
+if ( PHP_SAPI != "cli" )
+	exit( "THIS SHOULD ONLY BE RUN USING THE PHP CLI\r\n" );
+
+if ( $argc != 7 )
+	exit( "NEEDS 6 parameters : stage1_cli.php <sc> <year> <month> <day> <vers> <EXT>\r\n" );
+
+define( "EXT", $argv[6]);
 define( "RAW", '/cluster/data/raw/' );
 
 // Packet State Machine - States
@@ -620,12 +626,6 @@ function packet_analyse( $bytes, &$state, &$startreset, &$stopreset )
 $outputdata = array( );
 
 set_time_limit( 600 );  // Catches out infinte loops
-
-if ( PHP_SAPI != "cli" )
-	exit( "THIS SHOULD ONLY BE RUN USING THE PHP CLI\r\n" );
-
-if ( $argc != 6 )
-	exit( "NEEDS 5 parameters : stage1_cli.php <sc> <year> <month> <day> <vers>\r\n" );
 
 $year = $argv[ 2 ];
 if ( $year < 2000 )
