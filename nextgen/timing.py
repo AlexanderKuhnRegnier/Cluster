@@ -8,6 +8,61 @@ import numba as nb
 from scipy.optimize import minimize
 
 @jit(nopython=True)
+def numba_func_backwards(spin_times,reset_times,reset_counter):
+    spin_resets = np.empty(spin_times.shape,dtype=np.int64)
+    reset_index= 0
+    spin_index = 0
+    for spin_time in spin_times:
+        if spin_time<reset_times[reset_index]:
+            reset_index+=1
+        spin_resets[spin_index]=reset_counter[reset_index]
+        spin_index+=1
+    seen_spin_resets = spin_resets>>4
+    return spin_resets,seen_spin_resets
+@jit
+def extrapolate_timing_from_end(spin_period,reset_period,time,
+                       first_diff_HF,final_reset):
+    '''
+    Times in seconds, unless otherwise stated. HF clock freq is 4096 Hz.
+    The first difference refers to the time between the most recent sun pulse
+    and the packet time for a certain (usually NS) packet after the extended
+    mode starts.
+    '''
+    if first_diff_HF<0:
+        first_diff_HF += 2**16
+    first_diff_time = first_diff_HF/4096.
+    '''
+    The index of the timing extrapolation is going to be a spin, so every
+    spin period for the time period specified. Using the first difference 
+    provided, the remaining pattern can be calculated, assuming that
+    reset period and spin period do not drift too much, which should not be
+    the case in a couple of hours (unless there is a maneouvre).
+    Either way, the spin period should be obtained by averaging spin periods
+    before, on and after extended mode, so even this should be considered 
+    somehow.
+    
+    First spin is at time 0, the first reset is 'first_diff_' after.
+    But we are working 'backwards' here, caution!!    
+    '''
+    spin_times = np.arange(0,-time,-spin_period)
+    reset_times = np.arange(-(first_diff_time-reset_period),-(time+reset_period),-reset_period)
+    reset_counter = np.arange(final_reset,
+                              final_reset-reset_times.shape[0],-1)
+    '''
+    but in extended, mode, only the top 12 bits of the reset counter is 
+    registered, so this measure only increases every 16 reset counts.
+    '''    
+    '''
+    take care of overflow / negative values in this case!
+    '''
+    reset_counter[reset_counter<0]+=2**16
+
+    spin_resets,seen_spin_resets = numba_func_backwards(spin_times,reset_times,
+                                              reset_counter)
+    return spin_times,spin_resets,seen_spin_resets,reset_times,reset_counter
+
+
+@jit(nopython=True)
 def numba_func(spin_times,reset_times,reset_counter):
     spin_resets = np.empty(spin_times.shape,dtype=np.int64)
     i=0
@@ -68,6 +123,30 @@ def compare_real_to_sim(spin_period,reset_period,time,
                    first_diff_HF,initial_reset,combined_data,offset=2):
     spins = extrapolate_timing(spin_period=spin,reset_period=reset,time=time,
                        first_diff_HF=first_diff_HF,initial_reset=initial_reset)
+    plt.figure() 
+    #ax = f.add_subplot(111)           
+    plt.plot(spins[0],spins[2],c='b',label='simulated')
+    plt.scatter(spins[0],spins[2],c='b',label='simulated',s=30)
+    plt.scatter(spins[0],spins[1]/16.,c='g',label='spin resets',s=100)
+    plt.scatter(spins[3],spins[4]/16.,c='k',label='simulated resets',s=100)
+    #plt.figure()
+    #spins.groupby('reset').size().plot(title='number of vectors at reset',c='b')
+    #print spins.groupby('reset').size().mean()
+    #print spins.groupby('reset').size().std()
+    combined_data['time'] = spin_period*np.arange(0,combined_data.shape[0],1)
+    plt.plot(combined_data['time']+offset*spin_period,
+             combined_data['reset'],c='r',label='real, time+2 spins')
+    plt.scatter(combined_data['time']+offset*spin_period,
+                combined_data['reset'],c='r',label='real, time+2 spins',s=30)
+    plt.title('seen reset')
+    plt.legend()
+    plt.show()
+
+def compare_real_to_sim_from_end(spin_period,reset_period,time,
+                   first_diff_HF,final_reset,combined_data,offset=2):
+    spins = extrapolate_timing_from_end(spin_period=spin,reset_period=reset,time=time,
+                       first_diff_HF=first_diff_HF,final_reset=final_reset)
+    print spins
     plt.figure() 
     #ax = f.add_subplot(111)           
     plt.plot(spins[0],spins[2],c='b',label='simulated')
@@ -258,9 +337,9 @@ print "before:",reset_period,"value:",
 print target_func_reset(reset_period,best_spin,min_offset,combined_data['reset'].values,
                         first_diff_HF,initial_reset,time)
                         
-                        
+'''                    
 print "\nOnly Reset no Spin Optimisation"
-'''
+
 This and the reset optimisation above are pretty much just for reference,
 since we are only interested in the spin period, since that is what will
 give the vectors their time-stamp in the end. Plus, the reset period
