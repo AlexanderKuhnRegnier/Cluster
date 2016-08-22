@@ -666,7 +666,7 @@ RAW = 'Z:/data/raw/' #cluster alsvid server
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20
 dump_date = datetime(2016,1,6)
-sc = 3
+sc = 1
 ext = ExtData(sc,dump_date,'BS',dir=RAW)
 ext.read_data()
 
@@ -1281,7 +1281,6 @@ pickledir = 'Y:/testdata/'
 picklefile = pickledir+'extdata.pickle'
 with open(picklefile,'wb') as f:
     pickle.dump(combined_data,f,protocol=2)
-
 
 '''
 checking the number of vectors per (12 top bits) of reset counter, 

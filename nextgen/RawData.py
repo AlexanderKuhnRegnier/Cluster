@@ -13,6 +13,9 @@ class RawDataHeader:
     groundstation={0:'Unknown',1:'Vilspa 1',2:'Vilspa 2',3:'Kiruna',4:'Perth',
                    5:'Kourou',6:'Malindi',7:'Redu',8:'Canberra',
                    9:'Reference Station',15:'N/A'}
+    invalid_keys = [i for i in xrange(0,16,1) if i not in groundstation.keys()]
+    invalid_dict = dict([(i,'Invalid') for i in invalid_keys])
+    groundstation.update(invalid_dict)
     normal_mode_names = ['ns','normal mode','normal science','nm']
     burst_mode_names = ['bs','burst mode','burst science']
     mode_dict = dict([(label,'NS') for label in normal_mode_names])
