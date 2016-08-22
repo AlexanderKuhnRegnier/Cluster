@@ -5,6 +5,7 @@ import os
 import RawData
 import ext_mode_times as emt
 from frame_hex_format import hexify
+import matplotlib.pyplot as plt
 '''
 #Use this to suppress performance warn messages!
 import warnings
@@ -660,12 +661,12 @@ Only putting the joing half-vector into the even dataframe - is that wise,
 or could it introduce some errors, if there are missing packets or otherwise
 corrupted data?
 '''
-RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-#RAW = 'Z:/data/raw/' #cluster alsvid server
+#RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+RAW = 'Z:/data/raw/' #cluster alsvid server
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20
 dump_date = datetime(2016,1,6)
-sc = 1
+sc = 3
 ext = ExtData(sc,dump_date,'BS',dir=RAW)
 ext.read_data()
 
@@ -1073,8 +1074,14 @@ def rough_processing(combined_data,title=False,copy=True):
                                         lambda x: x-65536 if x>32767 else x)
     combined_data['z'] = combined_data['z'].apply(
                                         lambda x: x-65536 if x>32767 else x)
-    combined_data[['x','y','z']]=combined_data.apply(
-                            lambda x: x[['x','y','z']]*(x['range']**2),axis=1)
+    
+    combined_data['x']=combined_data['x'].values/\
+np.power(2,((np.ones(combined_data.shape[0])*12)-(combined_data['range'].values)*2))
+    combined_data['y']=combined_data['y'].values/\
+np.power(2,((np.ones(combined_data.shape[0])*12)-(combined_data['range'].values)*2))
+    combined_data['z']=combined_data['z'].values/\
+np.power(2,((np.ones(combined_data.shape[0])*12)-(combined_data['range'].values)*2))
+    
     combined_data[['x','y','z']]=combined_data[['x','y','z']].div(
                                 np.max(np.abs(combined_data[['x','y','z']])))
     combined_data['mag']=np.linalg.norm(combined_data[['x','y','z']],axis=1)
@@ -1082,6 +1089,9 @@ def rough_processing(combined_data,title=False,copy=True):
         combined_data.plot(y=['x','y','z','mag'],title=title)
     else:
         combined_data.plot(y=['x','y','z','mag'])
+    plt.figure()
+    plt.plot(range(len(combined_data)),combined_data['mag'],c='k')
+    plt.yscale('log')
 rough_processing(combined_data,title='before')
 '''
 Now, need to look at timing!!
@@ -1266,7 +1276,22 @@ print "spin period:",spin_period
 print "reset period:",reset_period
 
 import cPickle as pickle
-pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+#pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+pickledir = 'Y:/testdata/'
 picklefile = pickledir+'extdata.pickle'
 with open(picklefile,'wb') as f:
     pickle.dump(combined_data,f,protocol=2)
+
+
+'''
+checking the number of vectors per (12 top bits) of reset counter, 
+in order to check for anomalies.
+'''
+sizes = combined_data.groupby('reset').size()
+plt.figure()
+plt.scatter(range(len(sizes)),sizes.values,s=120)
+plt.title('Number of vectors per (12 top bits) of reset counter\n'
+            'dump date:'+dump_date.isoformat()+' sc:'+str(sc))
+plt.xlabel('top 12 bits of reset counter')
+plt.ylabel('Number of vectors')
+plt.minorticks_on()
