@@ -73,8 +73,12 @@ def extrapolate_timing_from_end(spin_period,reset_period,time,
 
 def compare_real_to_sim_from_end(spin_period,reset_period,time,
                    final_first_diff_HF,final_reset,combined_data,offset=2):
-                       
-    spins = extrapolate_timing_from_end(spin_period=spin,reset_period=reset,time=time,
+    '''
+    Graphically compare the 'simulated' extrapolated series of resets,
+    computed from the given parameters, to the real_resets
+    (combined_data['reset']) that were read from the BS file.
+    '''                       
+    spins = extrapolate_timing_from_end(spin_period,reset_period,time,
                        final_first_diff_HF=final_first_diff_HF,final_reset=final_reset)
      
     real_data_length = combined_data.shape[0] #number of spins in real data!
@@ -126,6 +130,17 @@ def plotboth_advanced(a_times,a,b_times,b,title=''):
 
 def target_func(offset,spin_period,reset_period,real_resets,final_first_diff_HF,
                 final_reset,time):
+    '''
+    For the given initial paramters that have been determined from a packet
+    after extended mode (final_first_diff_HF,final_reset), and those
+    that were estimated either before, or are currently being estimated
+    (offset,spin_period,reset_period) (time - extended mode time period),
+    a simulated series of reset values analogous to those actually observed
+    (fed in via real_resets) is created, and compared to the real reset values.
+    The element-wise difference squared between the two series is returned.
+    This is used in order to determine the parameters that let the simulated,
+    ie. extrapolated time series match the actual data as well as possible.
+    '''                    
     offset = int(round(offset))
     simulated_resets = extrapolate_timing_from_end(spin_period,reset_period,
                                             time,final_first_diff_HF,final_reset)[2]        
@@ -162,21 +177,35 @@ def target_func(offset,spin_period,reset_period,real_resets,final_first_diff_HF,
 
 def target_func_reset(reset_period,spin_period,offset,real_resets,final_first_diff_HF,
                 final_reset,time):
+    '''
+    Wrapper for target_func so that reset_period is the first arg
+    '''
     return target_func(offset,spin_period,reset_period,real_resets,
                        final_first_diff_HF,final_reset,time)    
 def target_func_offset(offset,spin_period,reset_period,real_resets,final_first_diff_HF,
                 final_reset,time):
+    '''
+    Wrapper for target_func so that offset is the first arg
+    '''
     return target_func(offset,spin_period,reset_period,real_resets,
                        final_first_diff_HF,final_reset,time)       
 def target_func_spin(spin_period,offset,reset_period,real_resets,final_first_diff_HF,
                 final_reset,time):
+    '''
+    Wrapper for target_func so that spin_period is the first arg
+    '''                    
     return target_func(offset,spin_period,reset_period,real_resets,
                        final_first_diff_HF,final_reset,time)       
 
-def find_offset_from_end(spin_period,reset_period,combined_data,
+def find_offset_from_end(spin_period,reset_period,real_resets,
                          final_first_diff_HF,final_reset,time):
+    '''
+    Determine the offset between the data extrapolated ('simulated') from
+    a packet after extended mode and the real data that is fed in via
+    real_resets.
+    '''
     results = []
-    real_resets = combined_data['reset'].values[-100:]
+    real_resets = real_resets[-100:]
     offsets = np.arange(-real_resets.shape[0],real_resets.shape[0],1)
     step = int(round(offsets.shape[0]/100))
     offsets = offsets[::step]
@@ -217,23 +246,8 @@ def find_offset_from_end(spin_period,reset_period,combined_data,
     axes[1].set_title('after')
     axes[1].scatter(min_offset,np.min(results))
     '''
-    return min_offset
-
-def estimate_spin_reset(sc,ext_date,dir='Z:/data/raw/'):
-    day_delta = pd.Timedelta('1 day')
-    dates=[ext_date-day_delta, ext_date, ext_date+day_delta]
-    modes= ['NS','BS']
-    spin_periods = []
-    reset_periods = []
-    for date in dates:
-        for mode in modes:
-            packetdata = RawData.RawDataHeader(sc,date,mode,dir=RAW).packet_info
-            spin_periods.append(packetdata['Spin Period (s)'].mean())
-            reset_periods.append(packetdata['Reset Period (s)'].mean())
-                                
-    spin_period = np.mean(spin_periods)
-    reset_period = np.mean(reset_periods)
-    return spin_period,reset_period
+    assert min_offset.shape[0] == 1,"should only have 1 result!"
+    return min_offset[0]
 
 '''
 Working backwards now, from a packet after ext mode
@@ -242,44 +256,15 @@ simulated timeseries, which is the one that is referenced by the
 'most recent sun pulse' value in the packet of interest.
 This spin is defined to be at time 0, all other spins at negative times.
 '''
- 
-RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-#RAW = 'Z:/data/raw/' #cluster alsvid server
-'''
-spin_period,reset_period = estimate_spin_reset(sc=1,
-                                               ext_date=datetime(2016,1,4),
-                                                dir=RAW)
-print "spin period:",spin_period
-print "reset period:",reset_period
-'''
-'''
-load previously processed ext mode data!
-'''
-import cPickle as pickle
-pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-#pickledir = 'Y:/testdata/'
-picklefile = pickledir+'extdata.pickle'
-with open(picklefile,'rb') as f:
-    combined_data = pickle.load(f)
 
-'''
-define spin and reset period, as well as initial packet conditions
-'''
-spin_period = 4.2607927059690756
-#optimised
-#spin_period = 4.26156082
-reset_period = 5.1522209199771503 
+def optimise_spin(original_spin_period,reset_period,time,final_first_diff_HF,
+                  final_reset,real_resets,best_offset):
+    result = minimize(target_func_spin,original_spin_period,method='Nelder-Mead',tol=1e-10,
+                      args=(best_offset,reset_period,real_resets,final_first_diff_HF,
+                    final_reset,time))
+    best_spin = result.x[0]
+    return best_spin
 
-spin = spin_period
-reset = reset_period
-spins = 15000
-first_diff_HF = (34866-23540)
-initial_reset = 58028
-time = spins*spin
-
-final_reset = 4729+2**16
-final_first_diff_HF = (47677-44563)
-real_resets = combined_data['reset'].values
 '''
 compare_real_to_sim_from_end(spin_period,reset_period,time,final_first_diff_HF,
                              final_reset,combined_data,offset=-4)
@@ -291,9 +276,10 @@ result = minimize(target_func_offset,1000,method='Nelder-Mead',tol=1e-10,
                   args=(spin_period,reset_period,combined_data['reset'][:],
                         final_first_diff_HF,final_reset,time,False))
 '''                        
- 
-min_offset = find_offset_from_end(spin_period,reset_period,combined_data,
-                                  final_first_diff_HF,final_reset,time)[0]
+'''
+#Usage examples, parameters would have to be supplied!
+min_offset = find_offset_from_end(spin_period,reset_period,combined_data['reset'].values,
+                                  final_first_diff_HF,final_reset,time)
 print "optimal offset:",min_offset   
           
 result = minimize(target_func_spin,4.04,method='Nelder-Mead',tol=1e-9,
@@ -322,7 +308,7 @@ print "before:",reset_period,"value:",
 print target_func_reset(reset_period,best_spin,min_offset,combined_data['reset'].values,
                         final_first_diff_HF,final_reset,time)
                      
-
+'''
 '''                    
 print "\nOnly Reset no Spin Optimisation"
 
