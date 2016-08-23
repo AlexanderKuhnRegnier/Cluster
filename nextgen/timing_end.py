@@ -105,7 +105,7 @@ def compare_real_to_sim_from_end(spin_period,reset_period,time,
              combined_data['reset'],c='r',label='real, time+2 spins')
     plt.scatter(combined_data['time']+offset*spin_period,
                 combined_data['reset'],c='r',label='real, time+2 spins',s=30)
-    plt.title('seen reset')
+    plt.title('seen reset, extrapolation from end')
     plt.legend()
     plt.show()
 
@@ -233,7 +233,17 @@ def find_offset_from_end(spin_period,reset_period,real_resets,
     minimum_index = np.where(results==np.min(results))
     min_offset = offsets[minimum_index]
     if min_offset.shape[0]>1:
-        raise Exception("There should only be 1 minimum offset!")
+        if min_offset.shape[0]==2:
+            '''
+            Real optimal offset is probably in the middle somewhere
+            '''
+            min_offset = int(round(np.mean(min_offset)))
+            step *= 2
+        else:
+            print "Min of results:",np.min(results)
+            print "Min indices:",minimum_index
+            print "Min offsets:",min_offset
+            raise Exception("There should only be at most 2 minimum offsets!")
     offsets = np.arange(-step,step+1,1)+min_offset
     results = []
     for offset in offsets:

@@ -88,7 +88,7 @@ def compare_real_to_sim(spin_period,reset_period,time,
              combined_data['reset'],c='r',label='real, time+2 spins')
     plt.scatter(combined_data['time']+offset*spin_period,
                 combined_data['reset'],c='r',label='real, time+2 spins',s=30)
-    plt.title('seen reset')
+    plt.title('seen reset, extrapolation from start')
     plt.legend()
     plt.show()
 
@@ -182,7 +182,8 @@ def find_offset_initial(spin_period,reset_period,real_resets,first_diff_HF,
     for offset in offsets:
         results.append(target_func_offset_local(offset,spin_period,
                     reset_period,real_resets,first_diff_HF,initial_reset,time))   
-    '''        
+         
+    '''   
     simulated_resets = extrapolate_timing(spin_period,reset_period,time,
                                           first_diff_HF,initial_reset)[2] 
     plotboth(real_resets,simulated_resets[:20])
@@ -190,13 +191,24 @@ def find_offset_initial(spin_period,reset_period,real_resets,first_diff_HF,
     axes[0].plot(offsets,results)
     axes[0].set_title('before')
     '''
+    
     '''
     now exand around the minimum, +- step
     '''
     minimum_index = np.where(results==np.min(results))
     min_offset = offsets[minimum_index]
     if min_offset.shape[0]>1:
-        raise Exception("There should only be 1 minimum offset!")
+        if min_offset.shape[0]==2:
+            '''
+            Real optimal offset is probably in the middle somewhere
+            '''
+            min_offset = int(round(np.mean(min_offset)))
+            step *= 2
+        else:
+            print "Min of results:",np.min(results)
+            print "Min indices:",minimum_index
+            print "Min offsets:",min_offset
+            raise Exception("There should only be at most 2 minimum offsets!")
     offsets = np.arange(-step,step+1,1)+min_offset
     results = []
     for offset in offsets:
@@ -204,11 +216,13 @@ def find_offset_initial(spin_period,reset_period,real_resets,first_diff_HF,
                     reset_period,real_resets,first_diff_HF,initial_reset,time))                      
     minimum_index = np.where(results==np.min(results))
     min_offset = offsets[minimum_index]
+    
     '''
     axes[1].plot(offsets,results)                              
     axes[1].set_title('after')
     axes[1].scatter(min_offset,np.min(results))
     '''
+    
     assert min_offset.shape[0] == 1,"should only have 1 result!"
     return min_offset[0]
  

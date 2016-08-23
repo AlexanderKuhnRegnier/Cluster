@@ -666,7 +666,7 @@ RAW = 'Z:/data/raw/' #cluster alsvid server
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20
 dump_date = datetime(2016,1,6)
-sc = 1
+sc = 3
 ext = ExtData(sc,dump_date,'BS',dir=RAW)
 ext.read_data()
 
