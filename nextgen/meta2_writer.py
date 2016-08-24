@@ -54,12 +54,11 @@ class meta2:
                 '''
                 read info into dataframe before any writing is done!
                 '''
-                self.frames.append(pd.read_csv(file,engine='c',parse_dates=[1,2]))
+                self.frames.append(pd.read_csv(file,parse_dates=[1,2,4]))
             else:
                 self.frames.append(pd.DataFrame(columns=self.columns))
     def write(self,dump_date,nr_vectors,spin_period,reset_period,
-              start_reset,end_reset):
-        print self.files,self.frames      
+              start_reset,end_reset):  
         for index,file in enumerate(self.files):
             new_row = pd.DataFrame(np.array([self.sc,self.ext_start,self.ext_end,
                                     self.version,dump_date,nr_vectors,
@@ -70,11 +69,33 @@ class meta2:
             self.frames[index].drop_duplicates(inplace=True)
             self.frames[index].to_csv(file,index=False)
     def read(self):
-        frames = pd.concat((self.frames))
+        frames = pd.concat((self.frames))      
+        frames.reset_index(drop=True,inplace=True)
         frames.drop_duplicates(inplace=True)
         return frames
+    
+    def check_interval(self,start,end):
+        '''
+        check whether start and end date are within one of the intervals in the
+        meta file!
+        A tolerance of 1 hour is applied to the search    
+        True if interval found, False if not!
+        '''
+        info = self.read()
+        start = (info['start_date'].apply(
+                                    lambda x:x-pd.Timedelta(60**2,'s')))<start
+        end = (info['end_date'].apply(
+                                    lambda x:x+pd.Timedelta(60**2,'s')))>end
+        together = start & end
+        if np.sum(together):
+            if np.sum(together)>1:
+                print ("WARNING, more than one interval found in one or more "
+                        "META files:"+','.join(self.files))
+            return True
+        else:
+            return False
 
-'''        
+'''   
 sc=1
 start_date = datetime(2016,1,4)
 end_date = datetime(2016,1,5)
@@ -90,4 +111,5 @@ meta = meta2(sc,start_date,end_date)
 meta.write(dump_date,nr_vectors,spin_period,reset_period,start_reset,end_reset)
 print "reading"
 print meta.read()
+print meta.check_interval(start_date,end_date)
 '''
