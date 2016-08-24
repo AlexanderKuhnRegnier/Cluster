@@ -74,12 +74,20 @@ class meta2:
         frames.drop_duplicates(inplace=True)
         return frames
     
-    def check_interval(self,start,end):
+    def overwrite_interval(self,start,end,nr_vectors=0):
         '''
         check whether start and end date are within one of the intervals in the
         meta file!
         A tolerance of 1 hour is applied to the search    
-        True if interval found, False if not!
+        To overwrite old instance, new number of vectors needs to be at 
+        least 100 vectors higher than the old number of vectors! Only if this
+        is satisfied, is True returned.
+        True if interval not found, False if it is!
+        Return True if:
+            interval not contained within already present dates
+            OR nr_vectors higher (at least 100 more) than already present
+                for a matching interval
+        otherwise, return False
         '''
         info = self.read()
         start = (info['start_date'].apply(
@@ -87,15 +95,27 @@ class meta2:
         end = (info['end_date'].apply(
                                     lambda x:x+pd.Timedelta(60**2,'s')))>end
         together = start & end
+        info = info[together]
+        if nr_vectors != 0:
+            if np.any(info['nr_vectors']<nr_vectors-100):
+                more_vectors=True
+            else:
+                more_vectors=False
+        else:
+            more_vectors=True #disable check - since it was not selected 
+                              #(0 was passed to nr_vectors)
         if np.sum(together):
             if np.sum(together)>1:
                 print ("WARNING, more than one interval found in one or more "
                         "META files:"+','.join(self.files))
-            return True
+            if more_vectors:
+                return True
+            else:
+                return False
         else:
-            return False
+            return True
 
-'''   
+  
 sc=1
 start_date = datetime(2016,1,4)
 end_date = datetime(2016,1,5)
@@ -111,5 +131,4 @@ meta = meta2(sc,start_date,end_date)
 meta.write(dump_date,nr_vectors,spin_period,reset_period,start_reset,end_reset)
 print "reading"
 print meta.read()
-print meta.check_interval(start_date,end_date)
-'''
+print meta.overwrite_interval(start_date,end_date,nr_vectors=2000)
