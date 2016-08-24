@@ -22,15 +22,15 @@ def estimate_spin_reset(sc,ext_date,dir='Z:/data/raw/'):
     reset_period = np.mean(reset_periods)
     return spin_period,reset_period
     
-#RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-RAW = 'Z:/data/raw/' #cluster alsvid server
+RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+#RAW = 'Z:/data/raw/' #cluster alsvid server
 
 '''
 load previously processed ext mode data!
 '''
 import cPickle as pickle
-#pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-pickledir = 'Y:/testdata/'
+pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+#pickledir = 'Y:/testdata/'
 picklefile = pickledir+'extdata.pickle'
 with open(picklefile,'rb') as f:
     combined_data = pickle.load(f)
@@ -112,7 +112,7 @@ below!!
 #different corrections, depending on what is seen in the data, and also the
 #SCET time vs. reset count discrepancy!!
 #SCET_time_diff = 63037
-#final_reset -= 3
+final_reset -= 4
 ###############################################################################
 start_extrapolation = ts.extrapolate_timing(spin,reset,time(spin),first_diff_HF,initial_reset)
 end_extrapolation = te.extrapolate_timing_from_end(spin,reset,time(spin),final_first_diff_HF,final_reset)
@@ -141,8 +141,8 @@ time series!!!
 Just matching up the results above, ie. the extrapolated results from
 the packets at the border of extended mode!!
 '''
-time_index = 0
-data_index = 1
+time_index = 3
+data_index = 4
 
 
 plt.figure()
@@ -153,6 +153,7 @@ plt.scatter(start_extrapolation[time_index],start_extrapolation[data_index],c='r
 plt.scatter(end_extrapolation[time_index]+SCET_time_diff,end_extrapolation[data_index],c='g',label='seen from end',s=30)
 plt.legend(loc='best')
 plt.minorticks_on()
+plt.grid(b=True, which='both', color='k', linestyle='--')
 plt.xlabel('time (s)')
 plt.show()
 
@@ -196,6 +197,7 @@ plt.scatter(start_extrapolation[time_index],start_extrapolation[data_index],c='r
 plt.scatter(end_extrapolation[time_index]+SCET_time_diff,end_extrapolation[data_index],c='g',label='seen from end',s=30)
 plt.legend(loc='best')
 plt.minorticks_on()
+plt.grid(b=True, which='both', color='k', linestyle='--')
 plt.xlabel('time (s)')
 plt.show()              
 
@@ -250,15 +252,15 @@ Now plot all of these things together on one graph!
 def plotting_all(times=[real_spin_times,start_spin_times,end_spin_times],
                  resets=[real_seen_spin_resets,start_seen_spin_resets,
                          end_seen_spin_resets],
-                         steps=1):
+                         steps=1,offset=offset_start,spin=spin_estimate):
     '''
     Plot extrapolated data from both ends against the real data,
     either all in one go if steps=1, or by typing n+Enter in the console
     vai raw_input in order to scroll through the different steps one at 
     a time.
     '''
-    ext_start = times[0][0]
-    ext_end = times[0][-1]
+    ext_start = times[0][0]+offset*spin
+    ext_end = times[0][-1]+offset*spin
     diff = ext_end-ext_start
     print "EXT Mode Times:",ext_start,ext_end,diff
     plt.figure(figsize=(22,17))
@@ -268,8 +270,8 @@ def plotting_all(times=[real_spin_times,start_spin_times,end_spin_times],
     for step in range(steps): 
         plt.cla()                     
         c='r'
-        label='real data'
-        plot_times = times[0][window_size*step:window_size*(step+1)]
+        label='real data, offset:'+str(offset)
+        plot_times = times[0][window_size*step:window_size*(step+1)]+offset*spin
         print "limits:",window_size*step,window_size*(step+1)
         plot_resets = resets[0][window_size*step:window_size*(step+1)]
         #times = real_spin_times
@@ -329,21 +331,7 @@ from packets surrounding extended mode, the spin period and reset were
 estimated. These are redefined for convenience below, according to this method
 (found using the function estimate_spin_reset)
 '''
-'''
-#SC 1 parameters, for 2016/01/04
-spin_period = 4.2607927059690756
-reset_period = 5.1522209199771503
-'''
-'''
-#SC 2 parameters, for 2016/01/04
-spin_period  = 4.1682032682937651
-reset_period = 5.1522152392407365
-'''
-'''
-#SC 3 parameters, for 2016/01/04
-spin_period = 4.2104047062408361
-reset_period = 5.1522212401212863
-'''
+
 '''
 Generate data, with the original spin and reset estimates above,
 not the optimisations!!

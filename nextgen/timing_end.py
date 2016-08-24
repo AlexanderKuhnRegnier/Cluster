@@ -106,7 +106,9 @@ def compare_real_to_sim_from_end(spin_period,reset_period,time,
     plt.scatter(combined_data['time']+offset*spin_period,
                 combined_data['reset'],c='r',label='real, time+2 spins',s=30)
     plt.title('seen reset, extrapolation from end')
-    plt.legend()
+    plt.legend(loc='best')
+    plt.minorticks_on()
+    plt.xlabel('time (s)')
     plt.show()
 
 def plotboth(a,b):

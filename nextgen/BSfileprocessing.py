@@ -661,12 +661,12 @@ Only putting the joing half-vector into the even dataframe - is that wise,
 or could it introduce some errors, if there are missing packets or otherwise
 corrupted data?
 '''
-#RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-RAW = 'Z:/data/raw/' #cluster alsvid server
+RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+#RAW = 'Z:/data/raw/' #cluster alsvid server
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20
 dump_date = datetime(2016,1,6)
-sc = 3
+sc = 2
 ext = ExtData(sc,dump_date,'BS',dir=RAW)
 ext.read_data()
 
@@ -1276,8 +1276,8 @@ print "spin period:",spin_period
 print "reset period:",reset_period
 
 import cPickle as pickle
-#pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-pickledir = 'Y:/testdata/'
+pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+#pickledir = 'Y:/testdata/'
 picklefile = pickledir+'extdata.pickle'
 with open(picklefile,'wb') as f:
     pickle.dump(combined_data,f,protocol=2)
@@ -1288,7 +1288,7 @@ in order to check for anomalies.
 '''
 sizes = combined_data.groupby('reset').size()
 plt.figure()
-plt.scatter(range(len(sizes)),sizes.values,s=120)
+plt.scatter(sizes.index.values,sizes.values,s=120)
 plt.title('Number of vectors per (12 top bits) of reset counter\n'
             'dump date:'+dump_date.isoformat()+' sc:'+str(sc))
 plt.xlabel('top 12 bits of reset counter')
