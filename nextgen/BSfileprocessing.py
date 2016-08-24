@@ -6,6 +6,8 @@ import RawData
 import ext_mode_times as emt
 from frame_hex_format import hexify
 import matplotlib.pyplot as plt
+#import timing
+#import valid_packets
 '''
 #Use this to suppress performance warn messages!
 import warnings
@@ -661,8 +663,8 @@ Only putting the joing half-vector into the even dataframe - is that wise,
 or could it introduce some errors, if there are missing packets or otherwise
 corrupted data?
 '''
-RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-#RAW = 'Z:/data/raw/' #cluster alsvid server
+#RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+RAW = 'Z:/data/raw/' #cluster alsvid server
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20
 dump_date = datetime(2016,1,6)
@@ -1251,36 +1253,7 @@ if max(mean_resets)>3000:
     combined_data.ix[increase_mask,'reset'] += 4096
     
 combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
-rough_processing(combined_data,title='after')
-
-'''
-Get an average spin time and reset time from packets 
-around the extended mode time
-'''
-
-ext_date = datetime(2016,1,4) #tbd
-day_delta = pd.Timedelta('1 day')
-dates=[ext_date-day_delta, ext_date, ext_date+day_delta]
-modes= ['NS','BS']
-spin_periods = []
-reset_periods = []
-for date in dates:
-    for mode in modes:
-        packetdata = RawData.RawDataHeader(sc,date,mode,dir=RAW).packet_info
-        spin_periods.append(packetdata['Spin Period (s)'].mean())
-        reset_periods.append(packetdata['Reset Period (s)'].mean())
-                            
-spin_period = np.mean(spin_periods)
-reset_period = np.mean(reset_periods)
-print "spin period:",spin_period
-print "reset period:",reset_period
-
-import cPickle as pickle
-pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-#pickledir = 'Y:/testdata/'
-picklefile = pickledir+'extdata.pickle'
-with open(picklefile,'wb') as f:
-    pickle.dump(combined_data,f,protocol=2)
+rough_processing(combined_data,title='after',copy=False)
 
 '''
 checking the number of vectors per (12 top bits) of reset counter, 
@@ -1294,3 +1267,23 @@ plt.title('Number of vectors per (12 top bits) of reset counter\n'
 plt.xlabel('top 12 bits of reset counter')
 plt.ylabel('Number of vectors')
 plt.minorticks_on()
+
+
+import cPickle as pickle
+#pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+pickledir = 'Y:/testdata/'
+picklefile = pickledir+'extdata.pickle'
+with open(picklefile,'wb') as f:
+    pickle.dump(combined_data,f,protocol=2)
+
+picklefile = pickledir+'packetinfo.pickle'
+with open(picklefile,'wb') as f:
+    pickle.dump(ext.packet_info,f,protocol=2)
+
+picklefile = pickledir+'sc.pickle'
+with open(picklefile,'wb') as f:
+    pickle.dump(sc,f)
+
+picklefile = pickledir+'dumpdate.pickle'
+with open(picklefile,'wb') as f:
+    pickle.dump(dump_date,f)

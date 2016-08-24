@@ -343,10 +343,12 @@ class start_end_packets:
         valid = self.simple_packet_search()
         if type(valid) == pd.DataFrame:
             return valid 
-        return None
-
+        return pd.DataFrame()
+        
+'''
 packets = start_end_packets(2,datetime(2016,1,6),3277,4041)
 valid = packets.find_valid(8)
+'''
 '''
 final_packets = packets.try_until_found()
 final_packets2 = packets.simple_packet_search()

@@ -207,8 +207,15 @@ def find_offset_from_end(spin_period,reset_period,real_resets,
     real_resets.
     '''
     results = []
-    real_resets = real_resets[-100:]
-    offsets = np.arange(-real_resets.shape[0],real_resets.shape[0],1)
+    real_resets = real_resets[-150:]
+    #print "final reset",final_reset
+    '''
+    Offsets need to be related to the TIME, not the shape of the data,
+    since we could be dealing with partial data that does not contain
+    enough vectors to span the whole time, of course
+    '''
+    nr_possible_vectors = round(time/spin_period + 10)
+    offsets = np.arange(-nr_possible_vectors,nr_possible_vectors,1)
     step = int(round(offsets.shape[0]/100))
     offsets = offsets[::step]
     target_func_offset_local = target_func_offset
@@ -216,19 +223,21 @@ def find_offset_from_end(spin_period,reset_period,real_resets,
         results.append(target_func_offset_local(offset,spin_period,
                     reset_period,real_resets,final_first_diff_HF,final_reset,
                     time))   
+    ###########################################################################
     '''
     simulation_results = extrapolate_timing_from_end(spin_period,reset_period,time,
                                           final_first_diff_HF,final_reset)
     real_times = np.arange(-real_resets.shape[0],0,1)*spin_period
     simulated_times = simulation_results[0]
     simulated_resets = simulation_results[2]
-    #print real_times.shape,real_resets.shape,simulated_times.shape,simulated_resets.shape
+    print real_times.shape,real_resets.shape,simulated_times.shape,simulated_resets.shape
     plotboth_advanced(real_times,real_resets,simulated_times,simulated_resets,
                       title='before')
     fig,axes = plt.subplots(1,2)
     axes[0].plot(offsets,results)
     axes[0].set_title('before')
     '''
+    ###########################################################################
     '''
     now exand around the minimum, +- step
     '''
@@ -253,12 +262,21 @@ def find_offset_from_end(spin_period,reset_period,real_resets,
                     reset_period,real_resets,final_first_diff_HF,final_reset,time))                    
     minimum_index = np.where(results==np.min(results))
     min_offset = offsets[minimum_index]
+    ###########################################################################
     '''
     axes[1].plot(offsets,results)                              
     axes[1].set_title('after')
-    axes[1].scatter(min_offset,np.min(results))
+    print "ts, min offset, min results",min_offset,np.min(results)
+    axes[1].scatter(min_offset[0],np.min(results))
     '''
-    assert min_offset.shape[0] == 1,"should only have 1 result!"
+    ###########################################################################
+    if min_offset.shape[0]==2:
+        print ("2 values at the same overlap, offset "
+                                    "UNCERTAINTY is thus +- 1!"
+                                    " Could be reduced by redoing after spin"
+                                    " correction?")
+        print "Using lower of the two found offsets!!"
+    assert min_offset.shape[0] < 3,"should only have 1 result (but 2 in rare cases)!"
     return min_offset[0]
 
 '''

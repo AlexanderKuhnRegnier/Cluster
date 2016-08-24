@@ -6,9 +6,17 @@ import matplotlib.pyplot as plt
 import RawData
 from datetime import datetime
 
-def estimate_spin_reset(sc,ext_date,dir='Z:/data/raw/'):
-    day_delta = pd.Timedelta('1 day')
-    dates=[ext_date-day_delta, ext_date, ext_date+day_delta]
+def estimate_spin_reset(sc,ext_date,days=3,dir='Z:/data/raw/'):
+    if days%2==0:
+        '''
+        Even number, so we need to increase by one in order to get data
+        from before and after ext mode evenly
+        '''
+        days+=1
+    mean_day =  (days+1)/2 #this IS ext_date, ie. the extended mode date
+    min_day = ext_date-pd.Timedelta(mean_day-1,'D')
+    max_day = ext_date+pd.Timedelta(mean_day-1,'D')
+    dates=pd.date_range(start=min_day,end=max_day,period='D')
     modes= ['NS','BS']
     spin_periods = []
     reset_periods = []
@@ -22,18 +30,19 @@ def estimate_spin_reset(sc,ext_date,dir='Z:/data/raw/'):
     reset_period = np.mean(reset_periods)
     return spin_period,reset_period
     
-RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-#RAW = 'Z:/data/raw/' #cluster alsvid server
+#RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+RAW = 'Z:/data/raw/' #cluster alsvid server
 
 '''
 load previously processed ext mode data!
 '''
 import cPickle as pickle
-pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-#pickledir = 'Y:/testdata/'
+#pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+pickledir = 'Y:/testdata/'
 picklefile = pickledir+'extdata.pickle'
 with open(picklefile,'rb') as f:
     combined_data = pickle.load(f)
+    
 
 '''
 #estimate from real packet data - quite slow
