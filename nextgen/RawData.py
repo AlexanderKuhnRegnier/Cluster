@@ -69,10 +69,13 @@ class RawDataHeader:
             with open(filepath,'rb') as f:
                 self.data = f.read()
         except IOError:
-            raise Exception("Could not open file:"+filepath)
+            print "Could not open file:"+filepath
+            #raise Exception
         if not self.data:
-            raise Exception("Could not read file:"+filepath)
-        self.__read_headers()
+            print "Could not read file:"+filepath
+            #raise Exception("Could not read file:"+filepath)
+        else:
+            self.__read_headers()
     @staticmethod
     def shift_left(num,left):
         return num<<left
@@ -130,7 +133,7 @@ class RawDataHeader:
         try:
             tel_mode = RawDataHeader.telem_mode[telemetry_mode]
         except KeyError: #should probably log this
-            print "Undesired telemetry_mode:",telemetry_mode
+            #print "Undesired telemetry_mode:",telemetry_mode
             tel_mode = str(telemetry_mode)
         self.fgm_data['Telemetry Mode'].append(tel_mode)
         self.fgm_data['Previous Sun Pulse'].append(prev_sun_pulse_hf)

@@ -146,6 +146,8 @@ def target_func(offset,spin_period,reset_period,real_resets,final_first_diff_HF,
     offset = int(round(offset))
     simulated_resets = extrapolate_timing_from_end(spin_period,reset_period,
                                             time,final_first_diff_HF,final_reset)[2]        
+    if abs(offset)>=len(simulated_resets):
+        return np.inf
     if offset>0:
         real_resets = real_resets[:len(real_resets)-offset]
     else:
@@ -214,9 +216,11 @@ def find_offset_from_end(spin_period,reset_period,real_resets,
     since we could be dealing with partial data that does not contain
     enough vectors to span the whole time, of course
     '''
-    nr_possible_vectors = round(time/spin_period + 10)
+    nr_possible_vectors = int(round(time/spin_period + 10))
     offsets = np.arange(-nr_possible_vectors,nr_possible_vectors,1)
-    step = int(round(offsets.shape[0]/100))
+    step = int(round(offsets.shape[0]/300))
+    if step<1:
+        step=1
     offsets = offsets[::step]
     target_func_offset_local = target_func_offset
     for offset in offsets:
@@ -225,6 +229,9 @@ def find_offset_from_end(spin_period,reset_period,real_resets,
                     time))   
     ###########################################################################
     '''
+    print "offsets:",offsets
+    print "Results:",results
+    print results[0],results[-1]
     simulation_results = extrapolate_timing_from_end(spin_period,reset_period,time,
                                           final_first_diff_HF,final_reset)
     real_times = np.arange(-real_resets.shape[0],0,1)*spin_period
@@ -264,9 +271,11 @@ def find_offset_from_end(spin_period,reset_period,real_resets,
     min_offset = offsets[minimum_index]
     ###########################################################################
     '''
+    print "offsets:",offsets
+    print "Results:",results
     axes[1].plot(offsets,results)                              
     axes[1].set_title('after')
-    print "ts, min offset, min results",min_offset,np.min(results)
+    print "te, min offset, min results",min_offset,np.min(results)
     axes[1].scatter(min_offset[0],np.min(results))
     '''
     ###########################################################################

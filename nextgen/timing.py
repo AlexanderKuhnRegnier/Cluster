@@ -27,11 +27,14 @@ def estimate_spin_reset(sc,ext_date,days=3,dir='Z:/data/raw/'):
     for date in dates:
         for mode in modes:
             packetdata = RawData.RawDataHeader(sc,date,mode,dir=dir).packet_info
-            spin_periods.append(packetdata['Spin Period (s)'].mean())
-            reset_periods.append(packetdata['Reset Period (s)'].mean())
-                                
-    spin_period = np.mean(spin_periods)
-    reset_period = np.mean(reset_periods)
+            if not packetdata.empty:
+                spin_periods.append(packetdata['Spin Period (s)'].mean())
+                reset_periods.append(packetdata['Reset Period (s)'].mean())
+    
+    spin_period = np.mean(pd.Series(spin_periods).dropna())
+    reset_period = np.mean(pd.Series(reset_periods).dropna())
+    if not ((3<spin_period<5) & (4<reset_period<6)):
+        return None,None
     return spin_period,reset_period
     
 #RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
@@ -91,7 +94,7 @@ def get_vector_block_times(sc,combined_data,first_diff_HF,
     if first_diff_HF<0:
         first_diff_HF += 2**16
     if final_first_diff_HF<0:
-        final_first_diff_HF =+ 2**16
+        final_first_diff_HF += 2**16
     reset_diff = final_reset-initial_reset
     if reset_diff<0:
         reset_diff+=2**16
@@ -177,14 +180,14 @@ def get_vector_times(sc,combined_data,first_diff_HF,
     mask1 = diff==1
     mask2 = diff==0
     valid = mask1 | mask2
-    print "masks"
-    print valid
+    #print "masks"
+    #print valid
     invalid = pd.DataFrame(~valid.values,index=combined_data.index,columns=['invalid'])
     invalid['block']=invalid['invalid'].cumsum()
-    print invalid
+    #print invalid
     blocks = np.unique(invalid['block'])
     times = []
-    print "data shape:",combined_data.shape
+    #print "data shape:",combined_data.shape
     for block in blocks:
         input_data = combined_data[invalid['block']==block]
         print "input data shape:",input_data.shape
@@ -196,7 +199,7 @@ def get_vector_times(sc,combined_data,first_diff_HF,
                                              final_reset,final_scet)
         if block_times.shape[0]==0:
             print "Unexpected result"
-            return None
+            return pd.Series()
         times.append(block_times)
     vector_times = pd.concat(times)
     if vector_times.shape[0] != combined_data.shape[0]:
@@ -234,6 +237,8 @@ with open(picklefile,'rb') as f:
     dump_date = pickle.load(f)
 
 print "Read data from pickles!"
+print "sc:",sc
+print "dump date:",dump_date
 
 #combined_data = pd.concat((combined_data.iloc[5000:8000],combined_data.iloc[9000:10000],combined_data.iloc[11000:14000]))
 #combined_data = combined_data.iloc[5000:8000]
@@ -321,10 +326,16 @@ if use_scch:
     '''
     ext_date = start_scet_time.date()
     spin_period,reset_period = estimate_spin_reset(sc,ext_date,
-                                                          days=3,dir=RAW)
-    #print "spin period:",spin_period
-    #print "reset period:",reset_period
+                                                          days=5,dir=RAW)
+    print "spin period:",spin_period
+    print "reset period:",reset_period
+    if not spin_period or not reset_period:
+        spin_period,reset_period = estimate_spin_reset(sc,ext_date,
+                                                          days=21,dir=RAW)       
     
+        print "Second attempt, across 21 days"
+        print "spin period:",spin_period
+        print "reset period:",reset_period
     commands = emt.ext_commands(sc,ext_date,dir=RAW)
     print "ext commanding, unfiltered"
     print commands
@@ -339,7 +350,9 @@ if use_scch:
     ext_start = commands.iloc[0]['Start']
     ext_end = commands.iloc[0]['End']
     ext_duration = commands.iloc[0]['Duration (s)']
+    print "ext duration:",ext_duration
     expected_duration = combined_data.shape[0]*spin_period
+    print "exptected duration:",expected_duration
     '''
     Now, from the ext_start time, as well as the spin_period, the times can
     be approximated
@@ -452,11 +465,11 @@ if use_scch:
             print "expected, ext duration",expected_duration,ext_duration
             '''
             Data would overlap, so try to adjust the spin period a little,
-            but only up to 0.1 % of the original estimate!
+            but only up to 1.5 % of the original estimate!
             '''
             adjusted_spin = ext_duration / combined_data.shape[0]
             print "adjusted spin",adjusted_spin
-            if abs(adjusted_spin-spin_period)>0.001*spin_period:
+            if abs(adjusted_spin-spin_period)>0.015*spin_period:
                 print "Overlap is unavoidable here for some reason, Error!"
                 raise Exception
             else:
@@ -471,3 +484,5 @@ if use_scch:
         raw_times = (np.arange(0,combined_data.shape[0],1)*spin_period)+pad
         real_spin_times = pd.Series([ext_start+pd.Timedelta(spin_time,'s') for spin_time in raw_times])
         combined_data['time'] = real_spin_times.values
+        
+combined_data.plot(x='time',y='mag')

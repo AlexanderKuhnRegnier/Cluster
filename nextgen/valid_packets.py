@@ -227,6 +227,12 @@ class start_end_packets:
         intervals = pd.concat((intervals,rollovers),axis=0)
         intervals.reset_index(drop=True,inplace=True)
         reset_diff = intervals['end_reset']-intervals['start_reset']
+        print "intervals scet times"
+        print intervals
+        if intervals.empty:
+            print "Found no intervals"
+            return None
+        #print intervals['end_scet'],intervals['start_scet']
         scet_diff = (intervals['end_scet']-  \
                                     intervals['start_scet'])/pd.Timedelta(1,'s')
         negative_diff = reset_diff<0
@@ -309,24 +315,26 @@ class start_end_packets:
         '''
         reset_diff = self.packets['Reset Count']-target_min
         reset_diff = reset_diff[reset_diff<0]
-        #reset_diff = self.packets['Reset Count']-target_min
-        #reset_diff = reset_diff[reset_diff.abs()<threshold]
-        reset_diff.sort_values(ascending=False,inplace=True)
-        #print reset_diff,target_min
-        min_packet_index = reset_diff.index[0]
+        if not reset_diff.empty:
+            #reset_diff = self.packets['Reset Count']-target_min
+            #reset_diff = reset_diff[reset_diff.abs()<threshold]
+            reset_diff.sort_values(ascending=False,inplace=True)
+            #print reset_diff,target_min
+            min_packet_index = reset_diff.index[0]
         '''
         find match for target_max - want lower value
         '''
         reset_diff = self.packets['Reset Count']-target_max
         reset_diff = reset_diff[reset_diff>0]
-        #reset_diff = self.packets['Reset Count']-target_max
-        #reset_diff = reset_diff[reset_diff.abs()<threshold]
-        reset_diff.sort_values(ascending=True,inplace=True) 
-        #print reset_diff,target_max
-        max_packet_index = reset_diff.index[0]   
-        final_packets = self.packets.loc[[min_packet_index,max_packet_index]]
-        if type(final_packets)==pd.DataFrame:
-            return final_packets
+        if not reset_diff.empty:
+            #reset_diff = self.packets['Reset Count']-target_max
+            #reset_diff = reset_diff[reset_diff.abs()<threshold]
+            reset_diff.sort_values(ascending=True,inplace=True) 
+            #print reset_diff,target_max
+            max_packet_index = reset_diff.index[0]   
+            final_packets = self.packets.loc[[min_packet_index,max_packet_index]]
+            if type(final_packets)==pd.DataFrame:
+                return final_packets
         return None
     
     def find_valid(self,max_days=8):

@@ -182,9 +182,11 @@ def find_offset_initial(spin_period,reset_period,real_resets,first_diff_HF,
     since we could be dealing with partial data that does not contain
     enough vectors to span the whole time, of course
     '''
-    nr_possible_vectors = round(time/spin_period + 10)
+    nr_possible_vectors = int(round(time/spin_period + 10))
     offsets = np.arange(-nr_possible_vectors,nr_possible_vectors,1)
-    step = int(round(offsets.shape[0]/100))
+    step = int(round(offsets.shape[0]/300))
+    if step<1:
+        step=1    
     offsets = offsets[::step]
     target_func_offset_local = target_func_offset
     for offset in offsets:

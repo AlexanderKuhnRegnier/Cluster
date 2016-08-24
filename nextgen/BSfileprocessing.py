@@ -222,7 +222,8 @@ class ExtData(RawData.RawDataHeader):
         return df
     def read_data(self):
         '''
-        filter non MSA Dump Packets out of the packets list
+        Read data, then filter out 
+        non MSA Dump Packets out of the packets list
         '''
         packet_mask = self.packet_info['Telemetry Mode'] == 'MSA Dump'
         self.removed_packets = self.packet_info[~packet_mask].index.values
@@ -230,19 +231,24 @@ class ExtData(RawData.RawDataHeader):
         self.packet_info = self.packet_info[packet_mask]
         even = []
         odd = []
-        packets = self.packet_info.index.values
+        #packets = self.packet_info.index.values
+        read_packets = []
         packet_offset = 0
         for packet,row in self.packet_info.iterrows():
             packet_offset += 49 #skip headers (already read)
-            packet_length = self.dds_data['Packet Length'][-1]
-            if packet_length != 3596: #maybe log this / exception?
+            packet_length = row['Packet Length']
+            skip = False
+            if packet_length != 3596 or row['Telemetry Mode'] != 'MSA Dump': #maybe log this / exception?
                 print ("Warning, packet length not as expected:"+
-                        str(packet_length))
+                        str(packet_length)+" SKIPPING")
+                skip = True
             vector_data_length = packet_length-34
-            even.append(self.read_even(self.data[packet_offset:
-                                    packet_offset+vector_data_length]))
-            odd.append(self.read_odd(self.data[packet_offset:
-                                    packet_offset+vector_data_length]))
+            if not skip:
+                read_packets.append(packet)
+                even.append(self.read_even(self.data[packet_offset:
+                                        packet_offset+vector_data_length]))
+                odd.append(self.read_odd(self.data[packet_offset:
+                                        packet_offset+vector_data_length]))
             packet_offset+=vector_data_length
         self.even = pd.concat((even))
         self.odd = pd.concat((odd))
@@ -250,13 +256,15 @@ class ExtData(RawData.RawDataHeader):
             raise Exception("Even and Odd shapes don't mach, should contain"
                             "the same number of vectors at this point!")
         top_level = []
-        for packet_count,packeto,packete in zip(packets,odd,even):
+        if (len(read_packets) != len(odd)) or (len(read_packets) != len(even)):
+            raise Exception("Unequal lengths!")
+        for packet,packeto,packete in zip(read_packets,odd,even):
             if packete.shape != packeto.shape:
                 raise Exception("Unequal number of vectors in packet nr:"+
-                                    str(packet_count))
+                                    str(packet))
             length = packete.shape[0]
-            top_level.extend([packet_count]*length)
-            packet_count += 1    
+            top_level.extend([packet]*length)
+            
         bottom_level=range(0,self.odd.shape[0])            
         multiindex=pd.MultiIndex.from_arrays([top_level,bottom_level],
                                              names=['packet','index'])
@@ -419,6 +427,7 @@ class ExtData(RawData.RawDataHeader):
         AAAA5555AAAA5555AAAA ie. 1010 1010 1010 etc....
         or
         5555AAAA5555AAAA5555 ie. 0101 0101 0101 etc....
+        So need to check for both simultaneously
         '''
         #invalid bytes
         invalid1 = 0b10101010
@@ -437,10 +446,8 @@ class ExtData(RawData.RawDataHeader):
         invalid_row_data2 = np.array([invalid_range2,invalid_reset2,
                              invalid_sensor2,invalid_magnetic2,
                              invalid_magnetic2,invalid_magnetic2])   
-        mask = ~(frame.apply(lambda x:np.all(x==invalid_row_data1),axis=1,
-                                    raw=True).values)
-        mask = mask | (~frame.apply(lambda x:np.all(x==invalid_row_data2),
-                                       axis=1,raw=True).values)
+        mask = ~(frame.apply(lambda x:np.all( (x==invalid_row_data1) | \
+                                (x==invalid_row_data2)),axis=1,raw=True).values)
         frame = frame[mask]        
         '''
         filter out entries with all 0's in them
@@ -667,9 +674,10 @@ corrupted data?
 RAW = 'Z:/data/raw/' #cluster alsvid server
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20
-dump_date = datetime(2016,1,6)
-sc = 2
+dump_date = datetime(2016,3,8)
+sc = 3
 ext = ExtData(sc,dump_date,'BS',dir=RAW)
+packet_info1 = ext.packet_info
 ext.read_data()
 
 print "Before filtering (even),(odd)"
@@ -1062,7 +1070,7 @@ combined_data['vector']=combined_data.index.get_level_values('vector')
 combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
 print "combined data"
 print combined_data
-def rough_processing(combined_data,title=False,copy=True):
+def rough_processing(combined_data,title=False,copy=True,log_mag=False):
     '''
     some rough and ready processing, bear in mind that the data still needs to 
     be scaled from engineering units to nT, the range is important for that
@@ -1091,10 +1099,11 @@ np.power(2,((np.ones(combined_data.shape[0])*12)-(combined_data['range'].values)
         combined_data.plot(y=['x','y','z','mag'],title=title)
     else:
         combined_data.plot(y=['x','y','z','mag'])
-    plt.figure()
-    plt.plot(range(len(combined_data)),combined_data['mag'],c='k')
-    plt.yscale('log')
-rough_processing(combined_data,title='before')
+    if log_mag:
+        plt.figure()
+        plt.plot(range(len(combined_data)),combined_data['mag'],c='k')
+        plt.yscale('log')
+#rough_processing(combined_data,title='before')
 '''
 Now, need to look at timing!!
 Spin periods at around 3.9 to 4.3 seconds
@@ -1287,3 +1296,5 @@ with open(picklefile,'wb') as f:
 picklefile = pickledir+'dumpdate.pickle'
 with open(picklefile,'wb') as f:
     pickle.dump(dump_date,f)
+    
+import timing
