@@ -66,7 +66,7 @@ class meta2:
                 self.frames.append(pd.read_csv(file,parse_dates=[1,2,4]))
             else:
                 self.frames.append(pd.DataFrame(columns=self.columns))
-    def write(self,dump_date,spin_period,reset_period):  
+    def write_meta(self,dump_date,spin_period,reset_period):  
         for index,file in enumerate(self.files):
             new_row = pd.DataFrame(np.array([self.sc,self.ext_start,self.ext_end,
                                     self.version,dump_date,self.nr_vectors,
@@ -83,7 +83,7 @@ class meta2:
         frames.drop_duplicates(inplace=True)
         return frames
     
-    def write_interval(self,combined_data):
+    def write_interval(self):
         '''
         check whether start and end date are within one of the intervals in the
         meta file!
@@ -100,17 +100,14 @@ class meta2:
         Still need to call write() in order to actually write a META2 file 
         entry!
         '''
-        start = combined_data['time'].min()
-        end = combined_data['time'].max()
-        nr_vectors = combined_data.shape[0]
         info = self.read()
         start = (info['start_date'].apply(
-                                    lambda x:x-pd.Timedelta(60**2,'s')))<start
+                                    lambda x:x-pd.Timedelta(60**2,'s')))<self.ext_start
         end = (info['end_date'].apply(
-                                    lambda x:x+pd.Timedelta(60**2,'s')))>end
+                                    lambda x:x+pd.Timedelta(60**2,'s')))>self.ext_end
         together = start & end
         info = info[together]
-        if np.any(info['nr_vectors']<nr_vectors-100):#np.any in case of 
+        if np.any(info['nr_vectors']<self.nr_vectors-100):#np.any in case of 
                                                 #multiple entries - noted below
             more_vectors=True
         else:

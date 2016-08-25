@@ -3,16 +3,23 @@ import pandas as pd
 from datetime import datetime
 import os
 import RawData
-import ext_mode_times as emt
 from frame_hex_format import hexify
 import matplotlib.pyplot as plt
-#import timing
-#import valid_packets
+import timing
+import meta2_interface as meta2
+import calibration_writing
 
-RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+pd.options.display.expand_frame_repr=False
+pd.options.display.max_rows=20
+
+#RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
 #RAW = 'Z:/data/raw/' #cluster alsvid server
-pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+RAW = '/cluster/data/raw/'
+#pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
 #pickledir = 'Y:/testdata/'
+#META = 'Y:/meta2/'
+META = '/home/ahk114/meta2/'
+PROC = '/home/ahk114/testdata/'
 
 '''
 #Use this to suppress performance warn messages!
@@ -677,8 +684,6 @@ or could it introduce some errors, if there are missing packets or otherwise
 corrupted data?
 '''
 
-pd.options.display.expand_frame_repr=False
-pd.options.display.max_rows=20
 dump_date = datetime(2016,3,8)
 sc = 3
 ext = ExtData(sc,dump_date,'BS',dir=RAW)
@@ -1266,8 +1271,8 @@ if max(mean_resets)>3000:
     combined_data.ix[increase_mask,'reset'] += 4096
     
 combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
-data_processing(combined_data,title='after',copy=False)
-
+#data_processing(combined_data,title='after',copy=False)
+data_processing(combined_data,plot=False,copy=False)
 '''
 checking the number of vectors per (12 top bits) of reset counter, 
 in order to check for anomalies.
@@ -1281,7 +1286,7 @@ plt.xlabel('top 12 bits of reset counter')
 plt.ylabel('Number of vectors')
 plt.minorticks_on()
 
-
+'''
 import cPickle as pickle
 
 picklefile = pickledir+'extdata.pickle'
@@ -1299,5 +1304,28 @@ with open(picklefile,'wb') as f:
 picklefile = pickledir+'dumpdate.pickle'
 with open(picklefile,'wb') as f:
     pickle.dump(dump_date,f)
-    
-import timing
+'''
+spin_period = 0
+reset_period = 0
+result = timing.get_timing(sc,dump_date,combined_data,ext.packet_info)
+if result:
+    spin_period = result[0]
+    reset_period = result[1]
+else:
+    print "Timing failed for some reason"
+    raise Exception
+meta = meta2.meta2(sc,combined_data,dir=META)
+if not meta.write_interval():
+    print "Interval already present, or a timing overlap!"
+    raise Exception
+
+###############################################################################
+'''
+Apply calibration, and write to file!
+'''
+calibration_writing.write_data(sc,combined_data,OUT=PROC)
+###############################################################################
+'''
+If the above is successful, record this in the meta file!
+'''
+meta.write_meta(dump_date,spin_period,reset_period)

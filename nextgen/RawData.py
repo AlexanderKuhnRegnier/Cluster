@@ -20,7 +20,7 @@ class RawDataHeader:
     burst_mode_names = ['bs','burst mode','burst science']
     mode_dict = dict([(label,'NS') for label in normal_mode_names])
     mode_dict.update(dict([(label,'BS') for label in burst_mode_names]))
-    def __init__(self,sc,dt,mode,version='B',dir='Z:/data/raw/'):
+    def __init__(self,sc,dt,mode,version='B',dir='/cluster/data/raw/'):
         version = version.upper()
         mode = mode.lower()
         if version not in ['A','B','K']:

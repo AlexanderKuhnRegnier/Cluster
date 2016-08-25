@@ -2,8 +2,7 @@ import numpy as np
 import math
 import os
 import pandas as pd
-import datetime
-import meta2_interface as meta2
+#from datetime import datetime
 import getcalibration
 
 def float2hex(f):
@@ -32,10 +31,11 @@ def integer2hex(i):
 
 date_1970 = pd.Timestamp('1970')
 RAW = '/cluster/data/raw/'
-EXT = '/home/ahk114/extended/'
-PROC = '/home/ahk114/testdata/'
+#PROC = '/home/ahk114/testdata/'
+#RAW = 'Z:/data/raw/'
+#PROC = 'Y:/reference/'
 
-def satt_stof_proc(sc,date,versions=['B','K','A'],RAW=RAW,PROC=PROC):
+def satt_stof_proc(sc,date,versions=['B','K','A'],RAW=RAW,PROC=''):
     '''
     eg.
     sattfile=RAW+'2016/01/'+'C'+'1'+'_'+'160122'+'_'+'B'+'.SATT' #Spacecraft Attitude and Spin Rates
@@ -60,7 +60,7 @@ def satt_stof_proc(sc,date,versions=['B','K','A'],RAW=RAW,PROC=PROC):
     else:
         return False,False,False
 
-def write_data(sc,ext_data,OUT=PROC): 
+def write_data(sc,ext_data,OUT=''): 
     k2   = np.pi / 4
     initial_date = ext_data['time'].iloc[0].date()
     offsetx,offsety,offsetz,gainx,gainy,gainz = \

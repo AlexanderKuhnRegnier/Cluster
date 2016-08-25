@@ -1,16 +1,36 @@
 from getcalfile import getcalfile
 import os
-import pandas as pd
 import numpy as np
+from datetime import datetime
 
 RAW = '/cluster/data/raw/'
-EXT = '/cluster/data/extended/'
-
 CAACAL='/cluster/caa/calibration/' #caa calibration files directory
 DAILYCAL='/cluster/operations/calibration/daily/'#dailycalfile dir
 
+#RAW = 'Z:/data/raw/'
+#CAACAL = 'Z:/caa/calibration/'
+#DAILYCAL = 'Z:/operations/calibration/daily/'
+
+def display_calibration(offsetx,offsety,offsetz,gainx,gainy,gainz):
+    dec_points = 4
+    pad = 11
+    print "Sensor: OB, ADC: 1"
+    print ("Range:    {1:{0:}}{2:{0:}}{3:{0:}}{4:{0:}}"
+                    "{5:{0:}}{6:{0:}}".format(pad,*range(2,8)))
+    print ("Offset X: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsetx[0,:]))
+    print ("Offset Y: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsety[0,:]))
+    print ("Offset Z: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsetz[0,:])) 
+    print ("Gain X  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainx[0,:]))
+    print ("Gain Y  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainy[0,:]))
+    print ("Gain Z  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainz[0,:]))
 def read_line(line):
-    return [float(entry) for entry in line.split(' ') if entry != ' ']
+    return [float(entry) for entry in line.split(' ') if not (entry == '' or entry.find('S')!=-1)]
 
 def getcal(sc,start_date,calibration='CAA'):
     # [adc 1..2][sensor 0..1 (OB..IB)][sc 1..4][range 2..5]
@@ -65,6 +85,7 @@ def getcal(sc,start_date,calibration='CAA'):
     else:
         print "Please select a valid calibration type! (caa|daily|default)"
         return False
+    print "calfile found:",calfile
     if os.path.isfile(calfile):
         if not os.stat(calfile).st_size:
             return False
@@ -82,22 +103,22 @@ def getcal(sc,start_date,calibration='CAA'):
     gainz = np.ones((4,6),dtype=np.float64)
     #sholud be 1,2 1,2 - but this makes indexing easier
     for adc_sensor in range(0,4):
-            offsetx[adc_sensor,:-1] = read_line(lines[line_counter])[:-1]
+            offsetx[adc_sensor,:-1] = read_line(lines[line_counter])[:5]
                                     #ignore identifier string (eg. S2_32)
             line_counter += 1
-            offsety[adc_sensor,:-1] = read_line(lines[line_counter])[:-1]
+            offsety[adc_sensor,:-1] = read_line(lines[line_counter])[:5]
                                     #ignore identifier string (eg. S2_32)
             line_counter += 1
-            offsetz[adc_sensor,:-1] = read_line(lines[line_counter])[:-1]
+            offsetz[adc_sensor,:-1] = read_line(lines[line_counter])[:5]
                                     #ignore identifier string (eg. S2_32)
             line_counter += 1            
-            gainx[adc_sensor,:-1] = read_line(lines[line_counter])[:-1]
+            gainx[adc_sensor,:-1] = read_line(lines[line_counter])[:5]
                                     #ignore identifier string (eg. S2_32)
             line_counter += 4 #skip 3 lines
-            gainy[adc_sensor,:-1] = read_line(lines[line_counter])[:-1]
+            gainy[adc_sensor,:-1] = read_line(lines[line_counter])[:5]
                                     #ignore identifier string (eg. S2_32)
             line_counter += 4 #skip 3 lines            
-            gainz[adc_sensor,:-1] = read_line(lines[line_counter])[:-1]
+            gainz[adc_sensor,:-1] = read_line(lines[line_counter])[:5]
                                     #ignore identifier string (eg. S2_32)
             line_counter += 1           
     '''
@@ -105,15 +126,15 @@ def getcal(sc,start_date,calibration='CAA'):
     '''
     for linecount in range(len(lines)):
         line = lines[linecount]
-        if '#!range7' in line:
-            line_counter += 1
-            offsetx[0,-1],offsety[0,-1],offsetz[0,-1] = read_line(lines[line_counter])
-            line_counter += 1
-            gainx[0,-1],dummy1,dummy2 = read_line(lines[line_counter])
-            line_counter += 1
-            dummy1,gainy[0,-1],dummy2 = read_line(lines[line_counter])
-            line_counter += 1
-            dummy1,dummy2,gainz[0,-1] = read_line(lines[line_counter])
+        if '#!Range7' in line:
+            linecount += 1
+            offsetx[0,-1],offsety[0,-1],offsetz[0,-1] = read_line(lines[linecount])
+            linecount += 1
+            gainx[0,-1],dummy1,dummy2 = read_line(lines[linecount])
+            linecount += 1
+            dummy1,gainy[0,-1],dummy2 = read_line(lines[linecount])
+            linecount += 1
+            dummy1,dummy2,gainz[0,-1] = read_line(lines[linecount])
             break
     if calibration.upper() == 'DAILY':
         daily_range7_dir = '/cluster/operations/calibration/daily/range7/'+start_date.strftime('%Y/%m/')
@@ -137,6 +158,9 @@ def getcal(sc,start_date,calibration='CAA'):
     Calibration modification - ignore orthogonalities, average gains in 
     spin plane, set offset in spin plane to 0 - assume they cancel out.
     '''
+    print "RAW {0} calibration, as read from {1}".format(calibration.upper(),
+                                                            calfile)
+    display_calibration(offsetx,offsety,offsetz,gainx,gainy,gainz)
     for adc_sensor in range(0,4):
         for r in range(0,6): #corresponds to [2,3,4,5,6,7]
             offsety[adc_sensor,r] = 0
@@ -148,4 +172,8 @@ def getcal(sc,start_date,calibration='CAA'):
             gainy[adc_sensor,r] = (n+m)/2
             gainz[adc_sensor,r] = (n+m)/2
             
+    print "Modified {0} calibration, used for data!".format(calibration.upper())
+    display_calibration(offsetx,offsety,offsetz,gainx,gainy,gainz)
     return offsetx,offsety,offsetz,gainx,gainy,gainz
+    
+#offsetx,offsety,offsetz,gainx,gainy,gainz =getcal(1,datetime(2016,1,20))
