@@ -60,10 +60,11 @@ Regarding wrap-arounds of the reset counter:
 '''
 
 #RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-RAW = 'Z:/data/raw/' #cluster alsvid server
+#RAW = 'Z:/data/raw/' #cluster alsvid server
 
 class start_end_packets:
-    def __init__(self,sc,dump_date,min_reset,max_reset):
+    def __init__(self,sc,dump_date,min_reset,max_reset,dir='Z:/data/raw/'):
+        self.RAW = dir
         self.sc = sc
         self.dump_date = dump_date
         self.min_reset = min_reset
@@ -91,7 +92,7 @@ class start_end_packets:
             packet_info_frames = []                            
             for date in self.dates:
                 packet_info_frames.append(RawData.RawDataHeader(self.sc,date,'NS',
-                                                                dir=RAW).packet_info)
+                                                        dir=self.RAW).packet_info)
             self.packets = pd.concat(packet_info_frames,axis=0)
         else:
             '''
@@ -112,7 +113,7 @@ class start_end_packets:
                 for date in new_dates:
                     packet_info_frames.append(
                                     RawData.RawDataHeader(self.sc,date,'NS',
-                                                          dir=RAW).packet_info) 
+                                                    dir=self.RAW).packet_info) 
                 
                 self.dates = new_dates.append(self.dates) #since new_dates 
                                                           #are before
@@ -227,8 +228,8 @@ class start_end_packets:
         intervals = pd.concat((intervals,rollovers),axis=0)
         intervals.reset_index(drop=True,inplace=True)
         reset_diff = intervals['end_reset']-intervals['start_reset']
-        print "intervals scet times"
-        print intervals
+        #print "intervals scet times"
+        #print intervals
         if intervals.empty:
             print "Found no intervals"
             return None

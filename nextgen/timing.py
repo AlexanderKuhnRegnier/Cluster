@@ -10,6 +10,11 @@ import ext_mode_times as emt
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20 
 
+RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+#RAW = 'Z:/data/raw/' #cluster alsvid server
+pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+#pickledir = 'Y:/testdata/'
+
 def estimate_spin_reset(sc,ext_date,days=3,dir='Z:/data/raw/'):
     if days%2==0:
         '''
@@ -37,9 +42,6 @@ def estimate_spin_reset(sc,ext_date,days=3,dir='Z:/data/raw/'):
         return None,None
     return spin_period,reset_period
     
-#RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-RAW = 'Z:/data/raw/' #cluster alsvid server
-
 def get_vector_block_times(sc,combined_data,first_diff_HF,
                            initial_reset,initial_scet,final_first_diff_HF,
                            final_reset,final_scet):
@@ -214,12 +216,8 @@ def get_vector_times(sc,combined_data,first_diff_HF,
 '''
 load previously processed ext mode data!
 '''
-#RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-RAW = 'Z:/data/raw/' #cluster alsvid server
 
 import cPickle as pickle
-#pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-pickledir = 'Y:/testdata/'
 picklefile = pickledir+'extdata.pickle'
 with open(picklefile,'rb') as f:
     combined_data = pickle.load(f)
@@ -265,7 +263,8 @@ reliable.
 '''
 min_reset = combined_data.reset.min()
 max_reset = combined_data.reset.max()
-valid = valid_packets.start_end_packets(sc,dump_date,min_reset,max_reset)
+valid = valid_packets.start_end_packets(sc,dump_date,min_reset,max_reset,
+                                        dir=RAW)
 start_end_packets = valid.find_valid(max_days=8)
 use_scch = False
 use_scch_extra = False
@@ -486,3 +485,7 @@ if use_scch:
         combined_data['time'] = real_spin_times.values
         
 combined_data.plot(x='time',y='mag')
+
+picklefile = pickledir+'extdata.pickle'
+with open(picklefile,'wb') as f:
+    pickle.dump(combined_data,f,protocol=2)

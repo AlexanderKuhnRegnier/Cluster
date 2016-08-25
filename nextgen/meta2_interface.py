@@ -115,7 +115,7 @@ class meta2:
         else:
             return True
 
-  
+''' 
 sc=1
 start_date = datetime(2016,1,4)
 end_date = datetime(2016,1,5)
@@ -132,3 +132,4 @@ meta.write(dump_date,nr_vectors,spin_period,reset_period,start_reset,end_reset)
 print "reading"
 print meta.read()
 print meta.overwrite_interval(start_date,end_date,nr_vectors=2000)
+'''

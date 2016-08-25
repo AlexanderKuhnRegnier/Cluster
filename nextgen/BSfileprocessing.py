@@ -8,6 +8,12 @@ from frame_hex_format import hexify
 import matplotlib.pyplot as plt
 #import timing
 #import valid_packets
+
+RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+#RAW = 'Z:/data/raw/' #cluster alsvid server
+pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
+#pickledir = 'Y:/testdata/'
+
 '''
 #Use this to suppress performance warn messages!
 import warnings
@@ -670,8 +676,7 @@ Only putting the joing half-vector into the even dataframe - is that wise,
 or could it introduce some errors, if there are missing packets or otherwise
 corrupted data?
 '''
-#RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-RAW = 'Z:/data/raw/' #cluster alsvid server
+
 pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20
 dump_date = datetime(2016,3,8)
@@ -1070,11 +1075,12 @@ combined_data['vector']=combined_data.index.get_level_values('vector')
 combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
 print "combined data"
 print combined_data
-def rough_processing(combined_data,title=False,copy=True,log_mag=False):
+def data_processing(combined_data,plot=True,title=False,copy=True,log_mag=False):
     '''
-    some rough and ready processing, bear in mind that the data still needs to 
-    be scaled from engineering units to nT, the range is important for that
+    Converting engineering units to nT
     Tim is still working on 'what' the scaling factors should be?
+    Calibration still needs to be applied, this will be done at a later
+    point in time before the data is fed into the dp software
     '''
     if copy:
         combined_data = combined_data.copy()
@@ -1085,25 +1091,23 @@ def rough_processing(combined_data,title=False,copy=True,log_mag=False):
     combined_data['z'] = combined_data['z'].apply(
                                         lambda x: x-65536 if x>32767 else x)
     
-    combined_data['x']=combined_data['x'].values/\
-np.power(2,((np.ones(combined_data.shape[0])*12)-(combined_data['range'].values)*2))
-    combined_data['y']=combined_data['y'].values/\
-np.power(2,((np.ones(combined_data.shape[0])*12)-(combined_data['range'].values)*2))
-    combined_data['z']=combined_data['z'].values/\
-np.power(2,((np.ones(combined_data.shape[0])*12)-(combined_data['range'].values)*2))
+    combined_data['x']=combined_data['x'].values/  \
+np.power(2,((np.ones(combined_data.shape[0],dtype=np.float64)*12)-(combined_data['range'].values)*2))
+    combined_data['y']=combined_data['y'].values/  \
+np.power(2,((np.ones(combined_data.shape[0],dtype=np.float64)*12)-(combined_data['range'].values)*2))
+    combined_data['z']=combined_data['z'].values/  \
+np.power(2,((np.ones(combined_data.shape[0],dtype=np.float64)*12)-(combined_data['range'].values)*2))
     
-    combined_data[['x','y','z']]=combined_data[['x','y','z']].div(
-                                np.max(np.abs(combined_data[['x','y','z']])))
     combined_data['mag']=np.linalg.norm(combined_data[['x','y','z']],axis=1)
     if title:
         combined_data.plot(y=['x','y','z','mag'],title=title)
-    else:
+    elif plot:
         combined_data.plot(y=['x','y','z','mag'])
     if log_mag:
         plt.figure()
         plt.plot(range(len(combined_data)),combined_data['mag'],c='k')
         plt.yscale('log')
-#rough_processing(combined_data,title='before')
+#data_processing(combined_data,title='before')
 '''
 Now, need to look at timing!!
 Spin periods at around 3.9 to 4.3 seconds
@@ -1262,7 +1266,7 @@ if max(mean_resets)>3000:
     combined_data.ix[increase_mask,'reset'] += 4096
     
 combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
-rough_processing(combined_data,title='after',copy=False)
+data_processing(combined_data,title='after',copy=False)
 
 '''
 checking the number of vectors per (12 top bits) of reset counter, 
@@ -1279,8 +1283,7 @@ plt.minorticks_on()
 
 
 import cPickle as pickle
-#pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
-pickledir = 'Y:/testdata/'
+
 picklefile = pickledir+'extdata.pickle'
 with open(picklefile,'wb') as f:
     pickle.dump(combined_data,f,protocol=2)
