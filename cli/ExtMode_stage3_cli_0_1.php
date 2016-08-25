@@ -33,26 +33,51 @@
 // ===============
 //
 //		0.1		2016-07-06		Initial Command Line version, derived from Web version
+//
+//
+// Adapted for use with caa calibration 2016-08-16
 
 #require_once( "meta_file_functions.php" );
 require_once '/home/ahk114/Cluster/processing/meta_file_functions.php';
 
-define('CAACAL','/cluster/caa/calibration/');
-define('DAILYCAL','/cluster/operations/calibration/daily/');
-define( "RAW", "/cluster/data/raw/" );
+define('CAACAL','/cluster/caa/calibration/'); #caa calibration files directory
+define('DAILYCAL','/cluster/operations/calibration/daily/');#dailycalfile dir
+define( "RAW", "/cluster/data/raw/" );			#where raw data files reside
 define( "EXTMODECOMMAND", "SFGMJ059 SFGMJ064 SFGMSEXT SFGMM002" );
-define( "EXT", '/cluster/data/extended/' );
-define("OUTEXT", '/home/ahk114/data/extended/');
-#define( "PROC", '/cluster/data/reference/' );
-define ("PROC", '/home/ahk114/referencecaa/');
+
 define( "COORD", 1 );
 define( "RESET_PERIOD", 5.152221 );
 define( "SPIN_PERIOD", 4 );
 define( "RESETPERIOD", 5.152 );
 define( "PREREAD", 32768 );
-define( "APPENDED",'/home/ahk114/logs/date_range_stage3/');
+
+if ( PHP_SAPI != "cli" )
+	exit( "THIS SHOULD ONLY BE RUN USING THE PHP CLI\r\n" );
+
+if ( $argc != 9 )
+	exit( "NEEDS 8 parameters : stage3_cli.php <sc> <year> <month> <day> <vers> <LOG> <EXT> <OUT>\r\n" );
+
+define('APPENDED',$argv[6]);
+echo "Appended file log dir:".APPENDED.PHP_EOL;
 $ext_appended = APPENDED.'ext_appended.log';
 $ext_gse_appended = APPENDED.'ext_gse_appended.log';
+#echo $ext_gse_appended.PHP_EOL;
+
+#define( "EXT", '/home/ahk114/data/extended/');	#where the output from stage1 and 2 are put
+#define ("PROC", '/home/ahk114/data/referencecaa/');#where the final output from this stage is put
+define("EXT",$argv[7]);
+define("PROC",$argv[8]);
+/*
+define( "APPENDED",'/home/ahk114/logs/date_range/');		#log file that shows which files were appended to in this processing.
+															#Those files may potentially contain duplicate entries!
+													
+if (!is_dir(APPENDED))
+{
+	mkdir(APPENDED,0750,true);
+	echo "Created appended log file directory:".APPENDED.PHP_EOL;
+}	
+*/
+												
 $verbose = FALSE;
 require_once 'getcalfile.php';	#needed to put this after constant definitions, otherwise the if loops in 
 								#getfile.php complained about the constants being undefined!
@@ -175,116 +200,7 @@ function lastextendedmode( $year, $month, $day, $hour, $minute, $second, $sc, $v
 	
 	return $extmode;
 } // lastextendedmode
-/*
-function getcal( $sc )
-{
-	global $gainx, $gainy, $gainz, $offsetx, $offsety, $offsetz;
-	
-	// [adc 1..2][sensor 0..1 (OB..IB)][sc 1..4][range 2..5]
-	//
-	// Order in Cal File
-	// OB     ADC1
-	//    IB  ADC1
-	// OB          ADC2
-	//    IB       ADC2
-	//
-	// Range 2, 3, 4, 5, 7
-	//
-	// Offset X
-	// Offset Y
-	// Offset Z
-	//
-	// Gain X
-	// ----
-	// ----
-	//
-	// ----
-	// Gain Y
-	// ----
-	//
-	// ----
-	// ----
-	// Gain Z
-	
-	$cal = fopen( "/cluster/operations/calibration/default/C" . $sc . ".fgmcal", "rb" );
-	if ( $cal )
-	{
-		$dummy = fgets( $cal, 256 );
-		for ( $adc = 1; $adc < 3; $adc++ )
-		{
-			for ( $sensor = 0; $sensor < 2; $sensor++ )
-			{
-				fscanf($cal,"%f %f %f %f %f %s",&$offsetx[$adc][$sensor][2],
-				                                &$offsetx[$adc][$sensor][3],
-				                                &$offsetx[$adc][$sensor][4],
-				                                &$offsetx[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);
 
-				fscanf($cal,"%f %f %f %f %f %s",&$offsety[$adc][$sensor][2],
-				                                &$offsety[$adc][$sensor][3],
-				                                &$offsety[$adc][$sensor][4],
-				                                &$offsety[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);
-
-				fscanf($cal,"%f %f %f %f %f %s",&$offsetz[$adc][$sensor][2],
-				                                &$offsetz[$adc][$sensor][3],
-				                                &$offsetz[$adc][$sensor][4],
-				                                &$offsetz[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);
-
-				fscanf($cal,"%f %f %f %f %f %s",&$gainx[$adc][$sensor][2],
-				                                &$gainx[$adc][$sensor][3],
-				                                &$gainx[$adc][$sensor][4],
-				                                &$gainx[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);
-				
-				$dummy = fgets( $cal, 256 );
-				$dummy = fgets( $cal, 256 );
-				$dummy = fgets( $cal, 256 );
-				
-				fscanf($cal,"%f %f %f %f %f %s",&$gainy[$adc][$sensor][2],
-				                                &$gainy[$adc][$sensor][3],
-				                                &$gainy[$adc][$sensor][4],
-				                                &$gainy[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);
-				
-				$dummy = fgets( $cal, 256 );
-				$dummy = fgets( $cal, 256 );
-				$dummy = fgets( $cal, 256 );
-				
-				fscanf($cal,"%f %f %f %f %f %s",&$gainz[$adc][$sensor][2],
-				                                &$gainz[$adc][$sensor][3],
-				                                &$gainz[$adc][$sensor][4],
-				                                &$gainz[$adc][$sensor][5],
-				                                &$dummy1,&$dummy2);
-				
-				// Bodge to assign simple values for Range 6 and 7, needs to be done better
-				
-				$gainx[ $adc ][ $sensor ][ 6 ]   = 1;				$gainx[ $adc ][ $sensor ][ 7 ]   = 1;
-				$gainy[ $adc ][ $sensor ][ 6 ]   = 1;				$gainy[ $adc ][ $sensor ][ 7 ]   = 1;
-				$gainz[ $adc ][ $sensor ][ 6 ]   = 1;				$gainz[ $adc ][ $sensor ][ 7 ]   = 1;
-				$offsetx[ $adc ][ $sensor ][ 6 ] = 0;				$offsetx[ $adc ][ $sensor ][ 7 ] = 0;
-				$offsety[ $adc ][ $sensor ][ 6 ] = 0;				$offsety[ $adc ][ $sensor ][ 7 ] = 0;
-				$offsetz[ $adc ][ $sensor ][ 6 ] = 0;				$offsetz[ $adc ][ $sensor ][ 7 ] = 0;
-			}
-		}
-	}
-	else
-	{
-		for ( $adc = 1; $adc < 3; $adc++ )
-			for ( $sensor = 0; $sensor < 2; $sensor++ )
-				for ( $range = 2; $range < 8; $range++ )
-				{
-					$offsetx[ $adc ][ $sensor ][ $range ] = 0;
-					$offsety[ $adc ][ $sensor ][ $range ] = 0;
-					$offsetz[ $adc ][ $sensor ][ $range ] = 0;
-					$gainx[ $adc ][ $sensor ][ $range ]   = 1;
-					$gainy[ $adc ][ $sensor ][ $range ]   = 1;
-					$gainz[ $adc ][ $sensor ][ $range ]   = 1;
-				}
-	}
-} // getcal
-*/
 function getcal($sc,$filepicked)
 {
 	global $gainx,$gainy,$gainz,$offsetx,$offsety,$offsetz,$verbose;
@@ -339,27 +255,30 @@ function getcal($sc,$filepicked)
 	$use_caa = FALSE;
 	$use_daily = FALSE;
 	$use_default = FALSE;
+	/*
+	Now hardwired to use caa calibration only!
+	*/
 	if ($calfile=getcalfile($sc,$filepicked,CAACAL))
 	{
-		echo "Using CAA calibration!".PHP_EOL;
+		#echo "Using CAA calibration!".PHP_EOL;
 		echo "CAL File: ".$calfile.PHP_EOL;
 		$use_caa = TRUE;
-		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!		
+		$cal=fopen($calfile,"rb");	
 	}
 	elseif ($calfile=getcalfile($sc,$filepicked,DAILYCAL))
 	{
-		if (!$use_caa){exit("No caa cal found, exiting!".PHP_EOL);}
+		if (!$use_caa){exit("No caa cal found, exiting!".PHP_EOL);} #caa only
 		echo "Using DAILY calibration!".PHP_EOL;
 		$use_daily = TRUE;
-		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!			
+		$cal=fopen($calfile,"rb");	
 	}
 	else
 	{
-		if (!$use_caa){exit("No caa cal found, exiting!".PHP_EOL);}
+		if (!$use_caa){exit("No caa cal found, exiting!".PHP_EOL);} #caa only
 		$use_default = TRUE;
 		echo "Using default calibration".PHP_EOL;
 		$calfile = "/cluster/operations/calibration/default/C".$sc.".fgmcal";
-		$cal=fopen($calfile,"rb"); #1 file like this is only for 1 spacecraft!!
+		$cal=fopen($calfile,"rb");
 	}
 	if (!$use_caa){exit("No caa cal found, exiting!".PHP_EOL);}
 	if ($cal)			#if cal file can be opened!
@@ -465,9 +384,9 @@ function getcal($sc,$filepicked)
 			|| (!(isset($r7offsetz))) 
 			|| (!(isset($r7gainx)))
 			|| (!(isset($r7gainy)))
-			|| (!(isset($r7gainz)))
-		){	#if these are not set, then assume that no range7 info was there, and fill it in with unit values
-		
+			|| (!(isset($r7gainz))))
+		{	#if these are not set, then assume that no range7 info was there, and fill it in with unit values
+			echo "No range 7 information found, applying unit gains and 0 offset!".PHP_EOL;
 			$r7offsetx = 0;
 			$r7offsety = 0;
 			$r7offsetz = 0;
@@ -491,6 +410,8 @@ function getcal($sc,$filepicked)
 	}
 	else
 	{
+		exit("CAA calibration file not found or can't be opened".PHP_EOL);
+		/* #caa only
 		for($adc=1;$adc<3;$adc++)
 			for($sensor=0;$sensor<2;$sensor++)
 				for($range=2;$range<8;$range++)
@@ -502,6 +423,7 @@ function getcal($sc,$filepicked)
 					$gainy[$adc][$sensor][$range]=1;
 					$gainz[$adc][$sensor][$range]=1;
 				}
+		*/
 	}
 }
 
@@ -575,12 +497,6 @@ function spinrate( $year, $month, $day, $sc, $version )
 
 // Code to minimally deal with parameter passing
 
-if ( PHP_SAPI != "cli" )
-	exit( "THIS SHOULD ONLY BE RUN USING THE PHP CLI\r\n" );
-
-if ( $argc != 6 )
-	exit( "NEEDS 5 parameters : stage3_cli.php <sc> <year> <month> <day> <vers>\r\n" );
-
 $year = $argv[ 2 ];
 if ( $year < 2000 )
 	$year += 2000;
@@ -652,13 +568,11 @@ for ( $ext = 0; $ext < 10; $ext++ )
 					$version = substr( basename( $filepicked ), 10, 1 );
 					
 					getcal( $sc ,$filepicked);
+					echo "Raw Calibration, before adjustment (just as read from file)".PHP_EOL;
+					displaycal( $sc ); #displaying calibration used
 					modifycal( $sc );
-					if ($verbose)
-					{
-						//Debugging only!!!!
-						displaycal( $sc );
-						//
-					}
+					echo "Displaying calibration that is actually used! (after modification)".PHP_EOL;
+					displaycal( $sc );
 					$satt_name = RAW . '20' . $year . '/' . $month . '/C' . $sc . '_' . $year . $month . $day . '_' . $version . '.SATT';
 					
 					if ( file_exists( $satt_name ) && ( $satt_h = fopen( $satt_name, "rb" ) ) )
@@ -698,7 +612,7 @@ for ( $ext = 0; $ext < 10; $ext++ )
 					// 2001-11-16T19:46:00.750Z   26.887    0.000    0.000
 					// 2001-11-16T19:46:04.760Z   26.829    0.000    0.000
 					// 2001-11-16T19:46:08.772Z   26.800    0.000    0.000
-					
+					echo "Reading raw data from:".PHP_EOL.$filepicked.PHP_EOL;			
 					$extfile = file( $filepicked );
 					
 					if ( !is_dir( EXT . date( 'Y', $start ) ) )
@@ -707,17 +621,17 @@ for ( $ext = 0; $ext < 10; $ext++ )
 					if ( !is_dir( EXT . date( 'Y/m', $start ) ) )
 						mkdir( EXT . date( 'Y/m', $start ), 0750 );
 					
-					if (!is_dir(OUTEXT.date('Y/m/',$start)))
+					if (!is_dir(EXT.date('Y/m/',$start)))
 					{
-						echo "Creating OUTEXT directory".PHP_EOL;
-						mkdir(OUTEXT.date('Y/m/',$start),0750,true);
+						echo "Creating EXT directory".PHP_EOL;
+						mkdir(EXT.date('Y/m/',$start),0750,true);
 					}
 					$dir_path = PROC.date( 'Y/m/', $start );
 					if (!is_dir($dir_path))
 					{
 						mkdir($dir_path,0750,true);
 					}
-					$outfile = OUTEXT . date( 'Y/m/', $start ) . 'C' . $sc . '_' . date( 'ymd', $start ) . '_' . $version . '.EXT';
+					$outfile = EXT . date( 'Y/m/', $start ) . 'C' . $sc . '_' . date( 'ymd', $start ) . '_' . $version . '.EXT';
 					
 					if (file_exists($outfile))
 					{
@@ -753,7 +667,6 @@ for ( $ext = 0; $ext < 10; $ext++ )
 					$time = $start;
 					
 					$lastreset = 999999;
-					
 					$loopsize   = count( $extfile );
 					$onepercent = (int) ( $loopsize / 100 );
 					
@@ -799,7 +712,8 @@ for ( $ext = 0; $ext < 10; $ext++ )
 								$bz = $instrz / $scale;
 							
 							if ( $range < 2 or $range > 7 )
-								exit( "WTf?" );
+								exit( "WTf? Range is off the scale?!" );
+
 							$bx = $bx * $gainx[ $extadc ][ $extsensor ][ $range ] - $offsetx[ $extadc ][ $extsensor ][ $range ];
 							$by = $by * $k2 * $gainy[ $extadc ][ $extsensor ][ $range ] - $offsety[ $extadc ][ $extsensor ][ $range ];
 							$bz = $bz * $k2 * $gainz[ $extadc ][ $extsensor ][ $range ] - $offsetz[ $extadc ][ $extsensor ][ $range ];
@@ -874,10 +788,10 @@ for ( $ext = 0; $ext < 10; $ext++ )
 							if ( !is_dir( EXT . date( 'Y/m', $time ) ) )
 								mkdir( EXT . date( 'Y/m', $time ), 0750 );
 							
-							if (!is_dir(OUTEXT.date('Y/m/',$time)))
+							if (!is_dir(EXT.date('Y/m/',$time)))
 							{
-								echo "Creating OUTEXT directory".PHP_EOL;
-								mkdir(OUTEXT.date('Y/m/',$time),0750,true);
+								echo "Creating EXT directory".PHP_EOL;
+								mkdir(EXT.date('Y/m/',$time),0750,true);
 							}
 							$dir_path = PROC.date( 'Y/m/', $time );
 							if (!is_dir($dir_path))
@@ -885,7 +799,7 @@ for ( $ext = 0; $ext < 10; $ext++ )
 								mkdir($dir_path,0750,true);
 							}
 							
-							$outfile = OUTEXT . date( 'Y/m/', $time ) . 'C' . $sc . '_' . date( 'ymd', $time ) . '_' . $version . '.EXT';
+							$outfile = EXT . date( 'Y/m/', $time ) . 'C' . $sc . '_' . date( 'ymd', $time ) . '_' . $version . '.EXT';
 
 							if (file_exists($outfile))
 							{
@@ -933,5 +847,5 @@ for ( $ext = 0; $ext < 10; $ext++ )
 		}
 	}
 }
-
+exit(1);
 ?>

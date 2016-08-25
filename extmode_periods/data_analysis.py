@@ -13,17 +13,18 @@ import cPickle as pickle
 #import pickle
 import pandas as pd
 from collections import OrderedDict
+
 #import itertools
 #import csv
 #import time
 logdir = 'Y:/logs/data_analysis/'
-VERBOSE=False
+VERBOSE=True
 PLOT_VERBOSE=False
 
 pickledir = 'Y:/overlap_stats/'
 imagedir=pickledir+'images/'
-refdirahk114 = 'Y:/reference/'
-refdirahk114caa = 'Y:/referencecaa/'
+refdirahk114 = 'Y:/data/referencecaa/'
+refdirahk114caa = 'Y:/data/referencecaa/'
 refdir = 'Z:/data/reference/'
 caadir = 'Z:/caa/ic_archive/'
 dirs = [refdirahk114,refdir,caadir,refdirahk114caa]
@@ -970,6 +971,25 @@ def analyse(spacecraft=1,start_date=datetime(2016,1,1),end_date='',
     #return vfiles.threshold_std,new
     return std_periods,vectors,vfiles_store
 
+def generate_dataframe_plotting_list(dataframe):
+    plot_list = []
+    if not dataframe.empty:
+        dataframe = dataframe.sort_index()
+        times = dataframe.index.values
+        diffs=pd.Series(data=times[1:]-times[:-1],
+                        index=times[1:])
+        delta = diffs/pd.Timedelta(1,'s')
+        dataframe['delta']=delta
+        interval_mask = dataframe['delta']>5
+        break_times = dataframe[interval_mask].index
+        plot_list = []
+        for i in xrange(break_times.shape[0]):
+            mask = dataframe.index<break_times[i]
+            plot_list.append(dataframe[mask])
+            dataframe = dataframe[~mask]
+        plot_list.append(dataframe)
+    return plot_list
+
 def plot_x_pos_mag(scs,start,end,save_dir=imagedir,image_type='.pdf',save=False,
                    show=True,source='caa',dpi=330):
     assert len(scs)==2,"Need two spacecraft to compare!"
@@ -1035,9 +1055,9 @@ def plot_x_pos_mag(scs,start,end,save_dir=imagedir,image_type='.pdf',save=False,
             plot_list.append(dataframe)
             for frame in plot_list:
                 axis.plot_date(frame.index,frame['mag'],fmt='-',
-                               c=colour_dict[sc_string])
+                               c=colour_dict[sc_string],zorder=10)
                 axis2.plot_date(frame.index,frame['x_pos_gse'],fmt='-',
-                                c='b')
+                                c='b',zorder=9)
             axis.set_yscale('log')
             for tl in axis.get_yticklabels():
                 tl.set_color(colour_dict[sc_string])
@@ -1100,51 +1120,396 @@ def plot_axis(array,ax,plotwhich_override=''):
             total_entries+=len(dates_list[-1])
         for ds,da in zip(dates_list,data_list):
             if [label,colour] in legend_colour_list_line:
-                ax.plot_date(ds,da,c=colour,fmt='-')
+                ax.plot_date(ds,da,c=colour,fmt='-',zorder=10)
             else:
-                ax.plot_date(ds,da,c=colour,label=label,fmt='-')
+                ax.plot_date(ds,da,c=colour,label=label,fmt='-',zorder=10)
                 legend_colour_list_line.append([label,colour])            
     legend = ax.legend(loc='best',fontsize=14) 
-        
-def plotting(scs,start_date,end_date,plotwhich='mag',return_output=False,
-              std_threshold=0,std_n=10,prune=True,prune_value=0,source='default',
-              plot_std=True):   
-    plt.ion()
+
+def invisible_labels(ax,which='x'):
+    if which=='x':
+        for label in ax.get_xticklabels():
+            label.set_visible(False)  
+    elif which=='y':
+        for label in ax.get_yticklabels():
+            label.set_visible(False)   
+    else:
+        raise Exception("Axis must be either 'x' or 'y'")
+
+def plotting_overlay(scs,start_date,end_date,plotwhichs,source='caa',show=True,
+                     save=False,dpi=300,filetype='.png',savedir=''):  
+    plt.ioff()
+    colour_dict = {1:'Black',2:'Red',3:'Green',4:'Magenta'}
     if type(scs) == int or type(scs) == float:
         scs = [int(scs)]
-    '''
-    sc is a list of ints [1,2,3,4]
-    '''
+    if plotwhichs == 'all' or plotwhichs =='ALL':
+        plotwhichs = ['x','y','z','mag']
+    elif type(plotwhichs)==str:
+        plotwhichs=[plotwhichs]
+
     start = pd.Timestamp(start_date).normalize().to_datetime()
     end = pd.Timestamp(end_date).normalize().to_datetime()
-    if not prune:
-        prune_start=datetime(1,1,1)
-        prune_end=datetime(1,1,1)
+    prune_start = start_date
+    if start_date==end_date:
+        prune_end = end_date+timedelta(days=1)
     else:
-        prune_start = start_date
-        if start_date==end_date:
-            prune_end = end_date+timedelta(days=1)
-        else:
-            prune_end = end_date
-    if plotwhich not in ['x','y','z','mag']:
-        raise Exception("Please select one of 'x','y','z' or 'mag'")
+        prune_end = end_date
+        
     if source=='default':
-        input=[[refdir,1,'r','ext mode default',plotwhich],[refdir,0,'b','default',plotwhich]]
+        ext_dir = refdir
+        norm_dir = refdir
     elif source=='caa':
-        input=[[refdirahk114caa,1,'r','ext mode caa',plotwhich],[caadir,0,'b','caa',plotwhich]]        
+        ext_dir = refdirahk114caa
+        norm_dir = caadir
     else:
         raise Exception("Select either 'default' or 'caa' as source")
-    for s in scs:
-        output = analyse(spacecraft=s,input=input,start_date=start,
-                 end_date=end,std_n=std_n,
-                 PLOT=True, scatter=False,std_threshold=std_threshold,
-                 prune_start=prune_start,
-                 prune_end=prune_end,
-                 prune_value=prune_value,plot_std=plot_std
-                 )       
-    if return_output:
-        return output
-               
+    vfiles = {}
+    for sc in scs:
+        for ext_mode,dir in enumerate([norm_dir,ext_dir]):
+            input = [[dir,ext_mode,'','','']]
+            vfile = vectorfiles()
+            process(vfile,sc,start,end,input,prune_start,prune_end)
+            vfiles[str(sc)+str(ext_mode)]=vfile
+    rows = len(plotwhichs)
+    columns = 1
+    labelsize=17.5
+    #fig, axarr = plt.subplots(rows,columns,sharex=True,sharey=True,figsize=(23,13))
+    fig = plt.figure(figsize=(23,13))
+    if rows==1:
+        axarr = fig.add_subplot(1,1,1)
+    else:
+        axarr = []
+        for i in range(rows):
+            if i==0:
+                axarr.append(fig.add_subplot(rows,1,i+1))
+            else:
+                axarr.append(fig.add_subplot(rows,1,i+1,sharex=axarr[0]))
+
+    if rows ==1:
+        ax = axarr
+        plotwhich = plotwhichs[0]
+        ax.set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+        if plotwhich == 'x':
+            ax.set_ylabel(r'$\mathrm{B_x \ (nT)}$',fontsize=labelsize)
+        elif plotwhich == 'y':
+            ax.set_ylabel(r'$\mathrm{B_y \ (nT)}$',fontsize=labelsize)
+        elif plotwhich == 'z':
+            ax.set_ylabel(r'$\mathrm{B_z \ (nT)}$',fontsize=labelsize)
+        elif plotwhich == 'mag':
+            ax.set_ylabel(r'$\mathrm{\vert B \vert \ (nT)}$',
+                        fontsize=labelsize)
+    else:
+        ax = axarr[-1]
+        ax.set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+        for ax,plotwhich in zip(axarr,plotwhichs):
+            if plotwhich == 'x':
+                ax.set_ylabel(r'$\mathrm{B_x \ (nT)}$',fontsize=labelsize)
+            elif plotwhich == 'y':
+                ax.set_ylabel(r'$\mathrm{B_y \ (nT)}$',fontsize=labelsize)
+            elif plotwhich == 'z':
+                ax.set_ylabel(r'$\mathrm{B_z \ (nT)}$',fontsize=labelsize)
+            elif plotwhich == 'mag':
+                ax.set_ylabel(r'$\mathrm{\vert B \vert \ (nT)}$',
+                            fontsize=labelsize)
+
+    for row,plotwhich in enumerate(plotwhichs):
+        if rows==1:
+            ax=axarr
+        else:
+            ax=axarr[row]
+        ax.minorticks_on()
+        ax.grid(True,which='major',color='0.6',linestyle='-',
+                alpha=0.8,axis='both')
+        ax.tick_params(axis='x',which='major',labelsize=12,pad=10)
+        ax.tick_params(axis='y',which='major',labelsize=12)
+        if row!=rows-1:
+            invisible_labels(ax,'x')
+            
+        lines = []
+        labels = []           
+        for sc in scs:            
+            for ext_mode in range(2):
+                vfile_index = str(sc)+str(ext_mode)
+                vfile = vfiles[vfile_index]
+                vectors = vfile.return_vectors()
+                '''
+                if ext_mode:
+                    label = 'ext mode'
+                    colour = 'DarkOrange'
+                else:
+                    label = 'normal mode'
+                    colour = colour_dict[sc]
+                '''
+                label = 'Cluster '+str(sc)
+                colour = colour_dict[sc]
+                plotting_list = generate_dataframe_plotting_list(vectors)
+                for frame in plotting_list:
+                    line,=ax.plot_date(frame.index.values,
+                            frame[plotwhich],fmt='-',c=colour,zorder=10)
+                if plotting_list:
+                    lines.append(line)
+                    labels.append(label)
+        if lines and labels:
+            if len(lines)==1 and len(labels)==1:
+                lines = (lines[0],)
+                labels = (labels[0],)
+            ax.legend((lines),(labels),loc='best')
+            
+    #ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
+    if start_date.strftime("%H:%M:%S") != '00:00:00':
+        fmt = "%d/%m/%Y %H:%M:%S"
+        save_fmt = "%d_%m_%YT%H-%M-%S"
+    else:
+        fmt = "%d/%m/%Y"
+        save_fmt = "%d_%m_%Y"
+    start_str = start_date.strftime(fmt)
+    start_str_save = start_date.strftime(save_fmt)
+    if end_date.strftime("%H:%M:%S") != '00:00:00':
+        fmt = "%d/%m/%Y %H:%M:%S"
+        save_fmt = "%d_%m_%YT%H-%M-%S"
+    else:
+        fmt = "%d/%m/%Y"
+        save_fmt = "%d_%m_%Y"
+    end_str = end_date.strftime(fmt)
+    end_str_save = end_date.strftime(save_fmt)
+    plt.suptitle(('From '+start_str+' to '+end_str+' ('+source+' calibration) ' 
+                    '(ext mode in same colour)'),fontsize=16)
+    plt.gcf().autofmt_xdate()
+    #plt.tight_layout()
+    plt.subplots_adjust(top=0.92,bottom=0.1)
+    if save:
+        if not os.path.isdir(savedir):
+            print (savedir+" is not a valid directory!\nPlease"
+                            "provide valid directory!")
+        else:
+            save_string = 'plotting_overlay_scs--'+'--'.join(map(str,scs))+'__'+\
+                                    start_str_save+'__'+end_str_save+filetype
+            fig.savefig(savedir+save_string,dpi=dpi,bbox_inches='tight',
+                                                        pad_inches=0.4)
+    if show:
+        figManager = plt.get_current_fig_manager()
+        figManager.window.showMaximized()
+        plt.show()
+    else:
+        plt.close()
+        
+def plotting(scs,start_date,end_date,plotwhichs,source='caa',show=True,
+             save=False,dpi=300,filetype='.png',savedir='',
+             override_filepath=False):  
+    plt.ioff()
+    colour_dict = {1:'Black',2:'Red',3:'Green',4:'Magenta'}
+    if type(scs) == int or type(scs) == float:
+        scs = [int(scs)]
+    if plotwhichs == 'all' or plotwhichs =='ALL':
+        plotwhichs = ['x','y','z','mag']
+    elif type(plotwhichs)==str:
+        plotwhichs=[plotwhichs]
+
+    start = pd.Timestamp(start_date).normalize().to_datetime()
+    end = pd.Timestamp(end_date).normalize().to_datetime()
+    prune_start = start_date
+    if start_date==end_date:
+        prune_end = end_date+timedelta(days=1)
+    else:
+        prune_end = end_date
+        
+    if source=='default':
+        ext_dir = refdir
+        norm_dir = refdir
+    elif source=='caa':
+        ext_dir = refdirahk114caa
+        norm_dir = caadir
+    else:
+        raise Exception("Select either 'default' or 'caa' as source")
+    vfiles = {}
+    for sc in scs:
+        for ext_mode,dir in enumerate([norm_dir,ext_dir]):
+            input = [[dir,ext_mode,'','','']]
+            vfile = vectorfiles()
+            process(vfile,sc,start,end,input,prune_start,prune_end)
+            vfiles[str(sc)+str(ext_mode)]=vfile
+    rows = len(plotwhichs)
+    columns = len(scs)
+    labelsize=17.5
+    #fig, axarr = plt.subplots(rows,columns,sharex=True,sharey=True,figsize=(23,13))
+    fig = plt.figure(figsize=(23,13))
+    if rows==1 and columns==1:
+        axarr = fig.add_subplot(1,1,1)
+    elif rows==1:
+        axarr = []
+        for i in range(columns):
+            if i==0:
+                axarr.append(fig.add_subplot(1,columns,i+1))
+            else:
+                axarr.append(fig.add_subplot(1,columns,i+1,sharex=axarr[0]
+                                                        ,sharey=axarr[0]))
+    elif columns==1:
+        axarr = []
+        for i in range(rows):
+            if i==0:
+                axarr.append(fig.add_subplot(rows,1,i+1))
+            else:
+                axarr.append(fig.add_subplot(rows,1,i+1,sharex=axarr[0]))
+    else:
+        axarr=[]
+        axarr_count = 1
+        for i in range(rows):
+            axarr.append([])
+            for j in range(columns):
+                if j==0 and i==0:
+                    axarr[-1].append(fig.add_subplot(rows,columns,axarr_count))
+                elif j==0:
+                    axarr[-1].append(fig.add_subplot(rows,columns,axarr_count,
+                                                            sharex=axarr[0][0]))
+                else:
+                    axarr[-1].append(fig.add_subplot(rows,columns,axarr_count,
+                                        sharex=axarr[0][0],sharey=axarr[-1][0]))
+                axarr_count += 1
+    if rows ==1 and columns==1:
+        ax = axarr
+        plotwhich = plotwhichs[0]
+        ax.set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+        if plotwhich == 'x':
+            ax.set_ylabel(r'$\mathrm{B_x \ (nT)}$',fontsize=labelsize)
+        elif plotwhich == 'y':
+            ax.set_ylabel(r'$\mathrm{B_y \ (nT)}$',fontsize=labelsize)
+        elif plotwhich == 'z':
+            ax.set_ylabel(r'$\mathrm{B_z \ (nT)}$',fontsize=labelsize)
+        elif plotwhich == 'mag':
+            ax.set_ylabel(r'$\mathrm{\vert B \vert \ (nT)}$',
+                        fontsize=labelsize)
+    elif rows == 1:
+        for ax in axarr:
+            ax.set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize) 
+        ax = axarr[0]
+        plotwhich = plotwhichs[0]
+        ax.set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+        if plotwhich == 'x':
+            ax.set_ylabel(r'$\mathrm{B_x \ (nT)}$',fontsize=labelsize)
+        elif plotwhich == 'y':
+            ax.set_ylabel(r'$\mathrm{B_y \ (nT)}$',fontsize=labelsize)
+        elif plotwhich == 'z':
+            ax.set_ylabel(r'$\mathrm{B_z \ (nT)}$',fontsize=labelsize)
+        elif plotwhich == 'mag':
+            ax.set_ylabel(r'$\mathrm{\vert B \vert \ (nT)}$',
+                        fontsize=labelsize)     
+    elif columns==1:
+        ax = axarr[-1]
+        ax.set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+        for ax,plotwhich in zip(axarr,plotwhichs):
+            if plotwhich == 'x':
+                ax.set_ylabel(r'$\mathrm{B_x \ (nT)}$',fontsize=labelsize)
+            elif plotwhich == 'y':
+                ax.set_ylabel(r'$\mathrm{B_y \ (nT)}$',fontsize=labelsize)
+            elif plotwhich == 'z':
+                ax.set_ylabel(r'$\mathrm{B_z \ (nT)}$',fontsize=labelsize)
+            elif plotwhich == 'mag':
+                ax.set_ylabel(r'$\mathrm{\vert B \vert \ (nT)}$',
+                            fontsize=labelsize)
+    else:
+        for ax in axarr[-1]:
+            ax.set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+        first_columns_axes = [axes[0] for axes in axarr]
+        for ax,plotwhich in zip(first_columns_axes,plotwhichs):
+            if plotwhich == 'x':
+                ax.set_ylabel(r'$\mathrm{B_x \ (nT)}$',fontsize=labelsize)
+            elif plotwhich == 'y':
+                ax.set_ylabel(r'$\mathrm{B_y \ (nT)}$',fontsize=labelsize)
+            elif plotwhich == 'z':
+                ax.set_ylabel(r'$\mathrm{B_z \ (nT)}$',fontsize=labelsize)
+            elif plotwhich == 'mag':
+                ax.set_ylabel(r'$\mathrm{\vert B \vert \ (nT)}$',
+                            fontsize=labelsize)
+    #axarr indexed via [row][column]
+    
+    for column,sc in enumerate(scs):
+        for row,plotwhich in enumerate(plotwhichs):
+            if columns==1 and rows==1:
+                ax=axarr
+            elif columns==1:
+                ax=axarr[row]
+            elif rows==1:
+                ax=axarr[column]
+            else:
+                ax=axarr[row][column]
+            ax.minorticks_on()
+            ax.grid(True,which='major',color='0.6',linestyle='-',
+                    alpha=0.8,axis='both')
+            ax.tick_params(axis='x',which='major',labelsize=12,pad=10)
+            ax.tick_params(axis='y',which='major',labelsize=12)
+            if column>0:
+                invisible_labels(ax,'y')
+            if row!=rows-1:
+                invisible_labels(ax,'x')
+            if row==0:
+                ax.set_title('Cluster '+str(sc),fontsize=14)
+            lines = []
+            labels = []
+            for ext_mode in range(2):
+                vfile_index = str(sc)+str(ext_mode)
+                vfile = vfiles[vfile_index]
+                vectors = vfile.return_vectors()
+                if ext_mode:
+                    label = 'ext mode'
+                    colour = 'DarkOrange'
+                else:
+                    label = 'normal mode'
+                    colour = colour_dict[sc]
+                plotting_list = generate_dataframe_plotting_list(vectors)
+                for frame in plotting_list:
+                    line,=ax.plot_date(frame.index.values,
+                            frame[plotwhich],fmt='-',c=colour,zorder=10)
+                if plotting_list:
+                    lines.append(line)
+                    labels.append(label)
+            '''
+            if lines and labels:
+                if len(lines)==1 and len(labels)==1:
+                    lines = (lines[0],)
+                    labels = (labels[0],)
+                ax.legend((lines),(labels),loc='best')
+            '''
+    #ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
+    if start_date.strftime("%H:%M:%S") != '00:00:00':
+        fmt = "%d/%m/%Y %H:%M:%S"
+        save_fmt = "%d_%m_%YT%H-%M-%S"
+    else:
+        fmt = "%d/%m/%Y"
+        save_fmt = "%d_%m_%Y"
+    start_str = start_date.strftime(fmt)
+    start_str_save = start_date.strftime(save_fmt)
+    if end_date.strftime("%H:%M:%S") != '00:00:00':
+        fmt = "%d/%m/%Y %H:%M:%S"
+        save_fmt = "%d_%m_%YT%H-%M-%S"
+    else:
+        fmt = "%d/%m/%Y"
+        save_fmt = "%d_%m_%Y"
+    end_str = end_date.strftime(fmt)
+    end_str_save = end_date.strftime(save_fmt)
+    plt.suptitle(('From '+start_str+' to '+end_str+' ('+source+' calibration) ' 
+                    '(Extended Mode in Orange)'),fontsize=16)
+    plt.gcf().autofmt_xdate()
+    #plt.tight_layout()
+    plt.subplots_adjust(top=0.92,bottom=0.1)
+    if override_filepath:
+        fig.savefig(override_filepath,dpi=dpi,bbox_inches='tight',
+                                                pad_inches=0.4)  
+    elif save:
+        if not os.path.isdir(savedir):
+            print (savedir+" is not a valid directory!\nPlease"
+                            "provide valid directory!")
+        else:
+            save_string = 'plotting_scs--'+'--'.join(map(str,scs))+'__'+\
+                                    start_str_save+'__'+end_str_save+filetype
+            fig.savefig(savedir+save_string,dpi=dpi,bbox_inches='tight',
+                                                        pad_inches=0.4)              
+    if show:
+        figManager = plt.get_current_fig_manager()
+        figManager.window.showMaximized()
+        plt.show()
+    else:
+        plt.close()
+
 def plot_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,show=True,
              source='caa',save_dir=imagedir):
     '''
@@ -1333,20 +1698,31 @@ def plot_mag_xyz(series,save=False,dpi=300,image_type='.pdf',prune=True,
     else:
         plt.close()
 
-def return_vectors(scs,start_date,end_date):
-    if type(scs) == int or type(scs) == float:
-        scs = [int(scs)]
+def return_ext_data(sc,start_date,end_date,source='caa'):
     start = pd.Timestamp(start_date).normalize().to_datetime()
     end = pd.Timestamp(end_date).normalize().to_datetime()
     prune_start=start_date
     prune_end = end_date
-    input=[[refdir,0,'','',''],[refdir,1,'','','']]
-    vecs=pd.DataFrame()
-    for sc in scs:
-        vfiles=vectorfiles()
-        process(vfiles,sc,start,end,input,prune_start,prune_end)
-        vecs = pd.concat((vecs,vfiles.return_vectors()))
-    return vecs
+    if source=='caa':
+        input=[[refdirahk114caa,1,'','','']]
+    else:
+        raise Exception("Only caa source supported")
+    vfiles=vectorfiles()
+    process(vfiles,sc,start,end,input,prune_start,prune_end)
+    return vfiles.return_vectors()
+  
+def return_normal_data(sc,start_date,end_date,source='caa'):
+    start = pd.Timestamp(start_date).normalize().to_datetime()
+    end = pd.Timestamp(end_date).normalize().to_datetime()
+    prune_start=start_date
+    prune_end = end_date
+    if source=='caa':
+        input=[[caadir,0,'','','']]
+    else:
+        raise Exception("Only caa source supported")
+    vfiles=vectorfiles()
+    process(vfiles,sc,start,end,input,prune_start,prune_end)
+    return vfiles.return_vectors()
     
 def return_vectors_from_vfiles(vfiles,start='',end=''):
     if type(vfiles) != list:
@@ -1519,6 +1895,119 @@ def package_data(series,dpi=300,image_type='.pdf',source='caa',
                   '__'+prune_end.strftime("%Y%m%dT%H%M%S")
         vfile.write_to_csv(directory+filename+'.csv')
     update_interval_files(series,result_dir,differences,coords)
+
+def surrounding_data_plot(series,dpi=300,image_type='.pdf',source='caa',
+                 result_dir='Y:/overlap_stats/results_caa/'):
+    '''
+    2 hours around interval!
+    '''
+    colour_dict = {1:'k',2:'r',3:'ForestGreen',4:'Magenta'}
+    if source=='default':
+        dir = refdir
+    elif source=='caa':
+        dir = caadir
+    else:
+        raise Exception("Select either 'default' or 'caa' as source")
+    
+    start_date = series.start.normalize().to_datetime()-timedelta(days=1)
+    end_date = series.end.normalize().to_datetime()+timedelta(days=1)
+    prune_start = series.start.to_datetime()
+    prune_end = series.end.to_datetime()
+    Year,month,day = dt_to_strings(prune_start)
+    directory = result_dir+Year+'/'+month+'/'
+    for i in range(0,100):
+        newdir = directory+format(i,'03d')+'__'+Year+'_'+month+'_'+day+'T'+\
+                                        dt_time_to_strings(prune_start)+'/'
+        if not os.path.isdir(newdir):
+            os.makedirs(newdir)
+            break
+    directory=newdir      
+    plotwhichs=['x','y','z']
+    ext_mode = 0
+    scs=range(1,5)
+    
+    start=prune_end
+    end = prune_end+timedelta(hours=10)
+    
+    labelsize=17.5
+    fig,axarr = plt.subplots(3,1,sharex=True,figsize = (23,13))
+    fig.suptitle('Normal Mode Data after ('+source+' cal)')
+    axarr[2].set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+    axarr[0].set_ylabel(r'$\mathrm{B_x \ (nT)}$',fontsize=labelsize)
+    axarr[1].set_ylabel(r'$\mathrm{B_y \ (nT)}$',fontsize=labelsize)
+    axarr[2].set_ylabel(r'$\mathrm{B_z \ (nT)}$',fontsize=labelsize)
+    for sc in scs:
+        vfile = vectorfiles()
+        input = [[dir,ext_mode,'','','']]
+        process(vfile,sc,start_date,end_date,input,prune_start=start,
+                                                    prune_end=end)  
+        vecs = vfile.return_vectors()
+        times = vecs.index.values
+        for ax,coord in zip(axarr,plotwhichs):
+            ax.plot_date(times,vecs[coord],fmt='-',c=colour_dict[sc])
+            ax.grid(True,which='major',color='0.6',linestyle='-',
+                    alpha=0.7,axis='y')
+            #ax.grid(True,which='minor',color='k',linestyle='-',alpha=0.1)
+            ax.tick_params(axis='both',which='major',labelsize=14,pad=20)
+            ax.minorticks_on()
+    
+    start=prune_start-timedelta(hours=10)
+    end = prune_start
+    
+    labelsize=17.5
+    fig,axarr = plt.subplots(3,1,sharex=True,figsize = (23,13))
+    fig.suptitle('Normal Mode Data before ('+source+' cal)')
+    axarr[2].set_xlabel(r'$\mathrm{Time \ UTC}$',fontsize=labelsize)
+    axarr[0].set_ylabel(r'$\mathrm{B_x \ (nT)}$',fontsize=labelsize)
+    axarr[1].set_ylabel(r'$\mathrm{B_y \ (nT)}$',fontsize=labelsize)
+    axarr[2].set_ylabel(r'$\mathrm{B_z \ (nT)}$',fontsize=labelsize)
+    for sc in scs:
+        vfile = vectorfiles()
+        input = [[dir,ext_mode,'','','']]
+        process(vfile,sc,start_date,end_date,input,prune_start=start,
+                                                    prune_end=end)  
+        vecs = vfile.return_vectors()
+        times = vecs.index.values
+        for ax,coord in zip(axarr,plotwhichs):
+            ax.plot_date(times,vecs[coord],fmt='-',c=colour_dict[sc])
+            ax.grid(True,which='major',color='0.6',linestyle='-',
+                    alpha=0.7,axis='y')
+            #ax.grid(True,which='minor',color='k',linestyle='-',alpha=0.1)
+            ax.tick_params(axis='both',which='major',labelsize=14,pad=20)
+            ax.minorticks_on()           
+    plt.show()
+           
+def extmode_start_ends(start_date,end_date,time_pad=30,components=['z'],
+         source='caa',show=False,save=False,dpi=350,filetype='.png',savedir=''):
+    '''
+    time padding around start and end times in minutes!!
+    '''
+    import find_extmode_periods as exmps 
+    ext_intervals = exmps.find_overlap_data(start_date,end_date,
+                                            overlay_plot=0)[0]
+    for row in ext_intervals:
+        start = row[0]
+        end = row[1]
+        ext_sc = row[2]+1
+        inspect = start
+        start_date = (inspect-np.timedelta64(time_pad*60,'s')).tolist()
+        end_date = (inspect+np.timedelta64(time_pad*60,'s')).tolist()
+        plotting(ext_sc,start_date,end_date,components,filetype=filetype,
+                 dpi=dpi,savedir=savedir,show=show,save=save)  
+        inspect = end
+        start_date = (inspect-np.timedelta64(time_pad*60,'s')).tolist()
+        end_date = (inspect+np.timedelta64(time_pad*60,'s')).tolist()
+        plotting(ext_sc,start_date,end_date,components,filetype=filetype,
+                 dpi=dpi,savedir=savedir,show=show,save=save)
+        
+def jumps(start_date,end_date):  
+    extmode_start_ends(start_date,end_date,show=False,
+    save=True,filetype='.png',dpi=380,savedir='Y:/results images/jumps/',
+    time_pad=5,components=['z'],source='caa')
+    '''
+    this had to be done within another function so that the circular dependency 
+    find_extmode_periods/data_analysis works out
+    '''
 
 #prune_start = datetime(2015,12,21,10,0,0)
 #prune_end = datetime(2015,12,21,19,0,0)
