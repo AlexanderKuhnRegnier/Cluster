@@ -1,4 +1,5 @@
 **/*.html*
+**/*.swp*
 **/session
 **/*.pyc
 **/*.pickle*

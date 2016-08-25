@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import numpy as np
+from datetime import datetime
 
 #META = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/META/'#home pc
 META = 'please supply directory manually'
@@ -20,9 +21,15 @@ class meta2:
         self.ext_start = combined_data['time'].min()
         self.ext_end = combined_data['time'].max()
         self.version = version
-        self.columns = ['sc','start_date','end_date','version','dump_date',
+        self.columns = ['processing_time','sc','start_date','end_date',
+                        'version','dump_date',
                         'nr_vectors','start_reset','end_reset',
-                        'spin_period','reset_period']
+                        'spin_period','reset_period',
+                        'initial_reset','initial_scet',
+                        'final_reset','final_scet',
+                        'reset_diff','scet_diff',
+                        'extra_resets']
+        self.date_columns = [0,2,3,5,12,14]
         if self.ext_start.date() == self.ext_end.date():
             Year = str(self.ext_start.date().year)
             year = Year[2:]
@@ -63,31 +70,62 @@ class meta2:
                 '''
                 read info into dataframe before any writing is done!
                 '''
-                self.frames.append(pd.read_csv(file,parse_dates=[1,2,4]))
+                self.frames.append(pd.read_csv(file,parse_dates=self.date_columns))
             else:
                 self.frames.append(pd.DataFrame(columns=self.columns))
-    def write_meta(self,dump_date,spin_period,reset_period):  
+    def write_meta(self,dump_date,spin_period,reset_period,initial_reset,
+                   initial_scet,final_reset,final_scet):
+        if initial_reset and initial_scet and final_reset and final_scet:
+            '''
+            checking if they have been assigned to - ie they are not None
+            '''
+            reset_diff = final_reset-initial_reset
+            if reset_diff<0:
+                reset_diff += 65536
+            scet_diff = (final_scet - initial_scet)/pd.Timedelta(1,'s')
+            expected_resets = scet_diff/reset_period
+            extra_resets = reset_diff-expected_resets
+        else:
+            reset_diff = None
+            scet_diff = None
+            extra_resets = None
+            print "No reset or SCET info from border packets!"
         for index,file in enumerate(self.files):
-            new_row = pd.DataFrame(np.array([self.sc,self.ext_start,self.ext_end,
+            new_row = pd.DataFrame(np.array([datetime.now(),self.sc,
+                                    self.ext_start,self.ext_end,
                                     self.version,dump_date,self.nr_vectors,
                                     self.start_reset,self.end_reset,
-                                    spin_period,reset_period]).reshape(-1,10),
+                                    spin_period,reset_period,
+                                    initial_reset,initial_scet,
+                                    final_reset,final_scet,
+                                    reset_diff,scet_diff,
+                                    extra_resets]).reshape(-1,
+                                    len(self.columns)),
                                     columns = self.columns)
             self.frames[index] = pd.concat((self.frames[index],new_row),
                                             ignore_index=True)
-            self.frames[index].drop_duplicates(inplace=True)
+            self.frames[index].sort_values('processing_time',ascending=False)
+            self.frames[index].drop_duplicates(subset=['sc','start_date',
+                                        'end_date','version',
+                                        'dump_date','nr_vectors','start_reset',
+                                        'end_reset'],
+                                        inplace=True)
             self.frames[index].to_csv(file,index=False)
     def read(self):
         frames = pd.concat((self.frames))      
         frames.reset_index(drop=True,inplace=True)
-        frames.drop_duplicates(inplace=True)
+        frames.sort_values('processing_time',ascending=False)
+        frames.drop_duplicates(subset=['sc','start_date','end_date','version',
+                                       'dump_date','nr_vectors','start_reset',
+                                       'end_reset'],
+                                       inplace=True)
         return frames
     
     def write_interval(self):
         '''
         check whether start and end date are within one of the intervals in the
         meta file!
-        A tolerance of 1 hour is applied to the search    
+        A tolerance of 15 minutes is applied to the search    
         To overwrite old instance, new number of vectors needs to be at 
         least 100 vectors higher than the old number of vectors! Only if this
         is satisfied, is True returned.
@@ -102,9 +140,9 @@ class meta2:
         '''
         info = self.read()
         start = (info['start_date'].apply(
-                                    lambda x:x-pd.Timedelta(60**2,'s')))<self.ext_start
+                                    lambda x:x-pd.Timedelta((60**2)/4.,'s')))<self.ext_start
         end = (info['end_date'].apply(
-                                    lambda x:x+pd.Timedelta(60**2,'s')))>self.ext_end
+                                    lambda x:x+pd.Timedelta((60**2)/4.,'s')))>self.ext_end
         together = start & end
         info = info[together]
         if np.any(info['nr_vectors']<self.nr_vectors-100):#np.any in case of 

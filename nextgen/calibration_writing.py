@@ -4,6 +4,7 @@ import os
 import pandas as pd
 #from datetime import datetime
 import getcalibration
+import tempfile
 
 def float2hex(f):
     if f==0:
@@ -13,7 +14,7 @@ def float2hex(f):
     else:
         sign = 1
     f = abs(f)
-    exp = math.floor(math.log10(f)/math.log10(2))
+    exp = int(math.floor(math.log10(f)/math.log10(2)))
     remainder = int(8388608*((f/math.pow(2,exp))-1))
     upperexp = int(((exp+127)/2.))
     lowerexp = int((exp+127)&1)
@@ -69,15 +70,17 @@ def write_data(sc,ext_data,OUT=''):
     for the calibration the IB sensor and ADC 0 info will be read by default
     '''
     sattfile,stoffile,procfile = satt_stof_proc(sc,initial_date,PROC=OUT)
-    tmp = '/home/ahk114/testdata/ExtProcRaw_123'
-    tmp2 = '/home/ahk114/testdata/ExtProcDecoded_123'
-    datahandle = open(tmp,'wb')
+    tmp = tempfile.NamedTemporaryFile(prefix='ExtProcRaw_')
+    tmp2 = tempfile.NamedTemporaryFile(prefix='ExtProcDecoded_')
+    tmp3 = tempfile.NamedTemporaryFile(prefix='TempSTOF_')
     for key,row in ext_data.iterrows():
         time = (row['time']-date_1970)/pd.Timedelta(1,'s')
         r_range = row['range']
+        r_range -= 2 #since columns are 0-indexed!
         x = row['x']*gainx[0,r_range] - offsetx[0,r_range]
         y = row['y']*k2*gainy[0,r_range] - offsety[0,r_range]
         z = row['z']*k2*gainz[0,r_range] - offsetz[0,r_range]
+        
         hexbx = float2hex(x)
         hexby = float2hex(y)
         hexbz = float2hex(z)
@@ -94,32 +97,66 @@ def write_data(sc,ext_data,OUT=''):
         data.extend(hexbz)
         data.extend([0,0,0,0,0,0,0,0])
         for content in data:
-            datahandle.write(chr(content))	
+            tmp.write(chr(content))	
         if row['time'].date()-initial_date == pd.Timedelta(1,'D'):
             '''
             We are into the next day. so break open a new file!
             Also process what we had from the first day.
             '''
-            datahandle.close()
+            print "Gone over midnight, resetting initial date"
+            initial_date = row['time'].date()
+            print "Writing to:",procfile
+            print sattfile
+            print stoffile
+            #print tmp2
+            #print tmp
+            #print tmp3
+            print procfile
+            '''
+            if os.path.isfile(tmp3):
+                os.remove(tmp3)
+            '''
+            cmd = ('/cluster/operations/software/dp/bin/putstof '+stoffile+' -o '+tmp3.name)
+            os.system(cmd)
             cmd = ('FGMPATH=/cluster/operations/calibration/default ; '
-                    'export FGMPATH ; cat '+tmp+' | '
+                    'export FGMPATH ; cat '+tmp.name+' | '
                     '/cluster/operations/software/dp/bin/fgmhrt -s gse -a '+sattfile+' | ' 
-                    '/cluster/operations/software/dp/bin/fgmpos -p '+stoffile+' | '
-                    '/cluster/operations/software/dp/bin/igmvec -o '+tmp2+' 2>/dev/null ; '
-                    'cat '+tmp2+' >> '+procfile+' ;')	
+                    '/cluster/operations/software/dp/bin/fgmpos -p '+tmp3.name+' | '
+                    '/cluster/operations/software/dp/bin/igmvec -o '+tmp2.name+' ; '
+                    'cat '+tmp2.name+' >> '+procfile+' ;')	
                     #append here, not copy (ie. overwrite)
-            os.system(cmd)    
-            datahandle = open(tmp,'wb')
+            os.system(cmd)   
+            tmp.close()
+            tmp2.close()
+            tmp3.close()
+            tmp = tempfile.NamedTemporaryFile(prefix='ExtProcRaw_')
+            tmp2 = tempfile.NamedTemporaryFile(prefix='ExtProcDecoded_')
+            tmp3 = tempfile.NamedTemporaryFile(prefix='TempSTOF_')
             sattfile,stoffile,procfile = satt_stof_proc(sc,row['time'].date(),
                                                         PROC=OUT)
             offsetx,offsety,offsetz,gainx,gainy,gainz = \
                 getcalibration.getcal(sc,row['time'].date(),calibration='CAA')                                                        
     		
-    datahandle.close()
-    cmd = ('FGMPATH=/cluster/operations/calibration/default ; '
-            'export FGMPATH ; cat '+tmp+' | '
-            '/cluster/operations/software/dp/bin/fgmhrt -s gse -a '+sattfile+' | ' 
-            '/cluster/operations/software/dp/bin/fgmpos -p '+stoffile+' | '
-            '/cluster/operations/software/dp/bin/igmvec -o '+tmp2+' 2>/dev/null ; '
-            'cp '+tmp2+' '+procfile+' ;')	
+    print "Writing to:",procfile
+    print sattfile
+    print stoffile
+    #print tmp2
+    #print tmp
+    #print tmp3
+    print procfile
+    '''
+    if os.path.isfile(tmp3):
+        os.remove(tmp3)
+    '''
+    cmd = ('/cluster/operations/software/dp/bin/putstof '+stoffile+' -o '+tmp3.name)
     os.system(cmd)
+    cmd = ('FGMPATH=/cluster/operations/calibration/default ; '
+            'export FGMPATH ; cat '+tmp.name+' | '
+            '/cluster/operations/software/dp/bin/fgmhrt -s gse -a '+sattfile+' | ' 
+            '/cluster/operations/software/dp/bin/fgmpos -p '+tmp3.name+' | '
+            '/cluster/operations/software/dp/bin/igmvec -o '+tmp2.name+' ; '
+            'cp '+tmp2.name+' '+procfile+' ;')	
+    os.system(cmd)
+    tmp.close()
+    tmp2.close()
+    tmp3.close()

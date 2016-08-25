@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import RawData
 from datetime import datetime
 from numba import jit
@@ -71,21 +71,22 @@ def extrapolate_timing_from_end(spin_period,reset_period,time,
     '''                                                 
     return spin_times[::-1],spin_resets[::-1],seen_spin_resets[::-1],reset_times[::-1],reset_counter[::-1]
 
+''' ##########no x-server when running from server - could use static
 def compare_real_to_sim_from_end(spin_period,reset_period,time,
                    final_first_diff_HF,final_reset,combined_data,offset=2):
-    '''
-    Graphically compare the 'simulated' extrapolated series of resets,
-    computed from the given parameters, to the real_resets
-    (combined_data['reset']) that were read from the BS file.
-    '''                       
+    
+    #Graphically compare the 'simulated' extrapolated series of resets,
+    #computed from the given parameters, to the real_resets
+    #(combined_data['reset']) that were read from the BS file.
+                          
     spins = extrapolate_timing_from_end(spin_period,reset_period,time,
                        final_first_diff_HF=final_first_diff_HF,final_reset=final_reset)
      
     real_data_length = combined_data.shape[0] #number of spins in real data!
-    '''
-    we will need to simulate at least as many spins as this, in order to
-    simulate the entire ext mode interval!
-    '''    
+    
+    #we will need to simulate at least as many spins as this, in order to
+    #simulate the entire ext mode interval!
+      
     
     plt.figure() 
     #ax = f.add_subplot(111)           
@@ -98,9 +99,9 @@ def compare_real_to_sim_from_end(spin_period,reset_period,time,
     #print spins.groupby('reset').size().mean()
     #print spins.groupby('reset').size().std()
     combined_data['time'] = spin_period*np.arange(-combined_data.shape[0]+1,0+1,1)
-    '''
-    +1 above since we want to END at 0, just like the simulated data
-    '''
+    
+    #+1 above since we want to END at 0, just like the simulated data
+    
     plt.plot(combined_data['time']+offset*spin_period,
              combined_data['reset'],c='r',label='real, time+2 spins')
     plt.scatter(combined_data['time']+offset*spin_period,
@@ -129,6 +130,7 @@ def plotboth_advanced(a_times,a,b_times,b,title=''):
     plt.title(title)
     plt.legend()
     plt.show()
+'''
 
 def target_func(offset,spin_period,reset_period,real_resets,final_first_diff_HF,
                 final_reset,time):

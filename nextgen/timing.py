@@ -2,7 +2,7 @@ import timing_end as te
 import timing_start as ts
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import RawData
 #from datetime import datetime
 import valid_packets
@@ -16,7 +16,7 @@ RAW = '/cluster/data/raw/'
 #pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
 #pickledir = 'Y:/testdata/'
 
-def estimate_spin_reset(sc,ext_date,days=3,dir=RAW):
+def estimate_spin_reset(sc,ext_date,days=5,dir=RAW):
     if days%2==0:
         '''
         Even number, so we need to increase by one in order to get data
@@ -45,7 +45,7 @@ def estimate_spin_reset(sc,ext_date,days=3,dir=RAW):
     
 def get_vector_block_times(sc,combined_data,first_diff_HF,
                            initial_reset,initial_scet,final_first_diff_HF,
-                           final_reset,final_scet):
+                           final_reset,final_scet,spin_period,reset_period):
     '''
     Needs full reset counts, which are read from the packet headers!
     '''
@@ -93,6 +93,7 @@ def get_vector_block_times(sc,combined_data,first_diff_HF,
     Need to get time from the scet difference
     '''
     SCET_time_diff = (final_scet-initial_scet)/pd.Timedelta(1,'s') #SCET diff between PACKETS
+    nr_spins = combined_data.shape[0]
     time = SCET_time_diff + 10 #(+10 for good measure)
     if first_diff_HF<0:
         first_diff_HF += 2**16
@@ -105,9 +106,12 @@ def get_vector_block_times(sc,combined_data,first_diff_HF,
     print "data shape:",combined_data.shape
     real_resets = combined_data['reset'].values #top 12 bits values from ext data!
     print "real resets shape:",real_resets.shape
-    ext_date = initial_scet.date()
+    #ext_date = initial_scet.date()
+    '''
+    #this is now done before any of the methods is selected!
     spin_period,reset_period = estimate_spin_reset(sc,ext_date,
-                                                          days=3,dir=RAW)
+                                                          days=5,dir=RAW)
+    '''
     #spin = spin_period
     #reset = reset_period
     ###############################################################################
@@ -131,7 +135,7 @@ def get_vector_block_times(sc,combined_data,first_diff_HF,
     print "real reset shape",real_resets.shape
     print "first diff HF", first_diff_HF
     print "initial reset", initial_reset
-    print "time",time,"/spins",time/spin_period
+    print "time",time,"nr. of spins:",time/spin_period
     offset_start = ts.find_offset_initial(spin_period,reset_period,real_resets,
                                           first_diff_HF,initial_reset,time)
     print "input into t end offset:"
@@ -140,38 +144,65 @@ def get_vector_block_times(sc,combined_data,first_diff_HF,
     print "data shape",real_resets.shape
     print "final first diff HF",final_first_diff_HF
     print "final reset",final_reset
-    print "time",time,"/spins",time/spin_period
+    print "time",time,"nr. of spins:",time/spin_period
     offset_end = te.find_offset_from_end(spin_period,reset_period,real_resets,
                                          final_first_diff_HF,final_reset,time)
     print "start offset:", offset_start," end offset:", offset_end     
-    
+    '''
+    #no longer recommended, since the spin estimate can be quite unreliabel
+    # --too large in most cases, so that the data would overlap the 
+    # normal mode data at the end - is this due to the extra resets?
     start_spin = ts.optimise_spin(spin_period,reset_period,time,first_diff_HF,
                                   initial_reset,real_resets,offset_start)
     end_spin = te.optimise_spin(spin_period,reset_period,time,final_first_diff_HF,
                                 final_reset,real_resets,offset_end)
-    
     spin_estimates = pd.DataFrame(np.array([start_spin,end_spin]).reshape(-1,2),columns=['start','end'],index=[0])
     spin_estimates['diff'] = spin_estimates['start']-spin_estimates['end']
     spin_estimates['mean'] = np.mean([start_spin,end_spin])
-    spin_estimates['orig'] = spin_period
-    spin_estimates = spin_estimates[['orig','start','end','diff','mean']]
-    spin_estimates['diff to orig']=spin_estimates['orig']-spin_estimates['mean']
+    '''
+    spin_estimates = pd.DataFrame([spin_period],columns=['orig'])
+    #spin_estimates = spin_estimates[['orig','start','end','diff','mean']]
+    #spin_estimates['diff to orig']=spin_estimates['orig']-spin_estimates['mean']
+    '''
+    Get improved spin estimate from the time of the spins specified by
+    offset_start and offset_end - since the SCET times and spin phases
+    are known at both the start and end, this is just a matter of
+    extracting the right value from the extrapolation!
+    '''
+    #times relative to SCET time of first packet!
+    first_spin = offset_start*spin_period-((first_diff_HF/4096.)+spin_period)
+    last_spin = SCET_time_diff+(offset_end*spin_period)-(final_first_diff_HF/4096.)
+    spin_estimates['mean'] = (last_spin-first_spin)/nr_spins
     print "spin estimates"
     print spin_estimates            
     spin_estimate=spin_estimates['mean'].values[0]
+    print "spin estimate used:",spin_estimate
     spin_times = np.arange(0,combined_data.shape[0],1)*spin_estimate
     real_spin_times = pd.Series([initial_scet+pd.Timedelta(spin_time,'s') for spin_time in spin_times])
-    real_spin_times+= pd.Timedelta( ((first_diff_HF/4096.)+offset_start*spin_estimate) ,'s')
-    if (offset_start<0) or (real_spin_times.iloc[-1]>final_scet) or \
-        not (3.8<start_spin<4.5) or not  (3.8<end_spin<4.5) or \
-        (offset_end>0) or (real_spin_times.iloc[0]<initial_scet):
+    real_spin_times+= pd.Timedelta( (spin_estimate-(first_diff_HF/4096.) + offset_start*spin_estimate) ,'s')
+    '''
+    #now obsolete with the new way of estimating spin period!
+    print start_spin
+    print end_spin
+    if ( not (3.8<start_spin<4.5) or not  (3.8<end_spin<4.5)):
+        print "Something went wrong"
+        return pd.Series()
+    '''
+    print "start offset (spins):",offset_start
+    print "last spin time:",real_spin_times.iloc[-1]
+    print "end NS packet SCET:",final_scet
+    print "offset at end (spins):",offset_end
+    print "first spin time:",real_spin_times.iloc[0]
+    print "start NS packet SCET:",initial_scet
+    if ((offset_start<0) or (real_spin_times.iloc[-1]>final_scet) or \
+        (offset_end>0) or (real_spin_times.iloc[0]<initial_scet)):
         print "Something has gone wrong, matching to scch is recommended."
         return pd.Series()
     return real_spin_times
 
 def get_vector_times(sc,combined_data,first_diff_HF,
                            initial_reset,initial_scet,final_first_diff_HF,
-                           final_reset,final_scet):
+                           final_reset,final_scet,spin_period,reset_period):
     '''
     Since the actual function needs to shift vectors for them to match,
     this function will prepare the data to be treated this way, by 
@@ -199,7 +230,8 @@ def get_vector_times(sc,combined_data,first_diff_HF,
         block_times = get_vector_block_times(sc,input_data,first_diff_HF,
                                              initial_reset,initial_scet,
                                              final_first_diff_HF,
-                                             final_reset,final_scet)
+                                             final_reset,final_scet,
+                                             spin_period,reset_period)
         if block_times.shape[0]==0:
             print "Unexpected result"
             return pd.Series()
@@ -266,6 +298,10 @@ def get_timing(sc,dump_date,combined_data,packet_info):
     '''
     min_reset = combined_data.reset.min()
     max_reset = combined_data.reset.max()
+    initial_reset = None
+    initial_scet = None
+    final_reset = None
+    final_scet = None
     valid = valid_packets.start_end_packets(sc,dump_date,min_reset,max_reset,
                                             dir=RAW)
     start_end_packets = valid.find_valid(max_days=8)
@@ -275,7 +311,26 @@ def get_timing(sc,dump_date,combined_data,packet_info):
     print max_reset
     print start_end_packets.shape
     
-    #disabled for testing of scch method!!!
+    print "Estimating spin and reset period!"
+    
+    ext_date = start_scet_time.date()
+    spin_period,reset_period = estimate_spin_reset(sc,ext_date,
+                                                          days=5,dir=RAW)
+    print "spin period:",spin_period
+    print "reset period:",reset_period
+    if not spin_period or not reset_period:
+        spin_period,reset_period = estimate_spin_reset(sc,ext_date,
+                                                          days=21,dir=RAW)       
+        print "Second attempt, across 21 days"
+        print "spin period:",spin_period
+        print "reset period:",reset_period
+        
+    if not spin_period or not reset_period:
+        '''
+        If in 21 days, no spin or reste period could be estimated, something
+        must have gone seriously wrong!
+        '''
+        raise Exception("Could not determine spin and reset period!")
     if not start_end_packets.empty:
         '''
         Start end end packets around ext mode have been found by the packet
@@ -293,7 +348,12 @@ def get_timing(sc,dump_date,combined_data,packet_info):
         vector_times = get_vector_times(sc,combined_data,first_diff_HF,
                                                initial_reset,initial_scet,
                                                final_first_diff_HF,
-                                               final_reset,final_scet)
+                                               final_reset,final_scet,
+                                               spin_period,reset_period)
+        '''
+        Record the SCET times and reset counts of the packets and later
+        infer the number of resets missing/extra from that!
+        '''
         if vector_times.shape[0] == 0:
             print "Failed to acquire timing from the packet info, using SCCH"
             use_scch_extra = True
@@ -326,18 +386,7 @@ def get_timing(sc,dump_date,combined_data,packet_info):
         Get an average spin time and reset time from packets 
         around the extended mode time
         '''
-        ext_date = start_scet_time.date()
-        spin_period,reset_period = estimate_spin_reset(sc,ext_date,
-                                                              days=5,dir=RAW)
-        print "spin period:",spin_period
-        print "reset period:",reset_period
-        if not spin_period or not reset_period:
-            spin_period,reset_period = estimate_spin_reset(sc,ext_date,
-                                                              days=21,dir=RAW)       
-        
-            print "Second attempt, across 21 days"
-            print "spin period:",spin_period
-            print "reset period:",reset_period
+
         commands = emt.ext_commands(sc,ext_date,dir=RAW)
         print "ext commanding, unfiltered"
         print commands
@@ -496,4 +545,4 @@ def get_timing(sc,dump_date,combined_data,packet_info):
     with open(picklefile,'wb') as f:
         pickle.dump(combined_data,f,protocol=2)
     '''
-    return spin_period,reset_period
+    return spin_period,reset_period,initial_reset,initial_scet,final_reset,final_scet

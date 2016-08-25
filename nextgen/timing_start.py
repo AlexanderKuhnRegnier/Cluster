@@ -1,8 +1,8 @@
-import pandas as pd
+#import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import RawData
-from datetime import datetime
+#import matplotlib.pyplot as plt
+#import RawData
+#from datetime import datetime
 from numba import jit
 import numba as nb
 from scipy.optimize import minimize
@@ -64,13 +64,14 @@ def extrapolate_timing(spin_period,reset_period,time,
                                               reset_counter)
     return spin_times,spin_resets,seen_spin_resets,reset_times,reset_counter
 
+''' no x-server for interactive plotting on server - could use static if needed
 def compare_real_to_sim(spin_period,reset_period,time,
                    first_diff_HF,initial_reset,combined_data,offset=2):
-    '''
-    Graphically compare the 'simulated' extrapolated series of resets,
-    computed from the given parameters, to the real_resets
-    (combined_data['reset']) that were read from the BS file.
-    '''                                              
+    
+    #Graphically compare the 'simulated' extrapolated series of resets,
+    #computed from the given parameters, to the real_resets
+    #(combined_data['reset']) that were read from the BS file.
+                                                 
     spins = extrapolate_timing(spin_period,reset_period,time,
                        first_diff_HF=first_diff_HF,initial_reset=initial_reset)
     plt.figure() 
@@ -113,6 +114,7 @@ def plotboth_advanced(a_times,a,b_times,b,title=''):
     plt.title(title)
     plt.legend()
     plt.show()
+'''
 
 def target_func(offset,spin_period,reset_period,real_resets,first_diff_HF,
                 initial_reset,time):

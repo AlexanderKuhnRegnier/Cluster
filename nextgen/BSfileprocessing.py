@@ -4,7 +4,8 @@ from datetime import datetime
 import os
 import RawData
 from frame_hex_format import hexify
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
+import argparse
 import timing
 import meta2_interface as meta2
 import calibration_writing
@@ -684,9 +685,24 @@ or could it introduce some errors, if there are missing packets or otherwise
 corrupted data?
 '''
 
-dump_date = datetime(2016,3,8)
-sc = 3
-ext = ExtData(sc,dump_date,'BS',dir=RAW)
+parser = argparse.ArgumentParser(description=('Process Extended Mode Data from '
+                                            'Burst Science Data Dump on Date'
+                                            ' specified'))
+parser.add_argument('-y', '--year',required=True,type=int,
+                    help='Year of Dump')
+parser.add_argument('-m', '--month',required=True,type=int,
+                    help='Month of Dump')
+parser.add_argument('-d', '--day',required=True,type=int,
+                    help='Day of Dump')
+parser.add_argument('-s', '--spacecraft',required=False,default=1,type=int,
+                    help='Spacecraft (1|2|3|4) [default:1]')
+parser.add_argument('-v', '--version',required=False,default='B',type=str,
+                    help='BS File Version, usually one of B,K or A [default:B]')
+args = parser.parse_args()
+
+dump_date = datetime(args.year,args.month,args.day)
+sc = args.spacecraft
+ext = ExtData(sc,dump_date,'BS',dir=RAW,version=args.version.upper())
 packet_info1 = ext.packet_info
 ext.read_data()
 
@@ -1080,7 +1096,7 @@ combined_data['vector']=combined_data.index.get_level_values('vector')
 combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
 print "combined data"
 print combined_data
-def data_processing(combined_data,plot=True,title=False,copy=True,log_mag=False):
+def data_processing(combined_data,plot=True,title=False,copy=True):
     '''
     Converting engineering units to nT
     Tim is still working on 'what' the scaling factors should be?
@@ -1104,14 +1120,13 @@ np.power(2,((np.ones(combined_data.shape[0],dtype=np.float64)*12)-(combined_data
 np.power(2,((np.ones(combined_data.shape[0],dtype=np.float64)*12)-(combined_data['range'].values)*2))
     
     combined_data['mag']=np.linalg.norm(combined_data[['x','y','z']],axis=1)
+    '''
     if title:
         combined_data.plot(y=['x','y','z','mag'],title=title)
     elif plot:
         combined_data.plot(y=['x','y','z','mag'])
-    if log_mag:
-        plt.figure()
-        plt.plot(range(len(combined_data)),combined_data['mag'],c='k')
-        plt.yscale('log')
+    '''
+
 #data_processing(combined_data,title='before')
 '''
 Now, need to look at timing!!
@@ -1277,6 +1292,8 @@ data_processing(combined_data,plot=False,copy=False)
 checking the number of vectors per (12 top bits) of reset counter, 
 in order to check for anomalies.
 '''
+
+'''##no x-server for interactive plotting on server (could use static?)
 sizes = combined_data.groupby('reset').size()
 plt.figure()
 plt.scatter(sizes.index.values,sizes.values,s=120)
@@ -1285,6 +1302,7 @@ plt.title('Number of vectors per (12 top bits) of reset counter\n'
 plt.xlabel('top 12 bits of reset counter')
 plt.ylabel('Number of vectors')
 plt.minorticks_on()
+'''
 
 '''
 import cPickle as pickle
@@ -1311,12 +1329,18 @@ result = timing.get_timing(sc,dump_date,combined_data,ext.packet_info)
 if result:
     spin_period = result[0]
     reset_period = result[1]
+    initial_reset = result[2]
+    initial_scet = result[3]
+    final_reset = result[4]
+    final_scet = result[5]
 else:
     print "Timing failed for some reason"
     raise Exception
 meta = meta2.meta2(sc,combined_data,dir=META)
 if not meta.write_interval():
     print "Interval already present, or a timing overlap!"
+    print "Not processing. Remove META file or investigate cause"
+    print meta.files
     raise Exception
 
 ###############################################################################
@@ -1328,4 +1352,4 @@ calibration_writing.write_data(sc,combined_data,OUT=PROC)
 '''
 If the above is successful, record this in the meta file!
 '''
-meta.write_meta(dump_date,spin_period,reset_period)
+meta.write_meta(dump_date,*result)

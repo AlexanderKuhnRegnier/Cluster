@@ -1,7 +1,7 @@
 from getcalfile import getcalfile
 import os
 import numpy as np
-from datetime import datetime
+#from datetime import datetime
 
 RAW = '/cluster/data/raw/'
 CAACAL='/cluster/caa/calibration/' #caa calibration files directory
