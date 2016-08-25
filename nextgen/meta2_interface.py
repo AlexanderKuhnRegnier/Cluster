@@ -1,12 +1,11 @@
 import pandas as pd
 import os
-from datetime import datetime
 import numpy as np
 
-META = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/META/'#home pc
-
+#META = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/META/'#home pc
+META = 'please supply directory manually'
 class meta2:
-    def __init__(self,sc,start_date,end_date,dir=META,version='B'):
+    def __init__(self,sc,combined_data,dir=META,version='B'):
         '''
         Create entries on two days if needed, since a fragmented packet
         might otherwise 'think' that no data was already there, and this would
@@ -15,34 +14,44 @@ class meta2:
         suffice. The code should be easy enough to extend for this case.
         '''
         self.sc = sc
-        self.ext_start = start_date
-        self.ext_end = end_date
+        self.nr_vectors = combined_data.shape[0]
+        self.start_reset = combined_data['reset'].min()
+        self.end_reset = combined_data['reset'].max()
+        self.ext_start = combined_data['time'].min()
+        self.ext_end = combined_data['time'].max()
         self.version = version
         self.columns = ['sc','start_date','end_date','version','dump_date',
-                        'nr_vectors','spin_period','reset_period']
-        if start_date.date() == end_date.date():
-            Year = str(start_date.date().year)
+                        'nr_vectors','start_reset','end_reset',
+                        'spin_period','reset_period']
+        if self.ext_start.date() == self.ext_end.date():
+            Year = str(self.ext_start.date().year)
             year = Year[2:]
-            month = format(start_date.date().month,'02d')
-            day = format(start_date.date().day,'02d')
+            month = format(self.ext_start.date().month,'02d')
+            day = format(self.ext_start.date().day,'02d')
             filename = 'C'+format(sc,'1d')+'_'+year+month+day+'_'+version+'.META2'
             filepath = dir+Year+'/'+month+'/'
             if not os.path.isdir(filepath):
                 os.makedirs(filepath)
             self.files = [filepath+filename]
         else:
-            Year = str(start_date.date().year)
+            '''
+            File for day 1
+            '''
+            Year = str(self.ext_start.date().year)
             year = Year[2:]
-            month = format(start_date.date().month,'02d')
-            day = format(start_date.date().day,'02d')
+            month = format(self.ext_start.date().month,'02d')
+            day = format(self.ext_start.date().day,'02d')
             filename1 = 'C'+format(sc,'1d')+'_'+year+month+day+'_'+version+'.META2'
             filepath1 = dir+Year+'/'+month+'/'
             if not os.path.isdir(filepath1):
                 os.makedirs(filepath1)
-            Year = str(end_date.date().year)
+            '''
+            File for day 2
+            '''
+            Year = str(self.ext_end.date().year)
             year = Year[2:]
-            month = format(start_date.date().month,'02d')
-            day = format(start_date.date().day,'02d')
+            month = format(self.ext_end.date().month,'02d')
+            day = format(self.ext_end.date().day,'02d')
             filename2 = 'C'+format(sc,'1d')+'_'+year+month+day+'_'+version+'.META2'
             filepath2 = dir+Year+'/'+month+'/'
             if not os.path.isdir(filepath2):
@@ -57,12 +66,12 @@ class meta2:
                 self.frames.append(pd.read_csv(file,parse_dates=[1,2,4]))
             else:
                 self.frames.append(pd.DataFrame(columns=self.columns))
-    def write(self,dump_date,nr_vectors,spin_period,reset_period,
-              start_reset,end_reset):  
+    def write(self,dump_date,spin_period,reset_period):  
         for index,file in enumerate(self.files):
             new_row = pd.DataFrame(np.array([self.sc,self.ext_start,self.ext_end,
-                                    self.version,dump_date,nr_vectors,
-                                    spin_period,reset_period]).reshape(-1,8),
+                                    self.version,dump_date,self.nr_vectors,
+                                    self.start_reset,self.end_reset,
+                                    spin_period,reset_period]).reshape(-1,10),
                                     columns = self.columns)
             self.frames[index] = pd.concat((self.frames[index],new_row),
                                             ignore_index=True)
@@ -74,7 +83,7 @@ class meta2:
         frames.drop_duplicates(inplace=True)
         return frames
     
-    def overwrite_interval(self,start,end,nr_vectors=0):
+    def write_interval(self,combined_data):
         '''
         check whether start and end date are within one of the intervals in the
         meta file!
@@ -88,7 +97,12 @@ class meta2:
             OR nr_vectors higher (at least 100 more) than already present
                 for a matching interval
         otherwise, return False
+        Still need to call write() in order to actually write a META2 file 
+        entry!
         '''
+        start = combined_data['time'].min()
+        end = combined_data['time'].max()
+        nr_vectors = combined_data.shape[0]
         info = self.read()
         start = (info['start_date'].apply(
                                     lambda x:x-pd.Timedelta(60**2,'s')))<start
@@ -96,14 +110,12 @@ class meta2:
                                     lambda x:x+pd.Timedelta(60**2,'s')))>end
         together = start & end
         info = info[together]
-        if nr_vectors != 0:
-            if np.any(info['nr_vectors']<nr_vectors-100):
-                more_vectors=True
-            else:
-                more_vectors=False
+        if np.any(info['nr_vectors']<nr_vectors-100):#np.any in case of 
+                                                #multiple entries - noted below
+            more_vectors=True
         else:
-            more_vectors=True #disable check - since it was not selected 
-                              #(0 was passed to nr_vectors)
+            more_vectors=False
+
         if np.sum(together):
             if np.sum(together)>1:
                 print ("WARNING, more than one interval found in one or more "
@@ -114,22 +126,3 @@ class meta2:
                 return False
         else:
             return True
-
-''' 
-sc=1
-start_date = datetime(2016,1,4)
-end_date = datetime(2016,1,5)
-
-dump_date = datetime(2016,1,6)
-nr_vectors = 1000
-spin_period = 4.26
-reset_period=5.1522208
-start_reset = 3000
-end_reset=4000
-
-meta = meta2(sc,start_date,end_date)
-meta.write(dump_date,nr_vectors,spin_period,reset_period,start_reset,end_reset)
-print "reading"
-print meta.read()
-print meta.overwrite_interval(start_date,end_date,nr_vectors=2000)
-'''
