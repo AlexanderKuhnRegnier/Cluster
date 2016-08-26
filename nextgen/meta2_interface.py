@@ -188,7 +188,7 @@ def read_meta_files(sc,start,end,version='BKA',dir=''):
                 results.append(pd.read_csv(file,parse_dates=date_columns))
                 
     metadata = pd.concat((results),axis=0)
-    metadata.drop_duplicates.drop_duplicates(subset=['sc','start_date','end_date','version',
+    metadata.drop_duplicates(subset=['sc','start_date','end_date','version',
                                        'dump_date','nr_vectors','start_reset',
                                        'end_reset'],
                                        inplace=True)
