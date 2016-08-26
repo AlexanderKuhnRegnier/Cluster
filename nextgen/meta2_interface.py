@@ -162,3 +162,34 @@ class meta2:
                 return False
         else:
             return True
+
+def read_meta_files(sc,start,end,version='BKA',dir=''):
+    columns = ['processing_time','sc','start_date','end_date',
+                            'version','dump_date',
+                            'nr_vectors','start_reset','end_reset',
+                            'spin_period','reset_period',
+                            'initial_reset','initial_scet',
+                            'final_reset','final_scet',
+                            'reset_diff','scet_diff',
+                            'extra_resets']    
+    date_columns = [0,2,3,5,12,14]
+    versions = [entry.upper() for entry in version]
+    results = []
+    for version in versions:
+        for date in pd.date_range(start=start,end=end,freq='D'):
+            Year = str(date.year)
+            year = Year[2:]
+            month = format(date.month,'02d')
+            day = format(date.day,'02d')        
+            filename = 'C'+format(sc,'1d')+'_'+year+month+day+'_'+version+'.META2'
+            filepath = dir+Year+'/'+month+'/'  
+            file = filepath+filename
+            if os.path.isfile(file):
+                results.append(pd.read_csv(file,parse_dates=date_columns))
+                
+    metadata = pd.concat((results),axis=0)
+    metadata.drop_duplicates.drop_duplicates(subset=['sc','start_date','end_date','version',
+                                       'dump_date','nr_vectors','start_reset',
+                                       'end_reset'],
+                                       inplace=True)
+    return metadata
