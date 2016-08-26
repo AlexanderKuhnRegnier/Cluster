@@ -15,20 +15,20 @@ DAILYCAL='/cluster/operations/calibration/daily/'#dailycalfile dir
 def display_calibration(offsetx,offsety,offsetz,gainx,gainy,gainz):
     dec_points = 4
     pad = 11
-    module_logger.info("Sensor: OB, ADC: 1"+
-    ("Range:    {1:{0:}}{2:{0:}}{3:{0:}}{4:{0:}}"+
-                    "{5:{0:}}{6:{0:}}".format(pad,*range(2,8)))+
-    ("Offset X: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"+
-        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsetx[0,:]))+
-    ("Offset Y: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"+
-        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsety[0,:]))+
-    ("Offset Z: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"+
-        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsetz[0,:])) +
-    ("Gain X  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"+
-        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainx[0,:]))+
-    ("Gain Y  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"+
-        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainy[0,:]))+
-    ("Gain Z  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"+
+    module_logger.info("Sensor: OB, ADC: 1"+'\n'+
+    ("Range:    {1:{0:}}{2:{0:}}{3:{0:}}{4:{0:}}"
+                    "{5:{0:}}{6:{0:}}".format(pad,*range(2,8)))+'\n'+
+    ("Offset X: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsetx[0,:]))+'\n'+
+    ("Offset Y: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsety[0,:]))+'\n'+
+    ("Offset Z: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsetz[0,:])) +'\n'+
+    ("Gain X  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainx[0,:]))+'\n'+
+    ("Gain Y  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainy[0,:]))+'\n'+
+    ("Gain Z  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
         "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainz[0,:])))
 def read_line(line):
     return [float(entry) for entry in line.split(' ') if not (entry == '' or entry.find('S')!=-1)]
@@ -173,7 +173,7 @@ def getcal(sc,start_date,calibration='CAA'):
             gainy[adc_sensor,r] = (n+m)/2
             gainz[adc_sensor,r] = (n+m)/2
             
-    module_logger.inf("Modified {0} calibration, used for data!".format(calibration.upper()))
+    module_logger.info("Modified {0} calibration, used for data!".format(calibration.upper()))
     display_calibration(offsetx,offsety,offsetz,gainx,gainy,gainz)
     return offsetx,offsety,offsetz,gainx,gainy,gainz
     

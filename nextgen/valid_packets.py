@@ -263,7 +263,7 @@ class start_end_packets:
                             (filtered_intervals['start_reset']<self.min_reset_shift+16)
                             & (filtered_intervals['end_reset']>self.max_reset_shift)]
         if filtered_intervals.shape[0]!=1:
-            module_logger.error("Should have found 1 interval!")
+            module_logger.error("Should have found 1 interval! (but expect to happen once or twice)")
             return None
         initial_reset = filtered_intervals['start_reset'].values[0]
         final_reset = filtered_intervals['end_reset'].values[0]
