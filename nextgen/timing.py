@@ -134,22 +134,22 @@ def get_vector_block_times(sc,combined_data,first_diff_HF,
     Estimate a new spin time from comparison to extrapolation - offset needs to
     be known before this!
     '''
-    module_logger.debug("\ninput into ts offset:"+
-                     "spin"+str(spin_period)+
-                     "reset"+str(reset_period)+
-                     "real reset shape"+str(real_resets.shape)+
-                     "first diff HF"+str(first_diff_HF)+
-                     "initial reset"+str(initial_reset)+
-                     "time"+str(time)+"nr. of spins:"+str(time/spin_period))
+    module_logger.debug("\ninput into ts offset:"+'\n'+
+                     "spin "+str(spin_period)+'\n'+
+                     "reset "+str(reset_period)+'\n'+
+                     "real reset shape "+str(real_resets.shape)+'\n'+
+                     "first diff HF "+str(first_diff_HF)+'\n'+
+                     "initial reset "+str(initial_reset)+'\n'+
+                     "time "+str(time)+" nr. of spins: "+str(time/spin_period))
     offset_start = ts.find_offset_initial(spin_period,reset_period,real_resets,
                                           first_diff_HF,initial_reset,time)
     module_logger.debug("\ninput into t end offset:"+
-                        "spin"+str(spin_period)+
-                        "reset"+str(reset_period)+
-                        "data shape"+str(real_resets.shape)+
-                        "final first diff HF"+str(final_first_diff_HF)+
-                        "final reset"+str(final_reset)+
-                        "time"+str(time)+"nr. of spins:"+str(time/spin_period))
+                        "spin "+str(spin_period)+'\n'+
+                        "reset "+str(reset_period)+'\n'+
+                        "data shape "+str(real_resets.shape)+'\n'+
+                        "final first diff HF "+str(final_first_diff_HF)+'\n'+
+                        "final reset "+str(final_reset)+'\n'+
+                        "time "+str(time)+" nr. of spins: "+str(time/spin_period))
     offset_end = te.find_offset_from_end(spin_period,reset_period,real_resets,
                                          final_first_diff_HF,final_reset,time)
     module_logger.debug("start offset:"+str(offset_start)+
