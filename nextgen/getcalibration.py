@@ -2,7 +2,8 @@ from getcalfile import getcalfile
 import os
 import numpy as np
 #from datetime import datetime
-
+import logging
+module_logger = logging.getLogger('ExtendedModeProcessing.'+__name__)
 RAW = '/cluster/data/raw/'
 CAACAL='/cluster/caa/calibration/' #caa calibration files directory
 DAILYCAL='/cluster/operations/calibration/daily/'#dailycalfile dir
@@ -14,21 +15,21 @@ DAILYCAL='/cluster/operations/calibration/daily/'#dailycalfile dir
 def display_calibration(offsetx,offsety,offsetz,gainx,gainy,gainz):
     dec_points = 4
     pad = 11
-    print "Sensor: OB, ADC: 1"
-    print ("Range:    {1:{0:}}{2:{0:}}{3:{0:}}{4:{0:}}"
-                    "{5:{0:}}{6:{0:}}".format(pad,*range(2,8)))
-    print ("Offset X: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
-        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsetx[0,:]))
-    print ("Offset Y: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
-        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsety[0,:]))
-    print ("Offset Z: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
-        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsetz[0,:])) 
-    print ("Gain X  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
-        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainx[0,:]))
-    print ("Gain Y  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
-        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainy[0,:]))
-    print ("Gain Z  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"
-        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainz[0,:]))
+    module_logger.info("Sensor: OB, ADC: 1"+
+    ("Range:    {1:{0:}}{2:{0:}}{3:{0:}}{4:{0:}}"+
+                    "{5:{0:}}{6:{0:}}".format(pad,*range(2,8)))+
+    ("Offset X: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"+
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsetx[0,:]))+
+    ("Offset Y: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"+
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsety[0,:]))+
+    ("Offset Z: {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"+
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*offsetz[0,:])) +
+    ("Gain X  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"+
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainx[0,:]))+
+    ("Gain Y  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"+
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainy[0,:]))+
+    ("Gain Z  : {2:{0:}.{1:}f}{3:{0:}.{1:}f}{4:{0:}.{1:}f}{5:{0:}.{1:}f}"+
+        "{6:{0:}.{1:}f}{7:{0:}.{1:}f}".format(pad,dec_points,*gainz[0,:])))
 def read_line(line):
     return [float(entry) for entry in line.split(' ') if not (entry == '' or entry.find('S')!=-1)]
 
@@ -83,9 +84,9 @@ def getcal(sc,start_date,calibration='CAA'):
     elif calibration.upper() == 'DAILY':
         calfile = getcalfile(sc,start_date,cal_dir=DAILYCAL)
     else:
-        print "Please select a valid calibration type! (caa|daily|default)"
+        module_logger.error("Please select a valid calibration type! (caa|daily|default)")
         return False
-    print "calfile found:",calfile
+    module_logger.info("calfile found:"+str(calfile))
     if os.path.isfile(calfile):
         if not os.stat(calfile).st_size:
             return False
@@ -158,8 +159,8 @@ def getcal(sc,start_date,calibration='CAA'):
     Calibration modification - ignore orthogonalities, average gains in 
     spin plane, set offset in spin plane to 0 - assume they cancel out.
     '''
-    print "RAW {0} calibration, as read from {1}".format(calibration.upper(),
-                                                            calfile)
+    module_logger.info("RAW {0} calibration, as read from {1}".format(calibration.upper(),
+                                                            calfile))
     display_calibration(offsetx,offsety,offsetz,gainx,gainy,gainz)
     for adc_sensor in range(0,4):
         for r in range(0,6): #corresponds to [2,3,4,5,6,7]
@@ -172,7 +173,7 @@ def getcal(sc,start_date,calibration='CAA'):
             gainy[adc_sensor,r] = (n+m)/2
             gainz[adc_sensor,r] = (n+m)/2
             
-    print "Modified {0} calibration, used for data!".format(calibration.upper())
+    module_logger.inf("Modified {0} calibration, used for data!".format(calibration.upper()))
     display_calibration(offsetx,offsety,offsetz,gainx,gainy,gainz)
     return offsetx,offsety,offsetz,gainx,gainy,gainz
     

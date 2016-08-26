@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -10,8 +11,8 @@ import timing
 import meta2_interface as meta2
 import calibration_writing
 
-pd.options.display.expand_frame_repr=False
-pd.options.display.max_rows=20
+#pd.options.display.expand_frame_repr=False
+pd.options.display.max_rows=30
 
 #RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
 #RAW = 'Z:/data/raw/' #cluster alsvid server
@@ -19,8 +20,6 @@ RAW = '/cluster/data/raw/'
 #pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
 #pickledir = 'Y:/testdata/'
 #META = 'Y:/meta2/'
-META = '/home/ahk114/meta2/'
-PROC = '/home/ahk114/testdata/'
 
 '''
 #Use this to suppress performance warn messages!
@@ -685,6 +684,9 @@ or could it introduce some errors, if there are missing packets or otherwise
 corrupted data?
 '''
 
+#META = '/home/ahk114/meta2/'
+#PROC = '/home/ahk114/testdata/'
+
 parser = argparse.ArgumentParser(description=('Process Extended Mode Data from '
                                             'Burst Science Data Dump on Date'
                                             ' specified'))
@@ -698,28 +700,71 @@ parser.add_argument('-s', '--spacecraft',required=False,default=1,type=int,
                     help='Spacecraft (1|2|3|4) [default:1]')
 parser.add_argument('-v', '--version',required=False,default='B',type=str,
                     help='BS File Version, usually one of B,K or A [default:B]')
+parser.add_argument('-e', '--debug',action="store_true",
+                    help='Enable debug logging level, shows maximum detail')   
+parser.add_argument('-i', '--meta',required=True,type=str,
+                    help='Directory for meta file storage')
+parser.add_argument('-o', '--out',required=True,type=str,
+                    help='Directory for final file output')    
+parser.add_argument('-l', '--log',required=True,type=str,
+                    help='Directory for log file - named after the dump date. '
+                            'Old log files will be appended to.')                      
 args = parser.parse_args()
+if args.meta[-1] != '/' or args.out[-1] != '/' or args.log[-1] != '/':
+    raise Exception("Need to have trailing forward slash on directories!")
 
+META = args.meta
+PROC = args.out
 dump_date = datetime(args.year,args.month,args.day)
 sc = args.spacecraft
+
+logger = logging.getLogger('ExtendedModeProcessing')
+
+#remove any previous handlers - isn't really necessary in most cases
+while len(logger.handlers) > 0:
+    logger.removeHandler(logger.handlers[0])
+    
+if args.debug:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
+
+# create file handler which logs even debug messages
+LOGFILE = args.log+'ExtMode_'+dump_date.strftime('%y%m%d')+'.log'
+fh = logging.FileHandler(LOGFILE)
+fh.setLevel(logging.DEBUG)
+# create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.ERROR)
+# create formatter and add it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(funcName)s - %(message)s')
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+# add the handlers to the logger
+logger.addHandler(fh)
+logger.addHandler(ch)
+
+logger.info('Creating ExtData instance')
 ext = ExtData(sc,dump_date,'BS',dir=RAW,version=args.version.upper())
 packet_info1 = ext.packet_info
+logger.info('Reading Extended Mode Data')
 ext.read_data()
+logger.info('Finished Reading Extended Mode Data')
 
-print "Before filtering (even),(odd)"
-print ext.even.shape,
-print ext.odd.shape
+logger.debug("Before filtering")
+logger.debug("even data shape"+str(ext.even.shape))
+logger.debug("odd data shape"+str(ext.odd.shape))
 even1 = ext.even.copy()
 odd1 = ext.odd.copy()
-print "joining half vecs"
+logger.info("joining half vectors")
 
 ext.join_half_vecs()
 
-print "joined"
-print ext.even.shape,
-print ext.odd.shape,
-print ext.evenodd.shape,
-print ext.oddeven.shape
+logger.info("joined half vectors")
+logger.debug("even data shape"+str(ext.even.shape))
+logger.debug("odd data shape"+str(ext.odd.shape))
+logger.debug("EvenOdd shape"+str(ext.evenodd.shape))
+logger.debug("OddEven shape"+str(ext.oddeven.shape))
 
 evenj = ext.even.copy()
 oddj = ext.odd.copy()
@@ -780,27 +825,27 @@ diff = df['reset'].diff()
 first element of diff will be NaN here
 then go through each row and 
 '''
-
+logger.info('creating EvenOdd and OddEven series')
 ext.two_series()
 evenodd1 = ext.evenodd.copy()
 oddeven1 = ext.oddeven.copy()
 
-print "two series"
-print ext.even.shape,
-print ext.odd.shape,
-print ext.evenodd.shape,
-print ext.oddeven.shape
+logger.info("created EvenOdd and OddEven series")
+logger.debug("even data shape"+str(ext.even.shape))
+logger.debug("odd data shape"+str(ext.odd.shape))
+logger.debug("EvenOdd shape"+str(ext.evenodd.shape))
+logger.debug("OddEven shape"+str(ext.oddeven.shape))
 
 ext.even = ext.filter_data(ext.even)
 ext.odd = ext.filter_data(ext.odd)
 ext.evenodd = ext.filter_data(ext.evenodd)
 ext.oddeven = ext.filter_data(ext.oddeven)
 
-print "After filtering"
-print ext.even.shape,
-print ext.odd.shape,
-print ext.evenodd.shape,
-print ext.oddeven.shape
+logger.info("finished filtering data")
+logger.debug("even data shape"+str(ext.even.shape))
+logger.debug("odd data shape"+str(ext.odd.shape))
+logger.debug("EvenOdd shape"+str(ext.evenodd.shape))
+logger.debug("OddEven shape"+str(ext.oddeven.shape))
 
 evenoddf = ext.evenodd.copy()
 oddevenf = ext.oddeven.copy()
@@ -811,6 +856,7 @@ packet_sizes_even.name = 'even'
 packet_sizes_odd = oddf.groupby(level=['packet']).size()
 packet_sizes_odd.name = 'odd'
 packet_sizesf = pd.concat((packet_sizes_even,packet_sizes_odd),axis=1)
+logger.debug("packet sizes after filtering\n"+str(packet_sizesf))
 packetinfo=ext.packet_info
 removed = ext.removed_packets
 removed_info = ext.removed_packets_info
@@ -828,9 +874,9 @@ hexify(odd_hex,columns=['reset'],inplace=True)
 ext.select_packets()
 new_packetsizes=ext.packet_sizes.copy()
 
-print "blocks"
-print ext.blocks
+logger.debug("blocks\n"+str(ext.blocks))
 
+logger.info("performing reset and vector contiguity analysis")
 vfilter_evenodd,vranges_evenodd = ext.vector_analysis(ext.evenodd)
 rfilter_evenodd,rranges_evenodd = ext.reset_analysis(ext.evenodd)
 vfilter_oddeven,vranges_oddeven = ext.vector_analysis(ext.oddeven)
@@ -891,6 +937,7 @@ Using sets is a very easy way of doing it, and is actually remarkably fast,
 considering that one has to create the full list of indices first, then
 take the intersection, and then sort the resulting set once again.
 '''
+logger.info("computing intersections")
 block_data = [[vranges_evenodd,rranges_evenodd,'evenodd'],
               [vranges_oddeven,rranges_oddeven,'oddeven']]
 intersections_dict = {'evenodd':[],'oddeven':[]}
@@ -939,8 +986,7 @@ level0 = intersections.index.get_level_values(0)
 level1 = range(1,intersections.shape[0]+1)
 intersections.index = pd.MultiIndex.from_arrays((level0,level1),
                                                 names=['order','block'])
-print "Sorted Intersections"
-print intersections
+logger.info("sorted intersections\n"+str(intersections))
 '''
 Having determined the intersections between the different analysis methods,
 the remaining overlaps have to be reduced to the elementary vectors, 
@@ -1012,11 +1058,13 @@ for (ordering,block,(start,end)) in zip(orderings,blocks,boundaries):
     data.index = multi
     dataframes.append(data)
 if not dataframes:
+    logger.error("did not find any data after intersection analysis!")
     raise Exception("No data found!")
     
 raw_combined_data = pd.concat((dataframes))
 raw_combined_data['block'] = raw_combined_data.index.get_level_values(
                                                                 'block')
+logger.info("data has been split into blocks based on contiguity analysis")                                                                
 '''
 Data which stems from incomplete half vector information that has not
 been filtered out before will have to be removed here. The only parts of
@@ -1066,6 +1114,7 @@ is not a big problem.
 The size of the blocks involved will determine which vectors are to be 
 kept when the number of vectors for one particular reset are identical.
 '''
+logger.info("eliminating duplicates")
 filtered = []
 for key,data in raw_combined_data.groupby('reset'):
     data_blocks = np.unique(data.index.get_level_values('block'))
@@ -1091,11 +1140,13 @@ for key,data in raw_combined_data.groupby('reset'):
 combined_data = pd.concat((filtered))  
 duplicated_indices = combined_data.index.duplicated()
 if np.sum(duplicated_indices):
+    logger.error("duplicated indices after dropping duplicates!")
     raise Exception("This should never happen after dropping duplicates!")
 combined_data['vector']=combined_data.index.get_level_values('vector')
 combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
-print "combined data"
-print combined_data
+logger.info("combined data frame has been created, vectors:"+str(combined_data.shape[0]))
+logger.debug("raw combined data\n"+str(combined_data))
+
 def data_processing(combined_data,plot=True,title=False,copy=True):
     '''
     Converting engineering units to nT
@@ -1103,6 +1154,7 @@ def data_processing(combined_data,plot=True,title=False,copy=True):
     Calibration still needs to be applied, this will be done at a later
     point in time before the data is fed into the dp software
     '''
+    logger.info("scaling data, calculating magnitudes")
     if copy:
         combined_data = combined_data.copy()
     combined_data['x'] = combined_data['x'].apply(
@@ -1269,6 +1321,7 @@ rely solely on the commanding.
 '''
 reset wrap around analysis and if needed, adjustment
 '''
+logger.info("determining if a reset counter rollover occurred")
 blockgroups = combined_data.groupby('block')
 mean_resets = blockgroups['reset'].mean()
 if max(mean_resets)>3000:
@@ -1283,6 +1336,7 @@ if max(mean_resets)>3000:
                                                                 'block').values
     increase_mask = np.in1d(combined_data.index.get_level_values(
                             'block').values,increase_blocks)
+    logger.info("number of vectors after overflow:"+str(np.sum(increase_mask)))
     combined_data.ix[increase_mask,'reset'] += 4096
     
 combined_data.sort_values(['reset','vector'],ascending=True,inplace=True)
@@ -1334,22 +1388,25 @@ if result:
     final_reset = result[4]
     final_scet = result[5]
 else:
-    print "Timing failed for some reason"
-    raise Exception
+    logger.error("timing failed for some reason!")
+    raise Exception("Fatal Timing Error")
 meta = meta2.meta2(sc,combined_data,dir=META)
 if not meta.write_interval():
-    print "Interval already present, or a timing overlap!"
-    print "Not processing. Remove META file or investigate cause"
-    print meta.files
-    raise Exception
+    logger.error("Interval already present, or a timing overlap!"
+                 " Not processing. Remove META file or investigate cause."
+                 " META2 files:"+str(meta.files))
+    raise Exception("Interval error")
 
 ###############################################################################
 '''
 Apply calibration, and write to file!
 '''
+logger.info("applying calibration and writing to file!")
 calibration_writing.write_data(sc,combined_data,OUT=PROC)
 ###############################################################################
 '''
 If the above is successful, record this in the meta file!
 '''
+logger.info("writing data statistics to meta file")
 meta.write_meta(dump_date,*result)
+logger.info("completed processing")

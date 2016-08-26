@@ -1,5 +1,6 @@
 import timing_end as te
 import timing_start as ts
+import logging
 import pandas as pd
 import numpy as np
 #import matplotlib.pyplot as plt
@@ -7,7 +8,7 @@ import RawData
 #from datetime import datetime
 import valid_packets
 import ext_mode_times as emt
-pd.options.display.expand_frame_repr=False
+#pd.options.display.expand_frame_repr=False
 pd.options.display.max_rows=20 
 
 #RAW = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
@@ -15,8 +16,10 @@ pd.options.display.max_rows=20
 RAW = '/cluster/data/raw/'
 #pickledir = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/'#home pc
 #pickledir = 'Y:/testdata/'
+module_logger = logging.getLogger('ExtendedModeProcessing.'+__name__)
 
 def estimate_spin_reset(sc,ext_date,days=5,dir=RAW):
+    module_logger.info('estimating spin and reset periods')
     if days%2==0:
         '''
         Even number, so we need to increase by one in order to get data
@@ -40,7 +43,9 @@ def estimate_spin_reset(sc,ext_date,days=5,dir=RAW):
     spin_period = np.mean(pd.Series(spin_periods).dropna())
     reset_period = np.mean(pd.Series(reset_periods).dropna())
     if not ((3<spin_period<5) & (4<reset_period<6)):
+        module_logger.error("unphysical spin and reset estimates, returning None")
         return None,None
+    module_logger.debug("determind spin and reset period:"+str(spin_period)+' '+str(reset_period))
     return spin_period,reset_period
     
 def get_vector_block_times(sc,combined_data,first_diff_HF,
@@ -103,9 +108,9 @@ def get_vector_block_times(sc,combined_data,first_diff_HF,
     if reset_diff<0:
         reset_diff+=2**16
         final_reset+=2**16
-    print "data shape:",combined_data.shape
+    module_logger.debug("input data shape:"+str(combined_data.shape))
     real_resets = combined_data['reset'].values #top 12 bits values from ext data!
-    print "real resets shape:",real_resets.shape
+    module_logger.debug("real resets shape:"+str(real_resets.shape))
     #ext_date = initial_scet.date()
     '''
     #this is now done before any of the methods is selected!
@@ -129,25 +134,26 @@ def get_vector_block_times(sc,combined_data,first_diff_HF,
     Estimate a new spin time from comparison to extrapolation - offset needs to
     be known before this!
     '''
-    print "input into ts offset:"
-    print "spin",spin_period
-    print "reset",reset_period
-    print "real reset shape",real_resets.shape
-    print "first diff HF", first_diff_HF
-    print "initial reset", initial_reset
-    print "time",time,"nr. of spins:",time/spin_period
+    module_logger.debug("\ninput into ts offset:"+
+                     "spin"+str(spin_period)+
+                     "reset"+str(reset_period)+
+                     "real reset shape"+str(real_resets.shape)+
+                     "first diff HF"+str(first_diff_HF)+
+                     "initial reset"+str(initial_reset)+
+                     "time"+str(time)+"nr. of spins:"+str(time/spin_period))
     offset_start = ts.find_offset_initial(spin_period,reset_period,real_resets,
                                           first_diff_HF,initial_reset,time)
-    print "input into t end offset:"
-    print "spin",spin_period
-    print "reset",reset_period
-    print "data shape",real_resets.shape
-    print "final first diff HF",final_first_diff_HF
-    print "final reset",final_reset
-    print "time",time,"nr. of spins:",time/spin_period
+    module_logger.debug("\ninput into t end offset:"+
+                        "spin"+str(spin_period)+
+                        "reset"+str(reset_period)+
+                        "data shape"+str(real_resets.shape)+
+                        "final first diff HF"+str(final_first_diff_HF)+
+                        "final reset"+str(final_reset)+
+                        "time"+str(time)+"nr. of spins:"+str(time/spin_period))
     offset_end = te.find_offset_from_end(spin_period,reset_period,real_resets,
                                          final_first_diff_HF,final_reset,time)
-    print "start offset:", offset_start," end offset:", offset_end     
+    module_logger.debug("start offset:"+str(offset_start)+
+                        " end offset:"+str(offset_end))
     '''
     #no longer recommended, since the spin estimate can be quite unreliabel
     # --too large in most cases, so that the data would overlap the 
@@ -173,10 +179,9 @@ def get_vector_block_times(sc,combined_data,first_diff_HF,
     first_spin = offset_start*spin_period-((first_diff_HF/4096.)+spin_period)
     last_spin = SCET_time_diff+(offset_end*spin_period)-(final_first_diff_HF/4096.)
     spin_estimates['mean'] = (last_spin-first_spin)/nr_spins
-    print "spin estimates"
-    print spin_estimates            
+    module_logger.info("\nspin estimates\n"+str(spin_estimates))           
     spin_estimate=spin_estimates['mean'].values[0]
-    print "spin estimate used:",spin_estimate
+    module_logger.info("spin estimate used:"+str(spin_estimate))
     spin_times = np.arange(0,combined_data.shape[0],1)*spin_estimate
     real_spin_times = pd.Series([initial_scet+pd.Timedelta(spin_time,'s') for spin_time in spin_times])
     real_spin_times+= pd.Timedelta( (spin_estimate-(first_diff_HF/4096.) + offset_start*spin_estimate) ,'s')
@@ -188,15 +193,21 @@ def get_vector_block_times(sc,combined_data,first_diff_HF,
         print "Something went wrong"
         return pd.Series()
     '''
-    print "start offset (spins):",offset_start
-    print "last spin time:",real_spin_times.iloc[-1]
-    print "end NS packet SCET:",final_scet
-    print "offset at end (spins):",offset_end
-    print "first spin time:",real_spin_times.iloc[0]
-    print "start NS packet SCET:",initial_scet
+    module_logger.debug("timing and offset info\n"+"start offset (spins):"+
+    str(offset_start)+"first spin time:"+str(real_spin_times.iloc[0])+
+    "start NS packet SCET:"+str(initial_scet)+
+    "offset at end (spins):"+str(offset_end)+
+    "last spin time:"+str(real_spin_times.iloc[-1])+
+    "end NS packet SCET:"+str(final_scet)+
+    "End time without spin adjustement:"+
+    str(initial_scet+pd.Timedelta( 
+    (((combined_data.shape[0]-1)*spin_estimates['orig'].values[0]) + 
+    (spin_estimate-(first_diff_HF/4096.) + offset_start*spin_estimate)) ,'s')))
+    
     if ((offset_start<0) or (real_spin_times.iloc[-1]>final_scet) or \
         (offset_end>0) or (real_spin_times.iloc[0]<initial_scet)):
-        print "Something has gone wrong, matching to scch is recommended."
+        module_logger.error("the timing usine offsets has failed to be "
+                            "overlap free, or there were unphysical offset!")
         return pd.Series()
     return real_spin_times
 
@@ -210,6 +221,7 @@ def get_vector_times(sc,combined_data,first_diff_HF,
     Those blocks will then be fed into the timin function separately,
     and the final result reconstituted from the different parts.
     '''
+    module_logger.info('called get_vector_times()')
     diff = combined_data.reset.diff()
     mask1 = diff==1
     mask2 = diff==0
@@ -224,21 +236,21 @@ def get_vector_times(sc,combined_data,first_diff_HF,
     #print "data shape:",combined_data.shape
     for block in blocks:
         input_data = combined_data[invalid['block']==block]
-        print "input data shape:",input_data.shape
-        print "for input block:",block
-        print "out of possible blocks:",blocks
+        module_logger.info("input data shape:"+str(input_data.shape)+
+             "\nfor input block:"+str(block)+
+              "\nout of possible blocks:"+str(blocks))
         block_times = get_vector_block_times(sc,input_data,first_diff_HF,
                                              initial_reset,initial_scet,
                                              final_first_diff_HF,
                                              final_reset,final_scet,
                                              spin_period,reset_period)
         if block_times.shape[0]==0:
-            print "Unexpected result"
+            module_logger.error("no block times found!")
             return pd.Series()
         times.append(block_times)
     vector_times = pd.concat(times)
     if vector_times.shape[0] != combined_data.shape[0]:
-        print "Vectors went missing along the way"
+        module_logger.error("vectors went missing along the way")
         return pd.Series()
     return vector_times
     
@@ -270,8 +282,8 @@ def get_timing(sc,dump_date,combined_data,packet_info):
     
     print "Read data from pickles!"
     '''
-    print "sc:",sc
-    print "dump date:",dump_date
+    module_logger.info("getting timing for sc:"+str(sc)+
+                        " ,dump date:"+str(dump_date))
     
     #combined_data = pd.concat((combined_data.iloc[5000:8000],combined_data.iloc[9000:10000],combined_data.iloc[11000:14000]))
     #combined_data = combined_data.iloc[5000:8000]
@@ -285,8 +297,8 @@ def get_timing(sc,dump_date,combined_data,packet_info):
     '''
     first_packet_used = combined_data.index.get_level_values('packet')[0]
     start_scet_time = packet_info.loc[first_packet_used]['SCET']
-    print first_packet_used
-    print start_scet_time
+    module_logger.debug('first packet used:'+str(first_packet_used))
+    module_logger.debug('start scet time:'+str(start_scet_time))
     '''
     Ext mode must have happened sometime before 'start_scet_time'
     But whether it is the first extended mode, or the second, or third that came
@@ -307,35 +319,36 @@ def get_timing(sc,dump_date,combined_data,packet_info):
     start_end_packets = valid.find_valid(max_days=8)
     use_scch = False
     use_scch_extra = False
-    print min_reset
-    print max_reset
-    print start_end_packets.shape
-    
-    print "Estimating spin and reset period!"
+    module_logger.debug("min,max data reset:"+str(min_reset)+','+str(max_reset))
+    module_logger.debug("star_end packets at borders, shape:"+
+                        str(start_end_packets.shape))
     
     ext_date = start_scet_time.date()
     spin_period,reset_period = estimate_spin_reset(sc,ext_date,
                                                           days=5,dir=RAW)
-    print "spin period:",spin_period
-    print "reset period:",reset_period
+    module_logger.debug("spin period:"+str(spin_period)+" reset period:"+
+                            str(reset_period))
     if not spin_period or not reset_period:
         spin_period,reset_period = estimate_spin_reset(sc,ext_date,
                                                           days=21,dir=RAW)       
-        print "Second attempt, across 21 days"
-        print "spin period:",spin_period
-        print "reset period:",reset_period
+        module_logger.error("second attempt at estimating spin and "
+        "reset periods, across 21 days. "+"spin period:"+str(spin_period)+
+        "reset period:"+str(reset_period))
         
     if not spin_period or not reset_period:
         '''
         If in 21 days, no spin or reste period could be estimated, something
         must have gone seriously wrong!
         '''
+        module_logger.error("could not determine spin and reset period!")
         raise Exception("Could not determine spin and reset period!")
     if not start_end_packets.empty:
         '''
-        Start end end packets around ext mode have been found by the packet
+        Start and end packets around ext mode have been found by the packet
         matching method!!
         '''
+        module_logger.info("start and end packets around ext mode have been " 
+                            "found by the packet matching method")
         start_end_packets = start_end_packets.sort_values('SCET',ascending=True)
         first_diff_HF = start_end_packets.iloc[0]['Packet Start HF'] - \
                         start_end_packets.iloc[0]['Most Recent Sun Pulse']
@@ -355,13 +368,14 @@ def get_timing(sc,dump_date,combined_data,packet_info):
         infer the number of resets missing/extra from that!
         '''
         if vector_times.shape[0] == 0:
-            print "Failed to acquire timing from the packet info, using SCCH"
+            module_logger.critical("failed to acquire timing from the packet info, using SCCH")
             use_scch_extra = True
             use_scch = True
         else:
             '''
             We are good to go, just insert the times into the data!
             '''
+            module_logger.info("successfully acquired timing")
             combined_data['time'] = vector_times.values
     
     else:
@@ -376,7 +390,7 @@ def get_timing(sc,dump_date,combined_data,packet_info):
         improvements, especially if the data happens to be segmented for some
         reason.
         '''
-        print "Using SCCH"
+        module_logger.error("using SCCH to get timing")
         '''
         Either the timing_adjustment or the
         Packet Matching has failed! So we are reduced to using the command history
@@ -388,10 +402,9 @@ def get_timing(sc,dump_date,combined_data,packet_info):
         '''
 
         commands = emt.ext_commands(sc,ext_date,dir=RAW)
-        print "ext commanding, unfiltered"
-        print commands
+        module_logger.debug("\next commanding, unfiltered\n"+str(commands))
         if commands.empty:
-            print "No commanding found, impossible to determine time now!"
+            module_logger.error("no commanding found, impossible to determine time now!")
             raise Exception
         commands = commands[commands['Start']<start_scet_time]
         commands.sort_values('Start',ascending=False,inplace=True)
@@ -399,14 +412,13 @@ def get_timing(sc,dump_date,combined_data,packet_info):
         Having sorted it like this, the first row contains the data pertaining
         to the most recent ext mode commands BEFORE the dump date
         '''
-        print "ext commanding"
-        print commands
+        module_logger.debug("\next commanding (using top)\n"+str(commands))
         ext_start = commands.iloc[0]['Start']
         ext_end = commands.iloc[0]['End']
         ext_duration = commands.iloc[0]['Duration (s)']
-        print "ext duration:",ext_duration
+        module_logger.debug("ext duration from SCCH:"+str(ext_duration))
         expected_duration = combined_data.shape[0]*spin_period
-        print "exptected duration:",expected_duration
+        module_logger.debug("exptected duration from spin_period:"+str(expected_duration))
         '''
         Now, from the ext_start time, as well as the spin_period, the times can
         be approximated
@@ -425,7 +437,7 @@ def get_timing(sc,dump_date,combined_data,packet_info):
         block_keys = []
         if blocks.shape[0]>1:      
             if blocks.shape[0]>4:
-                print "Giving up, too many blocks!"
+                module_logger.error("Giving up, too many blocks!")
                 raise Exception
             groups = combined_data.groupby('block')
             start_resets = []
@@ -450,14 +462,15 @@ def get_timing(sc,dump_date,combined_data,packet_info):
             vector_number_time = combined_data.shape[0]*spin_period
             time_diff = ext_duration-vector_number_time
             if time_diff<0:
-                print ("vectors in data * spin period should not be greater than the"
+                module_logger.error("vectors in data * spin period should not be greater than the"
                             " scch time period, especially for segmented data!")
                 raise Exception
             if not use_scch_extra:
                 total_reset_diffs = np.sum(reset_diffs)
                 time_diff_per_reset = time_diff/total_reset_diffs
                 resets_diff_per_reset = time_diff_per_reset/reset_period
-                print "resets per 16 resets needed:",resets_diff_per_reset
+                module_logger.info("stretching to make data fit, "+
+                "resets per 16 resets needed:"+str(resets_diff_per_reset))
                 '''
                 The value printed out above will be much higher than the value
                 you would get by using the method below!
@@ -479,22 +492,25 @@ def get_timing(sc,dump_date,combined_data,packet_info):
                 distribute the 'padding' needed to conform to the expected time
                 (from the SCCH) amongst those differences.
                 '''
-                print "Using scch extra"
+                module_logger.info("using scch with packet info at start/end")
                 initial_reset_ext = initial_reset>>4
                 final_reset_ext = final_reset>>4
                 start_reset_diff = combined_data.reset.min()-initial_reset_ext
                 end_reset_diff = final_reset_ext-combined_data.reset.max()
                 total_reset_diffs = np.sum(reset_diffs)+start_reset_diff+end_reset_diff
-                print "reset diff (naive total, start diff, end diff)",np.sum(reset_diffs),start_reset_diff,end_reset_diff
+                module_logger.debug("reset diff (naive total, start diff, end diff)"+
+                    str(np.sum(reset_diffs))+str(start_reset_diff)+str(end_reset_diff))
                 time_diff_per_reset = time_diff/total_reset_diffs
                 resets_diff_per_reset = time_diff_per_reset/reset_period
-                print "resets per 16 resets needed:",resets_diff_per_reset
+                module_logger.info("stretching to make data fit, "+
+                "resets per 16 resets needed:"+str(resets_diff_per_reset))
                 if resets_diff_per_reset > 17: #allow for it to be slightly over
-                    print ("Should not need to fill more than 16 reset period per"
+                    module_logger.critical("Should not need to fill more than 16 reset period per"
                           " 16 (max) reset difference")
-                    print "DEFAULTING BACK to standard scch procedure"  
-                    start_reset_diff=0
-                    time_diff_per_reset = time_diff/np.sum(reset_diffs)
+                    #to default back to standard scch
+                    #start_reset_diff=0
+                    #time_diff_per_reset = time_diff/np.sum(reset_diffs)
+                    raise Exception
             if blocks.shape[0]==2:
                 time1 = pd.Series([ext_start+pd.Timedelta(raw_time,'s') for raw_time in (np.arange(0,combined_data[combined_data['block']==block_keys[0]].shape[0],1)*spin_period)])+pd.Timedelta(start_reset_diff*time_diff_per_reset,'s')
                 time2 = pd.Series([time1.iloc[-1]+pd.Timedelta(raw_time,'s') for raw_time in (np.arange(0,combined_data[combined_data['block']==block_keys[1]].shape[0],1)*spin_period)])+pd.Timedelta(time_diff,'s')
@@ -516,15 +532,17 @@ def get_timing(sc,dump_date,combined_data,packet_info):
         else:
             pad = 0
             if expected_duration > ext_duration:
-                print "expected, ext duration",expected_duration,ext_duration
+                module_logger.error("expected duration from spin is larger than "
+                "duration from scch\n expected:"+str(expected_duration)+
+                "\nfrom scch:"+str(ext_duration))
                 '''
                 Data would overlap, so try to adjust the spin period a little,
                 but only up to 1.5 % of the original estimate!
                 '''
                 adjusted_spin = ext_duration / combined_data.shape[0]
-                print "adjusted spin",adjusted_spin
+                module_logger.error("adjusted spin"+str(adjusted_spin))
                 if abs(adjusted_spin-spin_period)>0.015*spin_period:
-                    print "Overlap is unavoidable here for some reason, Error!"
+                    module_logger.critical("Overlap is unavoidable here for some reason!")
                     raise Exception
                 else:
                     spin_period = adjusted_spin 
@@ -534,7 +552,8 @@ def get_timing(sc,dump_date,combined_data,packet_info):
                 '''
                 time_diff = ext_duration - expected_duration
                 pad = time_diff/2.
-                print "padding at start (and end):",pad
+                module_logger.info("need to add padding, since data is too short, "
+                                    "padding at start (and end):"+str(pad))
             raw_times = (np.arange(0,combined_data.shape[0],1)*spin_period)+pad
             real_spin_times = pd.Series([ext_start+pd.Timedelta(spin_time,'s') for spin_time in raw_times])
             combined_data['time'] = real_spin_times.values

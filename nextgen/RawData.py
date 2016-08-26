@@ -1,6 +1,8 @@
 import pandas as pd
 from datetime import datetime, timedelta
 from collections import OrderedDict as orddict
+import logging
+module_logger = logging.getLogger('ExtendedModeProcessing.'+__name__)
 class RawDataHeader:
     #packet header ID
     HF_freq = 4096.
@@ -24,13 +26,17 @@ class RawDataHeader:
         version = version.upper()
         mode = mode.lower()
         if version not in ['A','B','K']:
+            module_logger.error("Version must be one of 'A','B' or 'K'")
             raise Exception("Version must be one of 'A','B' or 'K'")
         if mode not in RawDataHeader.mode_dict.keys():
+            module_logger.error("Please select either 'NS' or 'BS'")
             raise Exception("Please select either 'NS' or 'BS'")
         if sc not in [1,2,3,4]:
+            module_logger.error("Select a valid spacecraft (1,2,3,4)")
             raise Exception("Select a valid spacecraft (1,2,3,4)")
         Year,year,month,day = map(int,dt.strftime("%Y,%y,%m,%d").split(','))
         if Year<2000:
+            module_logger.error("Need to select a year after (or on) 2000")
             raise Exception("Need to select a year after (or on) 2000")
         directory = dir+'{0:4d}/{1:02d}/'.format(Year,month)
         file = 'C{0:1d}_{1:02d}{2:02d}{3:02d}_{4:s}.{5:s}'.format(
@@ -69,10 +75,10 @@ class RawDataHeader:
             with open(filepath,'rb') as f:
                 self.data = f.read()
         except IOError:
-            print "Could not open file:"+filepath
+            module_logger.error("Could not open file:"+filepath)
             #raise Exception
         if not self.data:
-            print "Could not read file:"+filepath
+            module_logger.error("Could not read file:"+filepath)
             #raise Exception("Could not read file:"+filepath)
         else:
             self.__read_headers()

@@ -1,6 +1,8 @@
 import RawData
 import pandas as pd
 import numpy as np
+import logging
+module_logger = logging.getLogger('ExtendedModeProcessing.'+__name__)
 #from datetime import datetime
 from collections import OrderedDict as od
 '''
@@ -141,7 +143,7 @@ class start_end_packets:
         be avoided.
         '''
         if self.packets.empty:
-            print "Need to call read_packet_info first!"
+            module_logger.error("No packets read, need to call read_packet_info first!")
             return None
         '''
         Filtering out entries based on the criteria above
@@ -231,7 +233,7 @@ class start_end_packets:
         #print "intervals scet times"
         #print intervals
         if intervals.empty:
-            print "Found no intervals"
+            module_logger.error("Found no intervals")
             return None
         #print intervals['end_scet'],intervals['start_scet']
         scet_diff = (intervals['end_scet']-  \
@@ -261,7 +263,7 @@ class start_end_packets:
                             (filtered_intervals['start_reset']<self.min_reset_shift+16)
                             & (filtered_intervals['end_reset']>self.max_reset_shift)]
         if filtered_intervals.shape[0]!=1:
-            print "Should have found 1 interval!"
+            module_logger.error("Should have found 1 interval!")
             return None
         initial_reset = filtered_intervals['start_reset'].values[0]
         final_reset = filtered_intervals['end_reset'].values[0]
@@ -302,7 +304,7 @@ class start_end_packets:
         frame is populated!
         '''
         if self.packets.empty:
-            print "Need to populate packet info first!"
+            module_logger.error("Need to populate packet info first!")
             return None
         target_min = self.min_reset_shift+16
         target_max = self.max_reset_shift+0
@@ -353,6 +355,7 @@ class start_end_packets:
         if type(valid) == pd.DataFrame:
             return valid 
         return pd.DataFrame()
+
         
 '''
 packets = start_end_packets(2,datetime(2016,1,6),3277,4041)

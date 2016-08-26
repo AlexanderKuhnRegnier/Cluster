@@ -1,6 +1,7 @@
 import os
 import pandas as pd
-
+import logging
+module_logger = logging.getLogger('ExtendedModeProcessing.'+__name__)
 RAW = '/cluster/data/raw/'
 CAACAL='/cluster/caa/calibration/' #caa calibration files directory
 DAILYCAL='/cluster/operations/calibration/daily/'#dailycalfile dir
@@ -32,14 +33,15 @@ def getcalfile(sc,start_date,cal_dir):
                 if os.stat(steffile).st_size:
                     break
             else:
-                print "getcalfile, empty or missing stef file version ",date,version,steffile
+                module_logger.debug("getcalfile, empty or missing stef file version "+
+                                        str(date)+' '+str(version)+' '+str(steffile))
         #print "trying to use:",steffile
         line = find_entry(steffile)
         #print "line:",line
         if line:
             break
         else:
-            print "Trying to find START REVOLUTION entry in STEF file for previous day!"
+            module_logger.debug("Trying to find START REVOLUTION entry in STEF file for previous day!")
     Year = line[27:31]
     month =line[32:34]
     day  = line[35:37]

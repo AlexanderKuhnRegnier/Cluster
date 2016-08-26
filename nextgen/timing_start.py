@@ -6,6 +6,8 @@ import numpy as np
 from numba import jit
 import numba as nb
 from scipy.optimize import minimize
+import logging
+module_logger = logging.getLogger('ExtendedModeProcessing.'+__name__)
 
 @jit(nopython=True)
 def numba_func(spin_times,reset_times,reset_counter):
@@ -217,9 +219,10 @@ def find_offset_initial(spin_period,reset_period,real_resets,first_diff_HF,
             min_offset = int(round(np.mean(min_offset)))
             step *= 2
         else:
-            print "Min of results:",np.min(results)
-            print "Min indices:",minimum_index
-            print "Min offsets:",min_offset
+            module_logger.error("too many minimum offset found!"
+                            +"Min of results:"+str(np.min(results))
+                            +"Min indices:"+str(minimum_index)
+                            +"Min offsets:"+str(min_offset))
             raise Exception("There should only be at most 2 minimum offsets!")
     offsets = np.arange(-step,step+1,1)+min_offset
     results = []
@@ -237,11 +240,11 @@ def find_offset_initial(spin_period,reset_period,real_resets,first_diff_HF,
     '''
     ###########################################################################
     if min_offset.shape[0]==2:
-        print ("2 values at the same overlap, offset "
+        module_logger.error("2 values at the same overlap, offset "
                                     "UNCERTAINTY is thus +- 1!"
                                     " Could be reduced by redoing after spin"
                                     " correction?")
-        print "Using lower of the two found offsets!!"
+        module_logger.error("Using lower of the two found offsets!!")
     assert min_offset.shape[0] < 3,"should only have 1 result (but 2 in rare cases)!"
     return min_offset[0]
  

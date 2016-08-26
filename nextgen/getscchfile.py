@@ -1,5 +1,7 @@
 import os
 import datetime
+import logging
+module_logger = logging.getLogger('ExtendedModeProcessing.'+__name__)
 
 def get_scch_file(sc,dt,dir):
     Year=str(dt.year)
@@ -35,7 +37,7 @@ def getscchfiles(sc,start_date=0,end_date=0,dir='Z:/data/raw/'):
         if file:
             file_list.append(file)
         else: #log this/exception?
-            print "No commanding found for:",date
+            module_logger.error("No commanding found for:"+str(date))
     return file_list
             
 '''         

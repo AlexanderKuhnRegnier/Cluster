@@ -2,7 +2,8 @@ import pandas as pd
 import os
 import numpy as np
 from datetime import datetime
-
+import logging
+module_logger = logging.getLogger('ExtendedModeProcessing.'+__name__)
 #META = 'C:/Users/ahfku/Documents/Magnetometer/clusterdata/META/'#home pc
 META = 'please supply directory manually'
 class meta2:
@@ -89,7 +90,7 @@ class meta2:
             reset_diff = None
             scet_diff = None
             extra_resets = None
-            print "No reset or SCET info from border packets!"
+            module_logger.error("No reset or SCET info from border packets!")
         for index,file in enumerate(self.files):
             new_row = pd.DataFrame(np.array([datetime.now(),self.sc,
                                     self.ext_start,self.ext_end,
@@ -153,7 +154,7 @@ class meta2:
 
         if np.sum(together):
             if np.sum(together)>1:
-                print ("WARNING, more than one interval found in one or more "
+                module_logger.error("WARNING, more than one interval found in one or more "+
                         "META files:"+','.join(self.files))
             if more_vectors:
                 return True

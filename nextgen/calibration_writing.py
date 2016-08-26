@@ -5,6 +5,8 @@ import pandas as pd
 #from datetime import datetime
 import getcalibration
 import tempfile
+import logging
+module_logger = logging.getLogger('ExtendedModeProcessing.'+__name__)
 
 def float2hex(f):
     if f==0:
@@ -43,6 +45,7 @@ def satt_stof_proc(sc,date,versions=['B','K','A'],RAW=RAW,PROC=''):
     stoffile=RAW+'2016/01/'+'C'+'1'+'_'+'160122'+'_'+'B'+'.STOF'
     procfile=PROC+'2016/01/'+'C'+'1'+'_'+'160122'+'_'+'B'+'.EXT.GSE' #Where the data goes - into the reference folder!
     '''
+    module_logger.debug('creating satt,stof and proc files')
     for version in versions:
         sattfile=RAW+date.strftime('%Y/%m/')+'C'+format(sc,'1d')+'_'+ \
                     date.strftime('%y%m%d')+'_'+version.upper()+'.SATT'
@@ -54,18 +57,24 @@ def satt_stof_proc(sc,date,versions=['B','K','A'],RAW=RAW,PROC=''):
     procfile=PROC+date.strftime('%Y/%m/')+'C'+format(sc,'1d')+'_'+ \
                 date.strftime('%y%m%d')+'_'+version.upper()+'.EXT.GSE'
     if not os.path.isdir(PROC+date.strftime('%Y/%m/')):
+        module_logger.debug('creating output directory')
         os.makedirs(PROC+date.strftime('%Y/%m/'))
     if os.path.isfile(stoffile) and os.path.isfile(sattfile) and \
     os.path.isdir(PROC+date.strftime('%Y/%m/')):
+        module_logger.debug('satt,stof and proc files found:'
+        +sattfile+'\n'+stoffile+'\n'+procfile)
         return sattfile,stoffile,procfile
     else:
+        module_logger.debug('satt,stof or proc file directories do not exist')
         return False,False,False
 
 def write_data(sc,ext_data,OUT=''): 
     k2   = np.pi / 4
     initial_date = ext_data['time'].iloc[0].date()
+    module_logger.debug('getting calibration')
     offsetx,offsety,offsetz,gainx,gainy,gainz = \
                     getcalibration.getcal(sc,initial_date,calibration='CAA')
+    module_logger.debug('got calibration')
     '''
     for the calibration the IB sensor and ADC 0 info will be read by default
     '''
@@ -103,19 +112,13 @@ def write_data(sc,ext_data,OUT=''):
             We are into the next day. so break open a new file!
             Also process what we had from the first day.
             '''
-            print "Gone over midnight, resetting initial date"
+            module_logger.info("Gone over midnight, resetting initial date")
             initial_date = row['time'].date()
-            print "Writing to:",procfile
-            print sattfile
-            print stoffile
-            #print tmp2
-            #print tmp
-            #print tmp3
-            print procfile
-            '''
-            if os.path.isfile(tmp3):
-                os.remove(tmp3)
-            '''
+            module_logger.info("Writing to:"+str(procfile))
+            module_logger.debug(sattfile)
+            module_logger.debug(stoffile)
+            module_logger.debug(procfile)
+
             cmd = ('/cluster/operations/software/dp/bin/putstof '+stoffile+' -o '+tmp3.name)
             os.system(cmd)
             cmd = ('FGMPATH=/cluster/operations/calibration/default ; '
@@ -134,20 +137,16 @@ def write_data(sc,ext_data,OUT=''):
             tmp3 = tempfile.NamedTemporaryFile(prefix='TempSTOF_')
             sattfile,stoffile,procfile = satt_stof_proc(sc,row['time'].date(),
                                                         PROC=OUT)
+            module_logger.debug('getting calibration')
             offsetx,offsety,offsetz,gainx,gainy,gainz = \
-                getcalibration.getcal(sc,row['time'].date(),calibration='CAA')                                                        
-    		
-    print "Writing to:",procfile
-    print sattfile
-    print stoffile
-    #print tmp2
-    #print tmp
-    #print tmp3
-    print procfile
-    '''
-    if os.path.isfile(tmp3):
-        os.remove(tmp3)
-    '''
+                getcalibration.getcal(sc,row['time'].date(),calibration='CAA')  
+            module_logger.debug('got calibration')                                                        
+      
+    module_logger.info("Writing to:"+str(procfile))
+    module_logger.debug(sattfile)
+    module_logger.debug(stoffile)
+    module_logger.debug(procfile)
+
     cmd = ('/cluster/operations/software/dp/bin/putstof '+stoffile+' -o '+tmp3.name)
     os.system(cmd)
     cmd = ('FGMPATH=/cluster/operations/calibration/default ; '
